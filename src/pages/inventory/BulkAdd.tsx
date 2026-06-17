@@ -405,49 +405,73 @@ export function BulkAddPage() {
   }
 
   // Cycle Spare → Consumable → Supply → Tool → Spare
-  function toggleType(i: number) {
+  function setType(i: number, newType: 'Spare' | 'Consumable' | 'Supply' | 'Tool') {
     setDrafts(prev => prev.map((d, idx) => {
       if (idx !== i) return d
-      if (d.type === 'Spare') {
+      if (d.type === newType) return d
+      // Pull common fields off whatever the current draft is
+      const name =
+        d.type === 'Spare' ? (d.Description || d['Part Number']) :
+        d.type === 'Tool' ? d.Name :
+        (d as any).Item || ''
+      const brand =
+        d.type === 'Spare' ? d.Manufacturer :
+        d.type === 'Tool' ? d.Brand :
+        d.type === 'Supply' ? d.Brand :
+        ''
+      const category = (d as any).Category || ''
+      const qty = (d as any).Qty || ''
+      const unit = (d as any).Unit || ''
+      const notes = d.Notes
+      const location = d.Location
+      const subLocation = d['Sub-Location']
+      const photoUrl = d['Photo URL']
+
+      if (newType === 'Spare') {
+        const next = emptySpare()
+        next.Description = name
+        next.Manufacturer = brand
+        next.Qty = qty
+        next.Notes = notes
+        next.Location = location || 'Engine Room'
+        next['Sub-Location'] = subLocation
+        next['Photo URL'] = photoUrl
+        return next
+      }
+      if (newType === 'Consumable') {
         const next = emptyConsumable()
-        next.Item = d.Description || d['Part Number']
-        next.Qty = d.Qty
-        next.Notes = d.Notes
-        next.Location = d.Location || 'Interior'
-        next['Sub-Location'] = d['Sub-Location']
-        next['Photo URL'] = d['Photo URL']
+        next.Item = name
+        next.Category = category
+        next.Qty = qty
+        next.Unit = unit
+        next.Notes = notes
+        next.Location = location || 'Interior'
+        next['Sub-Location'] = subLocation
+        next['Photo URL'] = photoUrl
         return next
       }
-      if (d.type === 'Consumable') {
+      if (newType === 'Supply') {
         const next = emptySupply()
-        next.Item = d.Item
-        next.Category = d.Category
-        next.Qty = d.Qty
-        next.Unit = d.Unit
-        next.Notes = d.Notes
-        next.Location = d.Location || 'Exterior'
-        next['Sub-Location'] = d['Sub-Location']
-        next['Photo URL'] = d['Photo URL']
+        next.Item = name
+        next.Category = category
+        next.Brand = brand
+        next.Qty = qty
+        next.Unit = unit
+        next.Notes = notes
+        next.Location = location || 'Exterior'
+        next['Sub-Location'] = subLocation
+        next['Photo URL'] = photoUrl
         return next
       }
-      if (d.type === 'Supply') {
-        const next = emptyTool()
-        next.Name = d.Item
-        next.Brand = d.Brand
-        next.Notes = d.Notes
-        next.Location = d.Location || 'Engine Room'
-        next['Sub-Location'] = d['Sub-Location']
-        next['Photo URL'] = d['Photo URL']
-        return next
-      }
-      // Tool → Spare
-      const next = emptySpare()
-      next.Description = d.Name
-      next.Manufacturer = d.Brand
-      next.Notes = d.Notes
-      next.Location = d.Location || 'Engine Room'
-      next['Sub-Location'] = d['Sub-Location']
-      next['Photo URL'] = d['Photo URL']
+      // Tool
+      const next = emptyTool()
+      next.Name = name
+      next.Brand = brand
+      next.Category = category
+      next.Notes = notes
+      next.Location = location || 'Engine Room'
+      next['Sub-Location'] = subLocation
+      next['Photo URL'] = photoUrl
       return next
     }))
   }
@@ -664,13 +688,21 @@ export function BulkAddPage() {
             return (
               <div key={i} className="p-3 rounded-xl border border-border bg-card space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => toggleType(i)}
-                    className={`px-2 h-7 rounded-md text-xs font-medium border ${typeBtnCls}`}
-                    title="Tap to cycle through Spare / Consumable / Supply / Tool"
-                  >
-                    {typeLabel}
-                  </button>
+                  <div className={`relative inline-flex items-center px-2 h-7 rounded-md text-xs font-medium border ${typeBtnCls}`}>
+                    <span className="pointer-events-none pr-4">{typeLabel}</span>
+                    <span className="pointer-events-none absolute right-1.5 text-[10px] opacity-80">▾</span>
+                    <select
+                      value={d.type}
+                      onChange={e => setType(i, e.target.value as any)}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      title="Change type"
+                    >
+                      <option value="Spare">🔧 Spare</option>
+                      <option value="Consumable">📦 Consumable</option>
+                      <option value="Supply">🧰 Supply</option>
+                      <option value="Tool">🛠️ Tool</option>
+                    </select>
+                  </div>
                   {d['Photo URL'] ? (
                     <a
                       href={(() => {
