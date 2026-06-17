@@ -91,6 +91,9 @@ export function ToolsListPage() {
               className="w-full text-left p-3 rounded-lg border border-border bg-card hover:bg-secondary active:bg-secondary/80 transition-colors"
             >
               <div className="flex items-start justify-between gap-3">
+                {it['Photo URL'] ? (
+                  <img src={it['Photo URL']} alt="" className="w-12 h-12 rounded-md object-cover border border-border shrink-0" loading="lazy" />
+                ) : null}
                 <div className="min-w-0 flex-1">
                   <div className="text-base font-medium truncate">{it.Name || '(no name)'}</div>
                   <div className="text-xs text-muted-foreground truncate">

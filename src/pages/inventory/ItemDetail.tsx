@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useRoute } from 'wouter'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { MenuLayout } from '@/components/MenuLayout'
 import { Button } from '@/components/ui/button'
 import { FieldCombo } from '@/components/FieldCombo'
 import { getCrewName } from '@/lib/auth'
+import { compressImageToJpegBase64 } from '@/lib/imageCompress'
 import {
   fetchInventory,
   upsertInventoryItem,
+  uploadInventoryPhoto,
   mergeOptions,
   SPARE_SYSTEMS,
   SPARE_LOCATIONS,
@@ -28,14 +30,14 @@ type FieldDef = {
   type?: string
   options?: string[]
   placeholder?: string
-  combo?: 'location' | 'subLocation'
+  combo?: 'location' | 'subLocation' | 'system' | 'category'
 }
 
 const SPARE_FIELDS: FieldDef[] = [
   { key: 'Part Number', label: 'Part Number', placeholder: 'e.g. 1R-1808 (optional)' },
   { key: 'Description', label: 'Description', placeholder: 'e.g. Fuel filter element' },
   { key: 'Manufacturer', label: 'Manufacturer', placeholder: 'CAT, Racor, etc.' },
-  { key: 'System', label: 'System', options: SPARE_SYSTEMS },
+  { key: 'System', label: 'System', combo: 'system' },
   { key: 'Location', label: 'Location', combo: 'location' },
   { key: 'Sub-Location', label: 'Sub-Location', combo: 'subLocation' },
   { key: 'Qty', label: 'Quantity on hand', type: 'number' },
@@ -45,7 +47,7 @@ const SPARE_FIELDS: FieldDef[] = [
 
 const CONSUMABLE_FIELDS: FieldDef[] = [
   { key: 'Item', label: 'Item name', placeholder: 'e.g. Dish soap' },
-  { key: 'Category', label: 'Category', options: CONSUMABLE_CATEGORIES },
+  { key: 'Category', label: 'Category', combo: 'category' },
   { key: 'Location', label: 'Location', combo: 'location' },
   { key: 'Sub-Location', label: 'Sub-Location', combo: 'subLocation' },
   { key: 'Qty', label: 'Quantity on hand', type: 'number' },
@@ -57,7 +59,7 @@ const CONSUMABLE_FIELDS: FieldDef[] = [
 
 const TOOL_FIELDS: FieldDef[] = [
   { key: 'Name', label: 'Name', placeholder: 'e.g. Fluke 117 Multimeter' },
-  { key: 'Category', label: 'Category', options: TOOL_CATEGORIES },
+  { key: 'Category', label: 'Category', combo: 'category' },
   { key: 'Brand', label: 'Brand', placeholder: 'e.g. Milwaukee, Fluke, Snap-on' },
   { key: 'Model / Serial', label: 'Model / Serial', placeholder: 'optional' },
   { key: 'Location', label: 'Location', combo: 'location' },
@@ -83,6 +85,11 @@ function presetSubLocations(tab: InventoryTab): string[] {
   if (tab === 'Spares') return SPARE_SUB_LOCATIONS
   if (tab === 'Tools') return TOOL_SUB_LOCATIONS
   return CONSUMABLE_SUB_LOCATIONS
+}
+
+function presetCategories(tab: InventoryTab): string[] {
+  if (tab === 'Tools') return TOOL_CATEGORIES
+  return CONSUMABLE_CATEGORIES
 }
 
 function isQtyTab(tab: InventoryTab) {
@@ -126,21 +133,88 @@ export function ItemDetailPage({ tab }: { tab: InventoryTab }) {
     const list = (data || []) as any[]
     return new Set(list.map(it => (it['Sub-Location'] || '').trim()).filter(Boolean))
   }, [data])
+  const usedSystems = useMemo(() => {
+    const list = (data || []) as any[]
+    return new Set(list.map(it => (it.System || '').trim()).filter(Boolean))
+  }, [data])
+  const usedCategories = useMemo(() => {
+    const list = (data || []) as any[]
+    return new Set(list.map(it => (it.Category || '').trim()).filter(Boolean))
+  }, [data])
   const locOptions = useMemo(() => mergeOptions(presetLocations(tab), usedLocations), [tab, usedLocations])
   const subOptions = useMemo(() => mergeOptions(presetSubLocations(tab), usedSubLocations), [tab, usedSubLocations])
+  const systemOptions = useMemo(() => mergeOptions(SPARE_SYSTEMS, usedSystems), [usedSystems])
+  const categoryOptions = useMemo(() => mergeOptions(presetCategories(tab), usedCategories), [tab, usedCategories])
 
   const [values, setValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [savingDelta, setSavingDelta] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [photoState, setPhotoState] = useState<{ thumbUrl: string; viewUrl: string } | null>(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (item) {
       const initial: Record<string, string> = {}
       fieldsFor(tab).forEach(f => { initial[f.key] = item[f.key] || '' })
+      initial['Photo URL'] = item['Photo URL'] || ''
       setValues(initial)
+      const existing = (item['Photo URL'] || '').trim()
+      if (existing) {
+        const m = existing.match(/thumbnail\?id=([^&]+)/)
+        if (m) {
+          setPhotoState({ thumbUrl: existing, viewUrl: `https://drive.google.com/file/d/${m[1]}/view` })
+        } else {
+          setPhotoState({ thumbUrl: existing, viewUrl: existing })
+        }
+      } else {
+        setPhotoState(null)
+      }
     }
   }, [item, tab])
+
+  async function handlePhoto(files: FileList | null) {
+    if (!files || files.length === 0 || !item) return
+    setError(null)
+    setUploadingPhoto(true)
+    try {
+      const b64 = await compressImageToJpegBase64(files[0], { maxDim: 1600, quality: 0.8 })
+      const label = titleFor(tab, item)
+      const resp = await uploadInventoryPhoto({ base64: b64, tab, itemId: item.ID, label })
+      setPhotoState({ thumbUrl: resp.thumbUrl, viewUrl: resp.viewUrl })
+      const next = { ...values, 'Photo URL': resp.photoUrl }
+      setValues(next)
+      await upsertInventoryItem({
+        tab,
+        rowIndex,
+        values: next,
+        user: getCrewName() || 'crew',
+      })
+      await queryClient.invalidateQueries({ queryKey: [tab.toLowerCase()] })
+    } catch (e: any) {
+      setError(e?.message || 'Photo upload failed')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  async function removePhoto() {
+    setPhotoState(null)
+    const next = { ...values, 'Photo URL': '' }
+    setValues(next)
+    try {
+      await upsertInventoryItem({
+        tab,
+        rowIndex,
+        values: next,
+        user: getCrewName() || 'crew',
+      })
+      await queryClient.invalidateQueries({ queryKey: [tab.toLowerCase()] })
+    } catch (e: any) {
+      setError(e?.message || 'Save failed')
+    }
+  }
 
   if (isLoading) return <MenuLayout title={tab} showBack backHref={`/inventory/${tab.toLowerCase()}`}><div className="text-muted-foreground">Loading…</div></MenuLayout>
   if (!item) return <MenuLayout title={tab} showBack backHref={`/inventory/${tab.toLowerCase()}`}><div className="text-muted-foreground">Item not found.</div></MenuLayout>
@@ -231,6 +305,47 @@ export function ItemDetailPage({ tab }: { tab: InventoryTab }) {
 
         {error && <div className="text-red-500 text-sm p-3 rounded-lg border border-red-900/40 bg-red-950/30">{error}</div>}
 
+        {/* Photo */}
+        <div className="p-3 rounded-xl border border-border bg-card">
+          <div className="text-sm font-medium mb-2">Photo</div>
+          <div className="flex items-start gap-3">
+            {photoState ? (
+              <a href={photoState.viewUrl} target="_blank" rel="noreferrer" className="shrink-0">
+                <img src={photoState.thumbUrl} alt={titleFor(tab, item)} className="w-24 h-24 object-cover rounded-lg border border-border" />
+              </a>
+            ) : (
+              <div className="w-24 h-24 rounded-lg border border-dashed border-border flex items-center justify-center text-2xl text-muted-foreground">📷</div>
+            )}
+            <div className="flex flex-col gap-2 flex-1">
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="h-10 px-3 rounded-lg bg-secondary border border-border text-sm hover:bg-secondary/80 self-start"
+              >
+                {uploadingPhoto ? 'Uploading…' : (photoState ? 'Replace photo' : 'Add photo')}
+              </button>
+              {photoState && (
+                <button
+                  type="button"
+                  onClick={removePhoto}
+                  className="text-xs text-red-500 underline self-start"
+                >
+                  Remove photo
+                </button>
+              )}
+            </div>
+          </div>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={e => { handlePhoto(e.target.files); e.target.value = '' }}
+          />
+        </div>
+
         {/* Edit form */}
         <div className="space-y-3">
           {fieldsFor(tab).map(f => (
@@ -247,6 +362,20 @@ export function ItemDetailPage({ tab }: { tab: InventoryTab }) {
                   label={f.label}
                   value={values[f.key] || ''}
                   options={subOptions}
+                  onChange={v => setValues(prev => ({ ...prev, [f.key]: v }))}
+                />
+              ) : f.combo === 'system' ? (
+                <FieldCombo
+                  label={f.label}
+                  value={values[f.key] || ''}
+                  options={systemOptions}
+                  onChange={v => setValues(prev => ({ ...prev, [f.key]: v }))}
+                />
+              ) : f.combo === 'category' ? (
+                <FieldCombo
+                  label={f.label}
+                  value={values[f.key] || ''}
+                  options={categoryOptions}
                   onChange={v => setValues(prev => ({ ...prev, [f.key]: v }))}
                 />
               ) : (

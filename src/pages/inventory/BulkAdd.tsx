@@ -191,6 +191,11 @@ export function BulkAddPage() {
   const usedConsSubs = useMemo(() => new Set(((existingCons || []) as any[]).map(it => (it['Sub-Location'] || '').trim()).filter(Boolean)), [existingCons])
   const usedToolLocs = useMemo(() => new Set(((existingTools || []) as any[]).map(it => (it.Location || '').trim()).filter(Boolean)), [existingTools])
   const usedToolSubs = useMemo(() => new Set(((existingTools || []) as any[]).map(it => (it['Sub-Location'] || '').trim()).filter(Boolean)), [existingTools])
+  // Distinct Systems/Categories across existing items — lets bulk-add users pick
+  // a previously-used System or type a brand new one (same rule as Location).
+  const usedSpareSystems = useMemo(() => new Set(((existingSpares || []) as any[]).map(it => (it.System || '').trim()).filter(Boolean)), [existingSpares])
+  const usedConsCats = useMemo(() => new Set(((existingCons || []) as any[]).map(it => (it.Category || '').trim()).filter(Boolean)), [existingCons])
+  const usedToolCats = useMemo(() => new Set(((existingTools || []) as any[]).map(it => (it.Category || '').trim()).filter(Boolean)), [existingTools])
 
   const spareLocOpts = useMemo(() => mergeOptions(SPARE_LOCATIONS, usedSpareLocs), [usedSpareLocs])
   const spareSubOpts = useMemo(() => mergeOptions(SPARE_SUB_LOCATIONS, usedSpareSubs), [usedSpareSubs])
@@ -198,6 +203,9 @@ export function BulkAddPage() {
   const consSubOpts = useMemo(() => mergeOptions(CONSUMABLE_SUB_LOCATIONS, usedConsSubs), [usedConsSubs])
   const toolLocOpts = useMemo(() => mergeOptions(TOOL_LOCATIONS, usedToolLocs), [usedToolLocs])
   const toolSubOpts = useMemo(() => mergeOptions(TOOL_SUB_LOCATIONS, usedToolSubs), [usedToolSubs])
+  const spareSystemOpts = useMemo(() => mergeOptions(SPARE_SYSTEMS, usedSpareSystems), [usedSpareSystems])
+  const consCategoryOpts = useMemo(() => mergeOptions(CONSUMABLE_CATEGORIES, usedConsCats), [usedConsCats])
+  const toolCategoryOpts = useMemo(() => mergeOptions(TOOL_CATEGORIES, usedToolCats), [usedToolCats])
 
   async function handlePhotos(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -503,7 +511,7 @@ export function BulkAddPage() {
                     <Field label="Part Number" value={d['Part Number']} onChange={v => updateDraft(i, 'Part Number', v)} />
                     <Field label="Description" value={d.Description} onChange={v => updateDraft(i, 'Description', v)} />
                     <Field label="Manufacturer" value={d.Manufacturer} onChange={v => updateDraft(i, 'Manufacturer', v)} />
-                    <FieldSelect label="System" value={d.System} options={SPARE_SYSTEMS} onChange={v => updateDraft(i, 'System', v)} />
+                    <FieldCombo h={10} label="System" value={d.System} options={spareSystemOpts} onChange={v => updateDraft(i, 'System', v)} />
                     <FieldCombo h={10} label="Location" value={d.Location} options={spareLocOpts} onChange={v => updateDraft(i, 'Location', v)} />
                     <FieldCombo h={10} label="Sub-Location" value={d['Sub-Location']} options={spareSubOpts} onChange={v => updateDraft(i, 'Sub-Location', v)} />
                     <Field label="Qty" value={d.Qty} type="number" onChange={v => updateDraft(i, 'Qty', v)} />
@@ -512,7 +520,7 @@ export function BulkAddPage() {
                 ) : d.type === 'Consumable' ? (
                   <>
                     <Field label="Item *" value={d.Item} onChange={v => updateDraft(i, 'Item', v)} />
-                    <FieldSelect label="Category" value={d.Category} options={CONSUMABLE_CATEGORIES} onChange={v => updateDraft(i, 'Category', v)} />
+                    <FieldCombo h={10} label="Category" value={d.Category} options={consCategoryOpts} onChange={v => updateDraft(i, 'Category', v)} />
                     <FieldCombo h={10} label="Location" value={d.Location} options={consLocOpts} onChange={v => updateDraft(i, 'Location', v)} />
                     <FieldCombo h={10} label="Sub-Location" value={d['Sub-Location']} options={consSubOpts} onChange={v => updateDraft(i, 'Sub-Location', v)} />
                     <div className="grid grid-cols-2 gap-2">
@@ -524,7 +532,7 @@ export function BulkAddPage() {
                 ) : (
                   <>
                     <Field label="Name *" value={d.Name} onChange={v => updateDraft(i, 'Name', v)} />
-                    <FieldSelect label="Category" value={d.Category} options={TOOL_CATEGORIES} onChange={v => updateDraft(i, 'Category', v)} />
+                    <FieldCombo h={10} label="Category" value={d.Category} options={toolCategoryOpts} onChange={v => updateDraft(i, 'Category', v)} />
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="Brand" value={d.Brand} onChange={v => updateDraft(i, 'Brand', v)} />
                       <Field label="Model / Serial" value={d['Model / Serial']} onChange={v => updateDraft(i, 'Model / Serial', v)} />

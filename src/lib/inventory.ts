@@ -241,6 +241,20 @@ export async function extractInventoryFromPhotos(args: {
   return jsonOrError(res)
 }
 
+export async function uploadInventoryPhoto(args: {
+  base64: string
+  tab?: InventoryTab
+  itemId?: string
+  label?: string
+}): Promise<{ ok: true; fileId: string; thumbUrl: string; viewUrl: string; photoUrl: string }> {
+  const res = await fetch('/api/inventory-photo-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  })
+  return jsonOrError(res)
+}
+
 // Helper for combo fields: merge presets + user-seen values, dedup, keep order
 export function mergeOptions(presets: string[], used: Iterable<string>): string[] {
   const out: string[] = []
