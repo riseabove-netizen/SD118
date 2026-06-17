@@ -9,6 +9,7 @@ import { compressImageToJpegBase64 } from '@/lib/imageCompress'
 import {
   fetchInventory,
   mergeOptions,
+  uploadInventoryPhoto,
   SPARE_SYSTEMS,
   SPARE_LOCATIONS,
   SPARE_SUB_LOCATIONS,
@@ -33,6 +34,7 @@ type SpareDraft = {
   'Sub-Location': string
   Qty: string
   Notes: string
+  'Photo URL': string
 }
 
 type ConsumableDraft = {
@@ -44,6 +46,7 @@ type ConsumableDraft = {
   Qty: string
   Unit: string
   Notes: string
+  'Photo URL': string
 }
 
 type ToolDraft = {
@@ -56,6 +59,7 @@ type ToolDraft = {
   'Sub-Location': string
   Condition: string
   Notes: string
+  'Photo URL': string
 }
 
 type DraftItem = SpareDraft | ConsumableDraft | ToolDraft
@@ -64,18 +68,21 @@ function emptySpare(): SpareDraft {
   return {
     type: 'Spare', 'Part Number': '', Description: '', Manufacturer: '',
     System: '', Location: 'Engine Room', 'Sub-Location': '', Qty: '1', Notes: '',
+    'Photo URL': '',
   }
 }
 function emptyConsumable(): ConsumableDraft {
   return {
     type: 'Consumable', Item: '', Category: '', Location: 'Interior', 'Sub-Location': '',
     Qty: '1', Unit: 'ea', Notes: '',
+    'Photo URL': '',
   }
 }
 function emptyTool(): ToolDraft {
   return {
     type: 'Tool', Name: '', Category: '', Brand: '', 'Model / Serial': '',
     Location: 'Engine Room', 'Sub-Location': '', Condition: 'Good', Notes: '',
+    'Photo URL': '',
   }
 }
 
@@ -91,6 +98,7 @@ function draftToAi(d: DraftItem): any {
       sub_location: d['Sub-Location'],
       qty: parseInt(d.Qty || '1', 10) || 1,
       notes: d.Notes,
+      photo_url: d['Photo URL'],
     }
   }
   if (d.type === 'Tool') {
@@ -104,6 +112,7 @@ function draftToAi(d: DraftItem): any {
       sub_location: d['Sub-Location'],
       condition: d.Condition,
       notes: d.Notes,
+      photo_url: d['Photo URL'],
     }
   }
   return {
@@ -115,6 +124,7 @@ function draftToAi(d: DraftItem): any {
     qty: parseInt(d.Qty || '1', 10) || 1,
     unit: d.Unit,
     notes: d.Notes,
+    photo_url: d['Photo URL'],
   }
 }
 
@@ -131,6 +141,7 @@ function aiToDraft(item: any): DraftItem | null {
       'Sub-Location': String(item.sub_location || ''),
       Qty: String(item.qty ?? 1),
       Notes: String(item.notes || ''),
+      'Photo URL': String(item.photo_url || ''),
     }
   }
   if (item.type === 'Tool') {
@@ -144,6 +155,7 @@ function aiToDraft(item: any): DraftItem | null {
       'Sub-Location': String(item.sub_location || ''),
       Condition: String(item.condition || 'Good'),
       Notes: String(item.notes || ''),
+      'Photo URL': String(item.photo_url || ''),
     }
   }
   if (item.type === 'Consumable') {
@@ -156,6 +168,7 @@ function aiToDraft(item: any): DraftItem | null {
       Qty: String(item.qty ?? 1),
       Unit: String(item.unit || 'ea'),
       Notes: String(item.notes || ''),
+      'Photo URL': String(item.photo_url || ''),
     }
   }
   return null
@@ -234,24 +247,77 @@ export function BulkAddPage() {
     }
     setStage('extracting')
     try {
-      const res = await fetch('/api/inventory-bulk-extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, imagesBase64: photos.map(p => p.base64) }),
-      })
-      const raw = await res.text()
-      let data: any = {}
-      try { data = raw ? JSON.parse(raw) : {} } catch {}
-      if (!res.ok) throw new Error(data?.detail || data?.error || res.statusText)
+      const allDrafts: DraftItem[] = []
+      const summaries: string[] = []
 
-      const items = Array.isArray(data.items) ? data.items.map(aiToDraft).filter(Boolean) as DraftItem[] : []
-      if (items.length === 0) {
+      if (photos.length > 0) {
+        // Process each photo individually so its uploaded Drive URL can be
+        // attached to every item the AI extracts from THAT photo.
+        // Photo upload + AI extraction run in parallel per photo, and all
+        // photos run in parallel with each other.
+        const photoTasks = photos.map(async (p, idx) => {
+          const uploadPromise = uploadInventoryPhoto({
+            base64: p.base64,
+            tab: 'Spares',
+            label: `bulk-${new Date().toISOString().slice(0, 10)}-${idx + 1}`,
+          }).catch(err => {
+            console.warn('Bulk photo upload failed:', err)
+            return null
+          })
+
+          // Only feed the text prompt on the first photo so it isn't repeated
+          const extractText = idx === 0 ? text : ''
+          const extractPromise = fetch('/api/inventory-bulk-extract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: extractText, imagesBase64: [p.base64] }),
+          }).then(async res => {
+            const raw = await res.text()
+            let data: any = {}
+            try { data = raw ? JSON.parse(raw) : {} } catch {}
+            if (!res.ok) throw new Error(data?.detail || data?.error || res.statusText)
+            return data
+          })
+
+          const [uploadResult, extractData] = await Promise.all([uploadPromise, extractPromise])
+          const photoUrl = uploadResult ? uploadResult.photoUrl : ''
+          const items = Array.isArray(extractData.items)
+            ? (extractData.items.map(aiToDraft).filter(Boolean) as DraftItem[])
+            : []
+          const tagged = items.map(it => ({ ...it, 'Photo URL': photoUrl }) as DraftItem)
+          return { tagged, summary: String(extractData.summary || '') }
+        })
+
+        const results = await Promise.all(photoTasks)
+        for (const r of results) {
+          allDrafts.push(...r.tagged)
+          if (r.summary) summaries.push(r.summary)
+        }
+      } else {
+        // Text-only path: single extraction, no photo
+        const res = await fetch('/api/inventory-bulk-extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, imagesBase64: [] }),
+        })
+        const raw = await res.text()
+        let data: any = {}
+        try { data = raw ? JSON.parse(raw) : {} } catch {}
+        if (!res.ok) throw new Error(data?.detail || data?.error || res.statusText)
+        const items = Array.isArray(data.items)
+          ? (data.items.map(aiToDraft).filter(Boolean) as DraftItem[])
+          : []
+        allDrafts.push(...items)
+        if (data.summary) summaries.push(String(data.summary))
+      }
+
+      if (allDrafts.length === 0) {
         setError('AI did not detect any items. Try adding more detail in the text or take clearer photos.')
         setStage('input')
         return
       }
-      setDrafts(items)
-      setSummary(String(data.summary || ''))
+      setDrafts(allDrafts)
+      setSummary(summaries.join(' · '))
       setStage('review')
     } catch (e: any) {
       setError(e?.message || 'Extraction failed')
@@ -278,6 +344,7 @@ export function BulkAddPage() {
         next.Notes = d.Notes
         next.Location = d.Location || 'Interior'
         next['Sub-Location'] = d['Sub-Location']
+        next['Photo URL'] = d['Photo URL']
         return next
       }
       if (d.type === 'Consumable') {
@@ -286,6 +353,7 @@ export function BulkAddPage() {
         next.Notes = d.Notes
         next.Location = d.Location || 'Engine Room'
         next['Sub-Location'] = d['Sub-Location']
+        next['Photo URL'] = d['Photo URL']
         return next
       }
       // Tool → Spare
@@ -295,6 +363,7 @@ export function BulkAddPage() {
       next.Notes = d.Notes
       next.Location = d.Location || 'Engine Room'
       next['Sub-Location'] = d['Sub-Location']
+      next['Photo URL'] = d['Photo URL']
       return next
     }))
   }
@@ -495,7 +564,7 @@ export function BulkAddPage() {
               d.type === 'Spare' ? '🔧 Spare' : d.type === 'Consumable' ? '📦 Consumable' : '🛠️ Tool'
             return (
               <div key={i} className="p-3 rounded-xl border border-border bg-card space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <button
                     onClick={() => toggleType(i)}
                     className={`px-2 h-7 rounded-md text-xs font-medium border ${typeBtnCls}`}
@@ -503,6 +572,20 @@ export function BulkAddPage() {
                   >
                     {typeLabel}
                   </button>
+                  {d['Photo URL'] ? (
+                    <a
+                      href={(() => {
+                        const m = d['Photo URL'].match(/thumbnail\?id=([^&]+)/)
+                        return m ? `https://drive.google.com/file/d/${m[1]}/view` : d['Photo URL']
+                      })()}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0"
+                      title="Open photo in Drive"
+                    >
+                      <img src={d['Photo URL']} alt="item" className="w-10 h-10 object-cover rounded-md border border-border" />
+                    </a>
+                  ) : null}
                   <button onClick={() => removeDraft(i)} className="text-xs text-red-400 underline">Remove</button>
                 </div>
 

@@ -66,10 +66,12 @@ Return ONLY valid JSON in this exact shape (no prose, no markdown):
 {
   "summary": "Set system to Main Engines on all 5 spares.",
   "items": [
-    { "type": "Spare", "part_number": "1R-1808", "description": "Fuel filter element", "manufacturer": "CAT", "system": "Main Engines", "location": "Engine Room", "sub_location": "Bin #1", "qty": 3, "notes": "" },
-    { "type": "Tool", "name": "Fluke 117 Multimeter", "category": "Diagnostic", "brand": "Fluke", "model_serial": "117", "location": "Engine Room", "sub_location": "Workbench", "condition": "Good", "qty": 1, "notes": "" }
+    { "type": "Spare", "part_number": "1R-1808", "description": "Fuel filter element", "manufacturer": "CAT", "system": "Main Engines", "location": "Engine Room", "sub_location": "Bin #1", "qty": 3, "notes": "", "photo_url": "" },
+    { "type": "Tool", "name": "Fluke 117 Multimeter", "category": "Diagnostic", "brand": "Fluke", "model_serial": "117", "location": "Engine Room", "sub_location": "Workbench", "condition": "Good", "qty": 1, "notes": "", "photo_url": "" }
   ]
-}`
+}
+
+IMPORTANT: If any input item has a "photo_url" field, ALWAYS preserve that exact value on the corresponding output item. The photo_url ties a row to its photo and must not be dropped, modified, or moved to another item, even when the user asks for changes to other fields.`
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
