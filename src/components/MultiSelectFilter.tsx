@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface MultiSelectFilterProps {
   label: string
@@ -9,22 +10,60 @@ interface MultiSelectFilterProps {
 
 /**
  * Dropdown multi-select filter chip.
- * - Closed: shows label + count of selections (e.g. "System · 2")
- * - Open: shows scrollable checkbox list of options
- * Dark theme, red accents to match app.
+ *
+ * The dropdown panel is rendered through a portal with `position: fixed` so
+ * it escapes any `overflow-x-auto` ancestor (the filter chip row scrolls
+ * horizontally) and stacks above everything else on the page.
  */
 export function MultiSelectFilter({ label, options, selected, onChange }: MultiSelectFilterProps) {
   const [open, setOpen] = useState(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
+  // Position the panel below the chip whenever it opens or the viewport changes.
+  useLayoutEffect(() => {
+    if (!open) return
+    function place() {
+      const btn = btnRef.current
+      if (!btn) return
+      const r = btn.getBoundingClientRect()
+      const panelWidth = 256 // w-64
+      const margin = 8
+      let left = r.left
+      // Keep panel inside viewport horizontally
+      const maxLeft = window.innerWidth - panelWidth - margin
+      if (left > maxLeft) left = Math.max(margin, maxLeft)
+      if (left < margin) left = margin
+      setPos({ top: r.bottom + 4, left, width: panelWidth })
+    }
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open])
+
+  // Close on outside click or Escape
   useEffect(() => {
     if (!open) return
     function onDocClick(e: MouseEvent) {
-      if (!wrapRef.current) return
-      if (!wrapRef.current.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (panelRef.current?.contains(t)) return
+      if (btnRef.current?.contains(t)) return
+      setOpen(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
     }
     document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onKey)
+    }
   }, [open])
 
   function toggle(opt: string) {
@@ -39,8 +78,9 @@ export function MultiSelectFilter({ label, options, selected, onChange }: MultiS
   const hasSel = selected.length > 0
 
   return (
-    <div className="relative" ref={wrapRef}>
+    <>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         className={`shrink-0 px-3 h-9 rounded-full text-sm border flex items-center gap-1.5 transition-colors ${
@@ -51,7 +91,7 @@ export function MultiSelectFilter({ label, options, selected, onChange }: MultiS
       >
         <span>{label}</span>
         {hasSel && (
-          <span className={`text-xs rounded-full px-1.5 ${hasSel ? 'bg-primary-foreground/20' : 'bg-foreground/10'}`}>
+          <span className="text-xs rounded-full px-1.5 bg-primary-foreground/20">
             {selected.length}
           </span>
         )}
@@ -60,40 +100,62 @@ export function MultiSelectFilter({ label, options, selected, onChange }: MultiS
         </svg>
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-1 left-0 w-64 max-w-[80vw] rounded-lg border border-border bg-card shadow-xl overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</div>
-            {hasSel && (
-              <button type="button" onClick={clear} className="text-xs text-primary hover:underline">
-                Clear
+      {open && pos && typeof document !== 'undefined' && createPortal(
+        <>
+          {/* Light scrim — taps anywhere outside close it on touch devices */}
+          <div
+            className="fixed inset-0 z-[999]"
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            ref={panelRef}
+            className="fixed z-[1000] rounded-lg border border-border bg-card shadow-2xl overflow-hidden"
+            style={{ top: pos.top, left: pos.left, width: pos.width }}
+          >
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-card">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</div>
+              {hasSel && (
+                <button type="button" onClick={clear} className="text-xs text-primary hover:underline">
+                  Clear
+                </button>
+              )}
+            </div>
+            <div className="max-h-72 overflow-y-auto py-1 bg-card">
+              {options.length === 0 && (
+                <div className="px-3 py-2 text-sm text-muted-foreground">No options</div>
+              )}
+              {options.map(opt => {
+                const isSel = selected.includes(opt)
+                return (
+                  <label
+                    key={opt}
+                    className="flex items-center gap-2 px-3 py-2.5 text-sm cursor-pointer hover:bg-secondary"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSel}
+                      onChange={() => toggle(opt)}
+                      className="h-4 w-4 accent-red-600"
+                    />
+                    <span className="truncate flex-1">{opt || '(blank)'}</span>
+                  </label>
+                )
+              })}
+            </div>
+            <div className="border-t border-border px-3 py-2 bg-card flex justify-end">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-sm text-primary font-medium"
+              >
+                Done
               </button>
-            )}
+            </div>
           </div>
-          <div className="max-h-64 overflow-y-auto py-1">
-            {options.length === 0 && (
-              <div className="px-3 py-2 text-sm text-muted-foreground">No options</div>
-            )}
-            {options.map(opt => {
-              const isSel = selected.includes(opt)
-              return (
-                <label
-                  key={opt}
-                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-secondary"
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSel}
-                    onChange={() => toggle(opt)}
-                    className="h-4 w-4 accent-red-600"
-                  />
-                  <span className="truncate flex-1">{opt}</span>
-                </label>
-              )
-            })}
-          </div>
-        </div>
+        </>,
+        document.body
       )}
-    </div>
+    </>
   )
 }
