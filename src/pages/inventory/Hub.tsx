@@ -28,6 +28,7 @@ export function InventoryHubPage() {
         <HubCard icon="🪄" label="Bulk Add (AI)" description="Dictate or photograph multiple items at once" href="/inventory/bulk-add" />
         <HubCard icon="🔧" label="Spares" description="Mechanical parts by part number" href="/inventory/spares" />
         <HubCard icon="📦" label="Consumables" description="Interior, exterior, galley supplies" href="/inventory/consumables" />
+        <HubCard icon="🛠️" label="Tools" description="Hand tools, power tools, diagnostic gear" href="/inventory/tools" />
         <HubCard icon="📜" label="Transactions" description="Recent quantity changes" href="/inventory/transactions" />
       </div>
     </MenuLayout>

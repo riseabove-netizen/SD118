@@ -1,6 +1,6 @@
 // Shared inventory types and fetchers
 
-export type InventoryTab = 'Spares' | 'Consumables'
+export type InventoryTab = 'Spares' | 'Consumables' | 'Tools'
 
 export type SpareItem = {
   rowIndex: number // 1-based row in the sheet (header is row 1, first data row is 2)
@@ -38,6 +38,23 @@ export type ConsumableItem = {
   'Created By': string
 }
 
+export type ToolItem = {
+  rowIndex: number
+  ID: string
+  Name: string
+  Category: string
+  Brand: string
+  'Model / Serial': string
+  Location: string
+  'Sub-Location': string
+  Condition: string
+  'Last Checked': string
+  Notes: string
+  'Photo URL': string
+  'Created At': string
+  'Created By': string
+}
+
 export type Transaction = {
   Timestamp: string
   Tab: string
@@ -50,6 +67,7 @@ export type Transaction = {
   Notes: string
 }
 
+// Spare systems
 export const SPARE_SYSTEMS = [
   'Main Engines',
   'Generators',
@@ -64,15 +82,26 @@ export const SPARE_SYSTEMS = [
   'Other',
 ]
 
+// Locations (level 1) — broad areas of the vessel
+export const SPARE_LOCATIONS = [
+  'Engine Room',
+  'Lazarette',
+  'Bridge',
+  'Interior',
+  'Exterior',
+  'Other',
+]
+
 export const SPARE_SUB_LOCATIONS = [
-  'Engine Room - Port Locker',
-  'Engine Room - STBD Locker',
-  'Engine Room - Forward Bin',
-  'Engine Room - Aft Bin',
-  'Engine Room - Bin #1',
-  'Engine Room - Bin #2',
-  'Engine Room - Bin #3',
-  'Engine Room - Workbench',
+  'Port Locker',
+  'STBD Locker',
+  'Forward Bin',
+  'Aft Bin',
+  'Bin #1',
+  'Bin #2',
+  'Bin #3',
+  'Bin #1 - STBD Gen',
+  'Workbench',
   'Other',
 ]
 
@@ -89,20 +118,73 @@ export const CONSUMABLE_CATEGORIES = [
   'Other',
 ]
 
+export const CONSUMABLE_LOCATIONS = [
+  'Interior',
+  'Exterior',
+  'Engine Room',
+  'Bridge',
+  'Lazarette',
+  'Other',
+]
+
 export const CONSUMABLE_SUB_LOCATIONS = [
+  'Salon',
+  'Galley',
+  'Master Stateroom',
+  'Guest Cabin',
+  'Crew Mess',
   'Anchor Locker',
   'Fly Storage',
   'Bridge Deck Locker',
   'Aft Deck Locker - Port',
   'Aft Deck Locker - STBD',
-  'Galley',
-  'Engine Room',
-  'Crew Mess',
   'Lazarette',
-  'Master Stateroom',
-  'Guest Cabin',
-  'Salon',
+  'Engine Room',
   'Other',
+]
+
+// Tools
+export const TOOL_CATEGORIES = [
+  'Hand Tool',
+  'Power Tool',
+  'Mechanical',
+  'Electrical',
+  'Plumbing',
+  'Diagnostic',
+  'Safety',
+  'Measurement',
+  'Diving / Snorkeling',
+  'Other',
+]
+
+export const TOOL_LOCATIONS = [
+  'Engine Room',
+  'Lazarette',
+  'Bridge',
+  'Interior',
+  'Exterior',
+  'Other',
+]
+
+export const TOOL_SUB_LOCATIONS = [
+  'Workbench',
+  'Toolbox',
+  'Tool Cabinet',
+  'Port Locker',
+  'STBD Locker',
+  'Forward Bin',
+  'Aft Bin',
+  'Crew Mess',
+  'Garage',
+  'Other',
+]
+
+export const TOOL_CONDITIONS = [
+  'New',
+  'Good',
+  'Fair',
+  'Needs Service',
+  'Broken',
 ]
 
 async function jsonOrError(res: Response) {
@@ -157,4 +239,18 @@ export async function extractInventoryFromPhotos(args: {
     body: JSON.stringify(args),
   })
   return jsonOrError(res)
+}
+
+// Helper for combo fields: merge presets + user-seen values, dedup, keep order
+export function mergeOptions(presets: string[], used: Iterable<string>): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const p of presets) {
+    if (!seen.has(p)) { seen.add(p); out.push(p) }
+  }
+  for (const v of used) {
+    const s = (v || '').trim()
+    if (s && !seen.has(s)) { seen.add(s); out.push(s) }
+  }
+  return out
 }

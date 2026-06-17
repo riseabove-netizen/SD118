@@ -32,6 +32,11 @@ const CONSUMABLE_HEADERS = [
   'Min Qty', 'Max Qty', 'Last Used', 'Notes', 'Photo URL',
   'Created At', 'Created By',
 ]
+const TOOL_HEADERS = [
+  'ID', 'Name', 'Category', 'Brand', 'Model / Serial',
+  'Location', 'Sub-Location', 'Condition', 'Last Checked', 'Notes', 'Photo URL',
+  'Created At', 'Created By',
+]
 const TRANSACTION_HEADERS = [
   'Timestamp', 'Tab', 'Item ID', 'Item Name', 'Delta', 'Qty After',
   'Reason', 'User', 'Notes',
@@ -40,6 +45,7 @@ const TRANSACTION_HEADERS = [
 function headersFor(tab: string) {
   if (tab === 'Spares') return SPARE_HEADERS
   if (tab === 'Consumables') return CONSUMABLE_HEADERS
+  if (tab === 'Tools') return TOOL_HEADERS
   return null
 }
 
@@ -79,7 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let finalRowIndex = rowIndex
     let itemId = String(values.ID || '')
-    let itemName = String(values['Item'] || values['Part Number'] || values['Description'] || '')
+    let itemName = String(values['Item'] || values['Name'] || values['Part Number'] || values['Description'] || '')
 
     if (!rowIndex) {
       // CREATE new row
@@ -125,7 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       itemId = merged.ID
-      itemName = merged['Item'] || merged['Part Number'] || merged['Description'] || ''
+      itemName = merged['Item'] || merged['Name'] || merged['Part Number'] || merged['Description'] || ''
 
       const row = headers.map(h => merged[h] || '')
 

@@ -1,8 +1,8 @@
 node_modules/
 dist/
-.vercel/*
-!.vercel/project.json
-.env*
-*.log
+.vercel/
+.env
+.env.local
 .DS_Store
-__MACOSX/
+*.log
+src_package-lock.json

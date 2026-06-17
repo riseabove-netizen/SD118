@@ -14,34 +14,50 @@ const PROMPT = `You are helping the user clean up a list of inventory items they
 
 You will be given:
   1. The CURRENT list of draft items (as JSON).
-  2. A natural-language INSTRUCTION from the user describing changes to apply across the list (e.g. "all of these are spares for the main engines", "change all sub-locations to STBD locker", "set qty to 2 for every item", "remove the duplicates", "everything is from CAT", "all these are Racor filters").
+  2. A natural-language INSTRUCTION from the user describing changes to apply across the list (e.g. "all of these are spares for the main engines", "change all sub-locations to STBD locker", "set qty to 2 for every item", "remove the duplicates", "everything is from CAT", "the multimeter is a tool not a consumable").
 
 Apply the instruction to the list and return the FULL revised list. You may:
   - modify any field on any item
-  - change an item's type between "Spare" and "Consumable"
+  - change an item's type between "Spare", "Consumable", and "Tool"
   - delete items (omit them from the output)
   - add items (only if explicitly requested)
   - merge duplicates
 
-Allowed values:
+Location is TWO fields:
+  location     = broad area: "Engine Room", "Lazarette", "Bridge", "Interior", "Exterior", "Other"
+  sub_location = specific place inside that area (string). If the user explicitly asks for a NEW location/sub-location name (e.g. "create a new sub-location called Bin#1-STBD Gen" or "label them as Bin#1-STBD Gen"), use the exact name they gave — do NOT force it back to a preset list.
 
 Spare fields:
   type         = "Spare"
-  part_number  = string (manufacturer part number)
+  part_number  = string (manufacturer part number, optional)
   description  = short description
   manufacturer = brand (e.g. CAT, Racor, Jabsco)
   system       = one of: "Main Engines", "Generators", "Watermaker", "Hydraulics", "AC / Refrigeration", "Electrical", "Plumbing", "Steering", "Stabilizers", "Fuel System", "Other"
-  sub_location = string. Prefer one of the existing values: "Engine Room - Port Locker", "Engine Room - STBD Locker", "Engine Room - Forward Bin", "Engine Room - Aft Bin", "Engine Room - Gen Toolbox", "Engine Room - Workbench", "Other". If the user explicitly asks for a NEW sub-location name (e.g. "create a new sub-location called Bin#1-STBD Gen" or "label them as Bin#1-STBD Gen"), use the exact name they gave — do NOT force it back to the list.
+  location     = default "Engine Room"
+  sub_location = e.g. "Port Locker", "STBD Locker", "Bin #1", "Bin #2", "Bin #3", "Bin #1 - STBD Gen", "Workbench", "Other"
   qty          = integer (default 1)
   notes        = string
 
 Consumable fields:
   type         = "Consumable"
   item         = item name
-  category     = one of: "Galley", "Cleaning", "Toiletries", "Lines & Fenders", "Safety", "Deck Supplies", "Tools", "Spare Parts", "Office", "Other"
-  sub_location = string. Prefer one of: "Anchor Locker", "Fly Storage", "Bridge Deck Locker", "Aft Deck Locker - Port", "Aft Deck Locker - STBD", "Galley", "Engine Room", "Crew Mess", "Lazarette", "Master Stateroom", "Guest Cabin", "Salon", "Other". If the user explicitly asks for a NEW sub-location name, use the exact name they gave.
+  category     = one of: "Galley", "Cleaning", "Toiletries", "Lines & Fenders", "Safety", "Deck Supplies", "Office", "Other"
+  location     = "Interior", "Exterior", "Engine Room", "Bridge", "Lazarette", or "Other"
+  sub_location = e.g. "Salon", "Galley", "Crew Mess", "Master Stateroom", "Guest Cabin", "Anchor Locker", "Fly Storage", "Bridge Deck Locker", "Aft Deck Locker - Port", "Aft Deck Locker - STBD", "Lazarette", "Engine Room", "Other"
   qty          = integer (default 1)
   unit         = "ea", "bottle", "roll", "L", "kg", "box" (default "ea")
+  notes        = string
+
+Tool fields:
+  type         = "Tool"
+  name         = tool name (e.g. "3/8 inch Drive Socket Set", "Fluke 117 Multimeter")
+  category     = one of: "Hand Tool", "Power Tool", "Mechanical", "Electrical", "Plumbing", "Diagnostic", "Safety", "Measurement", "Diving / Snorkeling", "Other"
+  brand        = brand if known, else ""
+  model_serial = model number or serial if known, else ""
+  location     = default "Engine Room"
+  sub_location = e.g. "Workbench", "Toolbox", "Tool Cabinet", "Port Locker", "STBD Locker", "Forward Bin", "Aft Bin", "Garage", "Other"
+  condition    = "New", "Good", "Fair", "Needs Service", or "Broken". Default "Good".
+  qty          = integer (default 1)
   notes        = string
 
 Also write a short one-sentence "summary" describing what you changed.
@@ -50,7 +66,8 @@ Return ONLY valid JSON in this exact shape (no prose, no markdown):
 {
   "summary": "Set system to Main Engines on all 5 spares.",
   "items": [
-    { "type": "Spare", "part_number": "1R-1808", "description": "Fuel filter element", "manufacturer": "CAT", "system": "Main Engines", "sub_location": "Engine Room - Port Locker", "qty": 3, "notes": "" }
+    { "type": "Spare", "part_number": "1R-1808", "description": "Fuel filter element", "manufacturer": "CAT", "system": "Main Engines", "location": "Engine Room", "sub_location": "Bin #1", "qty": 3, "notes": "" },
+    { "type": "Tool", "name": "Fluke 117 Multimeter", "category": "Diagnostic", "brand": "Fluke", "model_serial": "117", "location": "Engine Room", "sub_location": "Workbench", "condition": "Good", "qty": 1, "notes": "" }
   ]
 }`
 

@@ -1,15 +1,24 @@
-import React, { useRef, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { useLocation } from 'wouter'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { MenuLayout } from '@/components/MenuLayout'
 import { Button } from '@/components/ui/button'
+import { FieldCombo } from '@/components/FieldCombo'
 import { getCrewName } from '@/lib/auth'
 import { compressImageToJpegBase64 } from '@/lib/imageCompress'
 import {
+  fetchInventory,
+  mergeOptions,
   SPARE_SYSTEMS,
+  SPARE_LOCATIONS,
   SPARE_SUB_LOCATIONS,
   CONSUMABLE_CATEGORIES,
+  CONSUMABLE_LOCATIONS,
   CONSUMABLE_SUB_LOCATIONS,
+  TOOL_CATEGORIES,
+  TOOL_LOCATIONS,
+  TOOL_SUB_LOCATIONS,
+  TOOL_CONDITIONS,
 } from '@/lib/inventory'
 
 type Stage = 'input' | 'extracting' | 'review' | 'saving' | 'done'
@@ -20,6 +29,7 @@ type SpareDraft = {
   Description: string
   Manufacturer: string
   System: string
+  Location: string
   'Sub-Location': string
   Qty: string
   Notes: string
@@ -29,24 +39,43 @@ type ConsumableDraft = {
   type: 'Consumable'
   Item: string
   Category: string
+  Location: string
   'Sub-Location': string
   Qty: string
   Unit: string
   Notes: string
 }
 
-type DraftItem = SpareDraft | ConsumableDraft
+type ToolDraft = {
+  type: 'Tool'
+  Name: string
+  Category: string
+  Brand: string
+  'Model / Serial': string
+  Location: string
+  'Sub-Location': string
+  Condition: string
+  Notes: string
+}
+
+type DraftItem = SpareDraft | ConsumableDraft | ToolDraft
 
 function emptySpare(): SpareDraft {
   return {
     type: 'Spare', 'Part Number': '', Description: '', Manufacturer: '',
-    System: '', 'Sub-Location': 'Other', Qty: '1', Notes: '',
+    System: '', Location: 'Engine Room', 'Sub-Location': '', Qty: '1', Notes: '',
   }
 }
 function emptyConsumable(): ConsumableDraft {
   return {
-    type: 'Consumable', Item: '', Category: '', 'Sub-Location': '',
+    type: 'Consumable', Item: '', Category: '', Location: 'Interior', 'Sub-Location': '',
     Qty: '1', Unit: 'ea', Notes: '',
+  }
+}
+function emptyTool(): ToolDraft {
+  return {
+    type: 'Tool', Name: '', Category: '', Brand: '', 'Model / Serial': '',
+    Location: 'Engine Room', 'Sub-Location': '', Condition: 'Good', Notes: '',
   }
 }
 
@@ -58,8 +87,22 @@ function draftToAi(d: DraftItem): any {
       description: d.Description,
       manufacturer: d.Manufacturer,
       system: d.System,
+      location: d.Location,
       sub_location: d['Sub-Location'],
       qty: parseInt(d.Qty || '1', 10) || 1,
+      notes: d.Notes,
+    }
+  }
+  if (d.type === 'Tool') {
+    return {
+      type: 'Tool',
+      name: d.Name,
+      category: d.Category,
+      brand: d.Brand,
+      model_serial: d['Model / Serial'],
+      location: d.Location,
+      sub_location: d['Sub-Location'],
+      condition: d.Condition,
       notes: d.Notes,
     }
   }
@@ -67,6 +110,7 @@ function draftToAi(d: DraftItem): any {
     type: 'Consumable',
     item: d.Item,
     category: d.Category,
+    location: d.Location,
     sub_location: d['Sub-Location'],
     qty: parseInt(d.Qty || '1', 10) || 1,
     unit: d.Unit,
@@ -83,8 +127,22 @@ function aiToDraft(item: any): DraftItem | null {
       Description: String(item.description || ''),
       Manufacturer: String(item.manufacturer || ''),
       System: String(item.system || ''),
-      'Sub-Location': String(item.sub_location || 'Other'),
+      Location: String(item.location || 'Engine Room'),
+      'Sub-Location': String(item.sub_location || ''),
       Qty: String(item.qty ?? 1),
+      Notes: String(item.notes || ''),
+    }
+  }
+  if (item.type === 'Tool') {
+    return {
+      type: 'Tool',
+      Name: String(item.name || ''),
+      Category: String(item.category || ''),
+      Brand: String(item.brand || ''),
+      'Model / Serial': String(item.model_serial || ''),
+      Location: String(item.location || 'Engine Room'),
+      'Sub-Location': String(item.sub_location || ''),
+      Condition: String(item.condition || 'Good'),
       Notes: String(item.notes || ''),
     }
   }
@@ -93,6 +151,7 @@ function aiToDraft(item: any): DraftItem | null {
       type: 'Consumable',
       Item: String(item.item || ''),
       Category: String(item.category || ''),
+      Location: String(item.location || 'Interior'),
       'Sub-Location': String(item.sub_location || ''),
       Qty: String(item.qty ?? 1),
       Unit: String(item.unit || 'ea'),
@@ -114,12 +173,31 @@ export function BulkAddPage() {
   const [summary, setSummary] = useState('')
   const [drafts, setDrafts] = useState<DraftItem[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [savedInfo, setSavedInfo] = useState<{ spares: number; consumables: number } | null>(null)
+  const [savedInfo, setSavedInfo] = useState<{ spares: number; consumables: number; tools: number } | null>(null)
 
   // AI revise on the review page
   const [reviseInstruction, setReviseInstruction] = useState('')
   const [revising, setRevising] = useState(false)
   const [reviseError, setReviseError] = useState<string | null>(null)
+
+  // Pull existing values for combo dropdowns
+  const { data: existingSpares } = useQuery({ queryKey: ['spares'], queryFn: () => fetchInventory('Spares') })
+  const { data: existingCons } = useQuery({ queryKey: ['consumables'], queryFn: () => fetchInventory('Consumables') })
+  const { data: existingTools } = useQuery({ queryKey: ['tools'], queryFn: () => fetchInventory('Tools') })
+
+  const usedSpareLocs = useMemo(() => new Set(((existingSpares || []) as any[]).map(it => (it.Location || '').trim()).filter(Boolean)), [existingSpares])
+  const usedSpareSubs = useMemo(() => new Set(((existingSpares || []) as any[]).map(it => (it['Sub-Location'] || '').trim()).filter(Boolean)), [existingSpares])
+  const usedConsLocs = useMemo(() => new Set(((existingCons || []) as any[]).map(it => (it.Location || '').trim()).filter(Boolean)), [existingCons])
+  const usedConsSubs = useMemo(() => new Set(((existingCons || []) as any[]).map(it => (it['Sub-Location'] || '').trim()).filter(Boolean)), [existingCons])
+  const usedToolLocs = useMemo(() => new Set(((existingTools || []) as any[]).map(it => (it.Location || '').trim()).filter(Boolean)), [existingTools])
+  const usedToolSubs = useMemo(() => new Set(((existingTools || []) as any[]).map(it => (it['Sub-Location'] || '').trim()).filter(Boolean)), [existingTools])
+
+  const spareLocOpts = useMemo(() => mergeOptions(SPARE_LOCATIONS, usedSpareLocs), [usedSpareLocs])
+  const spareSubOpts = useMemo(() => mergeOptions(SPARE_SUB_LOCATIONS, usedSpareSubs), [usedSpareSubs])
+  const consLocOpts = useMemo(() => mergeOptions(CONSUMABLE_LOCATIONS, usedConsLocs), [usedConsLocs])
+  const consSubOpts = useMemo(() => mergeOptions(CONSUMABLE_SUB_LOCATIONS, usedConsSubs), [usedConsSubs])
+  const toolLocOpts = useMemo(() => mergeOptions(TOOL_LOCATIONS, usedToolLocs), [usedToolLocs])
+  const toolSubOpts = useMemo(() => mergeOptions(TOOL_SUB_LOCATIONS, usedToolSubs), [usedToolSubs])
 
   async function handlePhotos(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -181,19 +259,41 @@ export function BulkAddPage() {
     setDrafts(prev => prev.filter((_, idx) => idx !== i))
   }
 
+  // Cycle Spare → Consumable → Tool → Spare
   function toggleType(i: number) {
     setDrafts(prev => prev.map((d, idx) => {
       if (idx !== i) return d
       if (d.type === 'Spare') {
-        return { ...emptyConsumable(), Notes: d.Notes, Qty: d.Qty, Item: d.Description }
-      } else {
-        return { ...emptySpare(), Notes: d.Notes, Qty: d.Qty, Description: d.Item }
+        const next = emptyConsumable()
+        next.Item = d.Description || d['Part Number']
+        next.Qty = d.Qty
+        next.Notes = d.Notes
+        next.Location = d.Location || 'Interior'
+        next['Sub-Location'] = d['Sub-Location']
+        return next
       }
+      if (d.type === 'Consumable') {
+        const next = emptyTool()
+        next.Name = d.Item
+        next.Notes = d.Notes
+        next.Location = d.Location || 'Engine Room'
+        next['Sub-Location'] = d['Sub-Location']
+        return next
+      }
+      // Tool → Spare
+      const next = emptySpare()
+      next.Description = d.Name
+      next.Manufacturer = d.Brand
+      next.Notes = d.Notes
+      next.Location = d.Location || 'Engine Room'
+      next['Sub-Location'] = d['Sub-Location']
+      return next
     }))
   }
 
   function addBlankSpare() { setDrafts(prev => [...prev, emptySpare()]) }
   function addBlankConsumable() { setDrafts(prev => [...prev, emptyConsumable()]) }
+  function addBlankTool() { setDrafts(prev => [...prev, emptyTool()]) }
 
   async function runRevise() {
     setReviseError(null)
@@ -239,11 +339,12 @@ export function BulkAddPage() {
     setError(null)
     setStage('saving')
     try {
-      const spares = drafts.filter(d => d.type === 'Spare' && (d['Part Number'].trim() || d.Description.trim())) as SpareDraft[]
-      const consumables = drafts.filter(d => d.type === 'Consumable' && d.Item.trim()) as ConsumableDraft[]
+      const spares = drafts.filter(d => d.type === 'Spare' && ((d as SpareDraft)['Part Number'].trim() || (d as SpareDraft).Description.trim())) as SpareDraft[]
+      const consumables = drafts.filter(d => d.type === 'Consumable' && (d as ConsumableDraft).Item.trim()) as ConsumableDraft[]
+      const tools = drafts.filter(d => d.type === 'Tool' && (d as ToolDraft).Name.trim()) as ToolDraft[]
 
-      if (spares.length === 0 && consumables.length === 0) {
-        setError('Nothing to save. Spares need a Part Number or Description; Consumables need an Item name.')
+      if (spares.length === 0 && consumables.length === 0 && tools.length === 0) {
+        setError('Nothing to save. Spares need a Part Number or Description; Consumables need an Item name; Tools need a Name.')
         setStage('review')
         return
       }
@@ -251,6 +352,7 @@ export function BulkAddPage() {
       // Strip the `type` discriminator before sending
       const sparePayload = spares.map(({ type, ...rest }) => { void type; return rest })
       const consumablePayload = consumables.map(({ type, ...rest }) => { void type; return rest })
+      const toolPayload = tools.map(({ type, ...rest }) => { void type; return rest })
 
       const res = await fetch('/api/inventory-bulk-save', {
         method: 'POST',
@@ -258,6 +360,7 @@ export function BulkAddPage() {
         body: JSON.stringify({
           spares: sparePayload,
           consumables: consumablePayload,
+          tools: toolPayload,
           user: getCrewName() || 'crew',
         }),
       })
@@ -268,7 +371,12 @@ export function BulkAddPage() {
 
       await queryClient.invalidateQueries({ queryKey: ['spares'] })
       await queryClient.invalidateQueries({ queryKey: ['consumables'] })
-      setSavedInfo({ spares: data.savedSpares || 0, consumables: data.savedConsumables || 0 })
+      await queryClient.invalidateQueries({ queryKey: ['tools'] })
+      setSavedInfo({
+        spares: data.savedSpares || 0,
+        consumables: data.savedConsumables || 0,
+        tools: data.savedTools || 0,
+      })
       setStage('done')
     } catch (e: any) {
       setError(e?.message || 'Save failed')
@@ -285,7 +393,7 @@ export function BulkAddPage() {
           <div className="p-4 rounded-xl border border-emerald-900/50 bg-emerald-950/30">
             <div className="text-emerald-400 font-medium mb-1">Items saved</div>
             <div className="text-sm">
-              {savedInfo?.spares ?? 0} spare(s), {savedInfo?.consumables ?? 0} consumable(s).
+              {savedInfo?.spares ?? 0} spare(s), {savedInfo?.consumables ?? 0} consumable(s), {savedInfo?.tools ?? 0} tool(s).
             </div>
           </div>
           <Button onClick={() => setLocation('/inventory/spares')} className="w-full">
@@ -293,6 +401,9 @@ export function BulkAddPage() {
           </Button>
           <Button variant="secondary" onClick={() => setLocation('/inventory/consumables')} className="w-full">
             View Consumables
+          </Button>
+          <Button variant="secondary" onClick={() => setLocation('/inventory/tools')} className="w-full">
+            View Tools
           </Button>
           <Button
             variant="secondary"
@@ -316,6 +427,7 @@ export function BulkAddPage() {
   if (stage === 'review' || stage === 'saving') {
     const spareCount = drafts.filter(d => d.type === 'Spare').length
     const consumableCount = drafts.filter(d => d.type === 'Consumable').length
+    const toolCount = drafts.filter(d => d.type === 'Tool').length
     return (
       <MenuLayout title="Review items" showBack backHref="/inventory/bulk-add">
         <div className="space-y-4">
@@ -333,7 +445,7 @@ export function BulkAddPage() {
               <div className="text-sm font-medium">Bulk edit with AI</div>
             </div>
             <div className="text-xs text-muted-foreground">
-              Describe changes to apply across all items below. Examples: “all of these are CAT spares”, “set system to Main Engines”, “move everything to a new sub-location called Bin#1-STBD Gen”, “remove duplicates”.
+              Describe changes to apply across all items below. Examples: “all of these are CAT spares”, “set system to Main Engines”, “the multimeter is a tool not a consumable”, “move everything to a new sub-location called Bin#1-STBD Gen”, “remove duplicates”.
             </div>
             <textarea
               value={reviseInstruction}
@@ -357,54 +469,80 @@ export function BulkAddPage() {
           </div>
 
           <div className="text-xs text-muted-foreground">
-            {drafts.length} item(s) ready · {spareCount} spare · {consumableCount} consumable
+            {drafts.length} item(s) ready · {spareCount} spare · {consumableCount} consumable · {toolCount} tool
           </div>
 
           {error && (
             <div className="text-red-500 text-sm p-3 rounded-lg border border-red-900/40 bg-red-950/30">{error}</div>
           )}
 
-          {drafts.map((d, i) => (
-            <div key={i} className="p-3 rounded-xl border border-border bg-card space-y-2">
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => toggleType(i)}
-                  className={`px-2 h-7 rounded-md text-xs font-medium border ${d.type === 'Spare' ? 'bg-primary text-primary-foreground border-primary' : 'bg-emerald-700 text-white border-emerald-700'}`}
-                  title="Tap to switch between Spare and Consumable"
-                >
-                  {d.type === 'Spare' ? '🔧 Spare' : '📦 Consumable'}
-                </button>
-                <button onClick={() => removeDraft(i)} className="text-xs text-red-400 underline">Remove</button>
-              </div>
+          {drafts.map((d, i) => {
+            const typeBtnCls =
+              d.type === 'Spare'
+                ? 'bg-primary text-primary-foreground border-primary'
+                : d.type === 'Consumable'
+                ? 'bg-emerald-700 text-white border-emerald-700'
+                : 'bg-amber-600 text-white border-amber-600'
+            const typeLabel =
+              d.type === 'Spare' ? '🔧 Spare' : d.type === 'Consumable' ? '📦 Consumable' : '🛠️ Tool'
+            return (
+              <div key={i} className="p-3 rounded-xl border border-border bg-card space-y-2">
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => toggleType(i)}
+                    className={`px-2 h-7 rounded-md text-xs font-medium border ${typeBtnCls}`}
+                    title="Tap to cycle through Spare / Consumable / Tool"
+                  >
+                    {typeLabel}
+                  </button>
+                  <button onClick={() => removeDraft(i)} className="text-xs text-red-400 underline">Remove</button>
+                </div>
 
-              {d.type === 'Spare' ? (
-                <>
-                  <Field label="Part Number" value={d['Part Number']} onChange={v => updateDraft(i, 'Part Number', v)} />
-                  <Field label="Description" value={d.Description} onChange={v => updateDraft(i, 'Description', v)} />
-                  <Field label="Manufacturer" value={d.Manufacturer} onChange={v => updateDraft(i, 'Manufacturer', v)} />
-                  <FieldSelect label="System" value={d.System} options={SPARE_SYSTEMS} onChange={v => updateDraft(i, 'System', v)} />
-                  <FieldCombo label="Sub-Location" value={d['Sub-Location']} options={SPARE_SUB_LOCATIONS} onChange={v => updateDraft(i, 'Sub-Location', v)} listId={`spare-sublocs-${i}`} />
-                  <Field label="Qty" value={d.Qty} type="number" onChange={v => updateDraft(i, 'Qty', v)} />
-                  <FieldArea label="Notes" value={d.Notes} onChange={v => updateDraft(i, 'Notes', v)} />
-                </>
-              ) : (
-                <>
-                  <Field label="Item *" value={d.Item} onChange={v => updateDraft(i, 'Item', v)} />
-                  <FieldSelect label="Category" value={d.Category} options={CONSUMABLE_CATEGORIES} onChange={v => updateDraft(i, 'Category', v)} />
-                  <FieldCombo label="Sub-Location" value={d['Sub-Location']} options={CONSUMABLE_SUB_LOCATIONS} onChange={v => updateDraft(i, 'Sub-Location', v)} listId={`cons-sublocs-${i}`} />
-                  <div className="grid grid-cols-2 gap-2">
+                {d.type === 'Spare' ? (
+                  <>
+                    <Field label="Part Number" value={d['Part Number']} onChange={v => updateDraft(i, 'Part Number', v)} />
+                    <Field label="Description" value={d.Description} onChange={v => updateDraft(i, 'Description', v)} />
+                    <Field label="Manufacturer" value={d.Manufacturer} onChange={v => updateDraft(i, 'Manufacturer', v)} />
+                    <FieldSelect label="System" value={d.System} options={SPARE_SYSTEMS} onChange={v => updateDraft(i, 'System', v)} />
+                    <FieldCombo h={10} label="Location" value={d.Location} options={spareLocOpts} onChange={v => updateDraft(i, 'Location', v)} />
+                    <FieldCombo h={10} label="Sub-Location" value={d['Sub-Location']} options={spareSubOpts} onChange={v => updateDraft(i, 'Sub-Location', v)} />
                     <Field label="Qty" value={d.Qty} type="number" onChange={v => updateDraft(i, 'Qty', v)} />
-                    <Field label="Unit" value={d.Unit} onChange={v => updateDraft(i, 'Unit', v)} />
-                  </div>
-                  <FieldArea label="Notes" value={d.Notes} onChange={v => updateDraft(i, 'Notes', v)} />
-                </>
-              )}
-            </div>
-          ))}
+                    <FieldArea label="Notes" value={d.Notes} onChange={v => updateDraft(i, 'Notes', v)} />
+                  </>
+                ) : d.type === 'Consumable' ? (
+                  <>
+                    <Field label="Item *" value={d.Item} onChange={v => updateDraft(i, 'Item', v)} />
+                    <FieldSelect label="Category" value={d.Category} options={CONSUMABLE_CATEGORIES} onChange={v => updateDraft(i, 'Category', v)} />
+                    <FieldCombo h={10} label="Location" value={d.Location} options={consLocOpts} onChange={v => updateDraft(i, 'Location', v)} />
+                    <FieldCombo h={10} label="Sub-Location" value={d['Sub-Location']} options={consSubOpts} onChange={v => updateDraft(i, 'Sub-Location', v)} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="Qty" value={d.Qty} type="number" onChange={v => updateDraft(i, 'Qty', v)} />
+                      <Field label="Unit" value={d.Unit} onChange={v => updateDraft(i, 'Unit', v)} />
+                    </div>
+                    <FieldArea label="Notes" value={d.Notes} onChange={v => updateDraft(i, 'Notes', v)} />
+                  </>
+                ) : (
+                  <>
+                    <Field label="Name *" value={d.Name} onChange={v => updateDraft(i, 'Name', v)} />
+                    <FieldSelect label="Category" value={d.Category} options={TOOL_CATEGORIES} onChange={v => updateDraft(i, 'Category', v)} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="Brand" value={d.Brand} onChange={v => updateDraft(i, 'Brand', v)} />
+                      <Field label="Model / Serial" value={d['Model / Serial']} onChange={v => updateDraft(i, 'Model / Serial', v)} />
+                    </div>
+                    <FieldCombo h={10} label="Location" value={d.Location} options={toolLocOpts} onChange={v => updateDraft(i, 'Location', v)} />
+                    <FieldCombo h={10} label="Sub-Location" value={d['Sub-Location']} options={toolSubOpts} onChange={v => updateDraft(i, 'Sub-Location', v)} />
+                    <FieldSelect label="Condition" value={d.Condition} options={TOOL_CONDITIONS} onChange={v => updateDraft(i, 'Condition', v)} />
+                    <FieldArea label="Notes" value={d.Notes} onChange={v => updateDraft(i, 'Notes', v)} />
+                  </>
+                )}
+              </div>
+            )
+          })}
 
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={addBlankSpare} className="h-10 rounded-lg border border-dashed border-border text-sm text-muted-foreground">+ Add spare</button>
-            <button onClick={addBlankConsumable} className="h-10 rounded-lg border border-dashed border-border text-sm text-muted-foreground">+ Add consumable</button>
+          <div className="grid grid-cols-3 gap-2">
+            <button onClick={addBlankSpare} className="h-10 rounded-lg border border-dashed border-border text-sm text-muted-foreground">+ Spare</button>
+            <button onClick={addBlankConsumable} className="h-10 rounded-lg border border-dashed border-border text-sm text-muted-foreground">+ Consumable</button>
+            <button onClick={addBlankTool} className="h-10 rounded-lg border border-dashed border-border text-sm text-muted-foreground">+ Tool</button>
           </div>
 
           <Button onClick={saveAll} disabled={stage === 'saving' || drafts.length === 0} className="w-full h-12 text-base">
@@ -420,7 +558,7 @@ export function BulkAddPage() {
     <MenuLayout title="Bulk Add" showBack backHref="/inventory">
       <div className="space-y-4">
         <div className="text-sm text-muted-foreground">
-          Dictate or type a list, attach photos, or both. AI will read everything, classify each item as a spare or consumable, and let you review before saving.
+          Dictate or type a list, attach photos, or both. AI will read everything, classify each item as a spare, consumable, or tool, and let you review before saving.
         </div>
 
         <div>
@@ -429,7 +567,7 @@ export function BulkAddPage() {
             value={text}
             onChange={e => setText(e.target.value)}
             rows={6}
-            placeholder="e.g. 3 Racor 2010PM-OR filters in port locker, 2 Jabsco 920-0001 impellers in STBD locker, 12 bottles of dish soap in galley, 4 rolls of paper towels…"
+            placeholder="e.g. 3 Racor 2010PM-OR filters in port locker, 2 Jabsco 920-0001 impellers in STBD locker, 12 bottles of dish soap in galley, 1 Fluke 117 multimeter on the workbench…"
             className="w-full px-3 py-2 rounded-lg bg-secondary border border-border"
           />
           <div className="text-xs text-muted-foreground mt-1">Tip: tap the microphone on your keyboard to dictate.</div>
@@ -496,61 +634,6 @@ function Field({ label, value, onChange, type }: { label: string; value: string;
         inputMode={type === 'number' ? 'decimal' : undefined}
         className="w-full h-10 px-3 rounded-lg bg-secondary border border-border"
       />
-    </div>
-  )
-}
-
-function FieldCombo({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void; listId?: string }) {
-  // value matches a preset → show dropdown; doesn't match (custom/new) → show text input.
-  const isCustom = value !== '' && !options.includes(value)
-  const [customMode, setCustomMode] = React.useState(isCustom)
-
-  // If parent value changes to a preset, drop custom mode
-  React.useEffect(() => {
-    if (value && options.includes(value)) setCustomMode(false)
-  }, [value, options])
-
-  return (
-    <div>
-      <label className="block text-xs text-muted-foreground mb-1">{label}</label>
-      {customMode ? (
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            placeholder="Type a new value"
-            autoFocus
-            className="flex-1 h-10 px-3 rounded-lg bg-secondary border border-primary"
-          />
-          <button
-            type="button"
-            onClick={() => { onChange(''); setCustomMode(false) }}
-            className="h-10 px-3 rounded-lg bg-secondary border border-border text-xs text-muted-foreground"
-            title="Pick from list instead"
-          >
-            ✕
-          </button>
-        </div>
-      ) : (
-        <select
-          value={value}
-          onChange={e => {
-            const v = e.target.value
-            if (v === '__new__') {
-              onChange('')
-              setCustomMode(true)
-            } else {
-              onChange(v)
-            }
-          }}
-          className="w-full h-10 px-3 rounded-lg bg-secondary border border-border"
-        >
-          <option value="">— pick one —</option>
-          {options.map(o => <option key={o} value={o}>{o}</option>)}
-          <option value="__new__">+ New custom value…</option>
-        </select>
-      )}
     </div>
   )
 }

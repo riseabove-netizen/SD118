@@ -12,47 +12,68 @@ const client = new Anthropic({
 
 const PROMPT = `You are cataloging items onboard the M/Y Rise Above (Sanlorenzo SD118, yacht). The user is dictating and/or attaching photos to add MULTIPLE inventory items at once.
 
-Classify each item as one of two categories:
+Classify each item as one of THREE types:
 
-  "Spare"       \u2014 a mechanical replacement part identified by a manufacturer part number
+  "Spare"       — a mechanical replacement part identified by a manufacturer part number
                   (filters, gaskets, impellers, belts, sensors, pumps, hoses, fuses, etc.).
-                  Typically stored in the engine room.
-  "Consumable"  \u2014 supplies that get used and restocked: galley provisions, cleaning chemicals,
+  "Consumable"  — supplies that get used and restocked: galley provisions, cleaning chemicals,
                   toiletries, lines, fenders, safety gear, deck supplies, office supplies, etc.
+  "Tool"        — a durable tool the crew uses (hand tools, power tools, diagnostic gear,
+                  measurement instruments, safety equipment, diving gear, etc.). Not a consumable
+                  and not a spare part.
 
-If the user explicitly says "spare" or "consumable", honor that. If part number is mentioned, prefer Spare. If category is ambiguous, make your best guess.
+If the user explicitly says "spare", "consumable", or "tool", honor that. If a part number is mentioned, prefer Spare. If category is ambiguous, make your best guess.
 
 For EACH distinct item across the text and images, output a record with the relevant fields below.
 
+Location is TWO fields:
+  location     = broad area of the vessel: "Engine Room", "Lazarette", "Bridge", "Interior", "Exterior", "Other"
+  sub_location = specific place inside that area (string). Prefer one of the suggestions below for each type, but if the user explicitly names a NEW location (e.g. "Bin#1-STBD Gen", "Crew Cabin 3 Locker"), use the exact name they gave — do NOT force it back to the list.
+
 For Spares, fields:
-  type        = "Spare"
-  part_number = manufacturer part number (string). If not stated, null.
-  description = short description
+  type         = "Spare"
+  part_number  = manufacturer part number (string). If not stated, "".
+  description  = short description
   manufacturer = brand if known, else ""
-  system      = one of: "Main Engines", "Generators", "Watermaker", "Hydraulics", "AC / Refrigeration", "Electrical", "Plumbing", "Steering", "Stabilizers", "Fuel System", "Other"
-  sub_location = one of: "Engine Room - Port Locker", "Engine Room - STBD Locker", "Engine Room - Forward Bin", "Engine Room - Aft Bin", "Engine Room - Gen Toolbox", "Engine Room - Workbench", "Other"  (best guess if not stated, default "Other")
-  qty         = integer count (default 1)
-  notes       = any extra info from the user, else ""
+  system       = one of: "Main Engines", "Generators", "Watermaker", "Hydraulics", "AC / Refrigeration", "Electrical", "Plumbing", "Steering", "Stabilizers", "Fuel System", "Other"
+  location     = default "Engine Room" unless the user said otherwise
+  sub_location = e.g. "Port Locker", "STBD Locker", "Bin #1", "Bin #2", "Bin #3", "Bin #1 - STBD Gen", "Workbench", "Other"
+  qty          = integer count (default 1)
+  notes        = any extra info from the user, else ""
 
 For Consumables, fields:
-  type        = "Consumable"
-  item        = item name (e.g. "Dish soap")
-  category    = one of: "Galley", "Cleaning", "Toiletries", "Lines & Fenders", "Safety", "Deck Supplies", "Tools", "Spare Parts", "Office", "Other"
-  sub_location = one of: "Anchor Locker", "Fly Storage", "Bridge Deck Locker", "Aft Deck Locker - Port", "Aft Deck Locker - STBD", "Galley", "Engine Room", "Crew Mess", "Lazarette", "Master Stateroom", "Guest Cabin", "Salon", "Other" (best guess if not stated)
-  qty         = integer count (default 1)
-  unit        = unit of measure ("ea", "bottle", "roll", "L", "kg", "box"). Default "ea".
-  notes       = any extra info, else ""
+  type         = "Consumable"
+  item         = item name (e.g. "Dish soap")
+  category     = one of: "Galley", "Cleaning", "Toiletries", "Lines & Fenders", "Safety", "Deck Supplies", "Tools", "Spare Parts", "Office", "Other"
+  location     = "Interior", "Exterior", "Engine Room", "Bridge", "Lazarette", or "Other"
+  sub_location = e.g. "Salon", "Galley", "Crew Mess", "Master Stateroom", "Guest Cabin", "Anchor Locker", "Fly Storage", "Bridge Deck Locker", "Aft Deck Locker - Port", "Aft Deck Locker - STBD", "Lazarette", "Engine Room", "Other"
+  qty          = integer count (default 1)
+  unit         = unit of measure ("ea", "bottle", "roll", "L", "kg", "box"). Default "ea".
+  notes        = any extra info, else ""
 
-Combine identical units (same part_number or same item+sub_location) into a single entry with qty=N.
+For Tools, fields:
+  type           = "Tool"
+  name           = tool name (e.g. "3/8 inch Drive Socket Set", "Fluke 117 Multimeter")
+  category       = one of: "Hand Tool", "Power Tool", "Mechanical", "Electrical", "Plumbing", "Diagnostic", "Safety", "Measurement", "Diving / Snorkeling", "Other"
+  brand          = brand if visible/known, else ""
+  model_serial   = model number or serial if visible, else ""
+  location       = default "Engine Room" unless the user said otherwise
+  sub_location   = e.g. "Workbench", "Toolbox", "Tool Cabinet", "Port Locker", "STBD Locker", "Forward Bin", "Aft Bin", "Crew Mess", "Garage", "Other"
+  condition      = "New", "Good", "Fair", "Needs Service", or "Broken". Default "Good".
+  qty            = integer count (default 1, although tools are usually unique units — use higher qty only when several identical units exist)
+  notes          = any extra info, else ""
+
+Combine identical units (same part_number / same item+sub_location / same tool name+brand) into a single entry with qty=N.
 
 Also produce a short one-sentence "summary" describing what you detected.
 
 Return ONLY valid JSON in this exact shape (no prose, no markdown):
 {
-  "summary": "Detected 3 spares and 5 consumables across 2 locations.",
+  "summary": "Detected 3 spares, 5 consumables, and 2 tools.",
   "items": [
-    { "type": "Spare", "part_number": "1R-1808", "description": "Fuel filter element", "manufacturer": "CAT", "system": "Main Engines", "sub_location": "Engine Room - Port Locker", "qty": 3, "notes": "" },
-    { "type": "Consumable", "item": "Dish soap", "category": "Galley", "sub_location": "Galley", "qty": 12, "unit": "bottle", "notes": "" }
+    { "type": "Spare", "part_number": "1R-1808", "description": "Fuel filter element", "manufacturer": "CAT", "system": "Main Engines", "location": "Engine Room", "sub_location": "Bin #1", "qty": 3, "notes": "" },
+    { "type": "Consumable", "item": "Dish soap", "category": "Galley", "location": "Interior", "sub_location": "Galley", "qty": 12, "unit": "bottle", "notes": "" },
+    { "type": "Tool", "name": "Fluke 117 Multimeter", "category": "Diagnostic", "brand": "Fluke", "model_serial": "117", "location": "Engine Room", "sub_location": "Workbench", "condition": "Good", "qty": 1, "notes": "" }
   ]
 }`
 
@@ -94,16 +115,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     }))
 
-    const userContent: Anthropic.ContentBlockParam[] = [...imageContent]
+    const userContent: any[] = [...imageContent]
     if (text && text.trim()) {
-      userContent.push({ type: 'text', text: `User dictation:\n${text.trim()}\n\n${PROMPT}` })
+      userContent.push({ type: 'text', text: `USER TEXT:\n${text.trim()}\n\n${PROMPT}` })
     } else {
       userContent.push({ type: 'text', text: PROMPT })
     }
 
     const message = await client.messages.create({
       model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: 6000,
       messages: [{ role: 'user', content: userContent }],
     })
 
@@ -114,10 +135,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       data = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
     } catch {
       return res.status(502).json({ error: 'AI returned non-JSON response', raw: responseText.slice(0, 800) })
-    }
-
-    if (!Array.isArray((data as any).items)) {
-      return res.status(502).json({ error: 'AI response missing items array', raw: responseText.slice(0, 800) })
     }
 
     return res.status(200).json(data)

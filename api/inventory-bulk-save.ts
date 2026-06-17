@@ -37,12 +37,17 @@ const CONSUMABLE_HEADERS = [
   'Min Qty', 'Max Qty', 'Last Used', 'Notes', 'Photo URL',
   'Created At', 'Created By',
 ]
+const TOOL_HEADERS = [
+  'ID', 'Name', 'Category', 'Brand', 'Model / Serial',
+  'Location', 'Sub-Location', 'Condition', 'Last Checked', 'Notes', 'Photo URL',
+  'Created At', 'Created By',
+]
 
 function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 }
 
-// Map a consumable sub-location to Interior or Exterior
+// Fallback: if Location wasn't provided, map a consumable sub-location to Interior/Exterior/etc.
 function locationForConsumable(sub: string): string {
   const exterior = new Set([
     'Anchor Locker', 'Fly Storage', 'Bridge Deck Locker',
@@ -51,11 +56,13 @@ function locationForConsumable(sub: string): string {
   if (!sub) return ''
   if (exterior.has(sub)) return 'Exterior'
   if (sub === 'Engine Room') return 'Engine Room'
+  if (sub === 'Lazarette') return 'Lazarette'
   return 'Interior'
 }
 
 type SpareDraft = Record<string, string>
 type ConsumableDraft = Record<string, string>
+type ToolDraft = Record<string, string>
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -67,13 +74,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   }
 
-  const { spares, consumables, user } = (req.body || {}) as {
+  const { spares, consumables, tools, user } = (req.body || {}) as {
     spares?: SpareDraft[]
     consumables?: ConsumableDraft[]
+    tools?: ToolDraft[]
     user?: string
   }
 
-  if ((!spares || spares.length === 0) && (!consumables || consumables.length === 0)) {
+  if (
+    (!spares || spares.length === 0) &&
+    (!consumables || consumables.length === 0) &&
+    (!tools || tools.length === 0)
+  ) {
     return res.status(400).json({ error: 'No items to save' })
   }
 
@@ -86,6 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let savedSpares = 0
     let savedConsumables = 0
+    let savedTools = 0
 
     if (spares && spares.length > 0) {
       const rows = spares
@@ -93,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .map(s => {
           const merged: SpareDraft = { ...s }
           if (!merged.ID) merged.ID = newId()
-          merged.Location = 'Engine Room'
+          if (!merged.Location) merged.Location = 'Engine Room'
           merged['Created At'] = now
           merged['Created By'] = userName
           return SPARE_HEADERS.map(h => (merged[h] !== undefined && merged[h] !== null ? String(merged[h]) : ''))
@@ -115,7 +128,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .map(c => {
           const merged: ConsumableDraft = { ...c }
           if (!merged.ID) merged.ID = newId()
-          merged.Location = locationForConsumable(merged['Sub-Location'] || '')
+          if (!merged.Location) merged.Location = locationForConsumable(merged['Sub-Location'] || '')
           if (!merged.Unit) merged.Unit = 'ea'
           merged['Created At'] = now
           merged['Created By'] = userName
@@ -132,7 +145,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    return res.status(200).json({ ok: true, savedSpares, savedConsumables })
+    if (tools && tools.length > 0) {
+      const rows = tools
+        .filter(t => (t.Name || '').trim())
+        .map(t => {
+          const merged: ToolDraft = { ...t }
+          if (!merged.ID) merged.ID = newId()
+          if (!merged.Location) merged.Location = 'Engine Room'
+          if (!merged.Condition) merged.Condition = 'Good'
+          merged['Created At'] = now
+          merged['Created By'] = userName
+          return TOOL_HEADERS.map(h => (merged[h] !== undefined && merged[h] !== null ? String(merged[h]) : ''))
+        })
+      if (rows.length > 0) {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: INVENTORY_ID,
+          range: 'Tools!A:A',
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: rows },
+        })
+        savedTools = rows.length
+      }
+    }
+
+    return res.status(200).json({ ok: true, savedSpares, savedConsumables, savedTools })
   } catch (error: any) {
     console.error('inventory-bulk-save error:', error)
     const detail =
