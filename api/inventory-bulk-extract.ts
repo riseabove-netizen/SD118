@@ -12,17 +12,19 @@ const client = new Anthropic({
 
 const PROMPT = `You are cataloging items onboard the M/Y Rise Above (Sanlorenzo SD118, yacht). The user is dictating and/or attaching photos to add MULTIPLE inventory items at once.
 
-Classify each item as one of THREE types:
+Classify each item as one of FOUR types:
 
   "Spare"       — a mechanical replacement part identified by a manufacturer part number
                   (filters, gaskets, impellers, belts, sensors, pumps, hoses, fuses, etc.).
-  "Consumable"  — supplies that get used and restocked: galley provisions, cleaning chemicals,
-                  toiletries, lines, fenders, safety gear, deck supplies, office supplies, etc.
+  "Consumable"  — provisions that get used and restocked frequently: galley provisions,
+                  cleaning chemicals, toiletries, food, office supplies, etc.
+  "Supply"      — durable supplies stored in lockers: lines, fenders, paint, hardware,
+                  fasteners, lubricants, deck supplies, safety gear, hoses, etc. Not a tool,
+                  not a spare part with a part number, and not a quickly-consumed provision.
   "Tool"        — a durable tool the crew uses (hand tools, power tools, diagnostic gear,
-                  measurement instruments, safety equipment, diving gear, etc.). Not a consumable
-                  and not a spare part.
+                  measurement instruments, safety equipment, diving gear, etc.).
 
-If the user explicitly says "spare", "consumable", or "tool", honor that. If a part number is mentioned, prefer Spare. If category is ambiguous, make your best guess.
+If the user explicitly says "spare", "consumable", "supply", or "tool", honor that. If a part number is mentioned, prefer Spare. If category is ambiguous, make your best guess.
 
 For EACH distinct item across the text and images, output a record with the relevant fields below.
 
@@ -51,6 +53,17 @@ For Consumables, fields:
   unit         = unit of measure ("ea", "bottle", "roll", "L", "kg", "box"). Default "ea".
   notes        = any extra info, else ""
 
+For Supplies, fields:
+  type         = "Supply"
+  item         = item name (e.g. "3/4 inch dock line", "5200 sealant")
+  category     = one of: "Deck Supplies", "Lines & Fenders", "Cleaning", "Safety", "Paint & Coatings", "Hardware", "Fasteners", "Lubricants", "Electrical", "Plumbing", "Galley", "Office", "Other"
+  brand        = brand if known, else ""
+  location     = "Engine Room", "Lazarette", "Bridge", "Interior", "Exterior", or "Other"
+  sub_location = e.g. "Port Locker", "STBD Locker", "Forward Bin", "Aft Bin", "Aft Deck Locker - Port", "Aft Deck Locker - STBD", "Anchor Locker", "Bridge Deck Locker", "Fly Storage", "Workbench", "Garage", "Other"
+  qty          = integer count (default 1)
+  unit         = unit of measure ("ea", "bottle", "m", "ft", "box", "roll"). Default "ea".
+  notes        = any extra info, else ""
+
 For Tools, fields:
   type           = "Tool"
   name           = tool name (e.g. "3/8 inch Drive Socket Set", "Fluke 117 Multimeter")
@@ -69,10 +82,11 @@ Also produce a short one-sentence "summary" describing what you detected.
 
 Return ONLY valid JSON in this exact shape (no prose, no markdown):
 {
-  "summary": "Detected 3 spares, 5 consumables, and 2 tools.",
+  "summary": "Detected 3 spares, 5 consumables, 4 supplies, and 2 tools.",
   "items": [
     { "type": "Spare", "part_number": "1R-1808", "description": "Fuel filter element", "manufacturer": "CAT", "system": "Main Engines", "location": "Engine Room", "sub_location": "Bin #1", "qty": 3, "notes": "" },
     { "type": "Consumable", "item": "Dish soap", "category": "Galley", "location": "Interior", "sub_location": "Galley", "qty": 12, "unit": "bottle", "notes": "" },
+    { "type": "Supply", "item": "3/4 inch dock line", "category": "Lines & Fenders", "brand": "New England Ropes", "location": "Exterior", "sub_location": "Aft Deck Locker - STBD", "qty": 4, "unit": "ea", "notes": "" },
     { "type": "Tool", "name": "Fluke 117 Multimeter", "category": "Diagnostic", "brand": "Fluke", "model_serial": "117", "location": "Engine Room", "sub_location": "Workbench", "condition": "Good", "qty": 1, "notes": "" }
   ]
 }`

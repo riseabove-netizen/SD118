@@ -1,6 +1,6 @@
 // Shared inventory types and fetchers
 
-export type InventoryTab = 'Spares' | 'Consumables' | 'Tools'
+export type InventoryTab = 'Spares' | 'Consumables' | 'Tools' | 'Supplies'
 
 export type SpareItem = {
   rowIndex: number // 1-based row in the sheet (header is row 1, first data row is 2)
@@ -25,6 +25,25 @@ export type ConsumableItem = {
   ID: string
   Item: string
   Category: string
+  Location: string
+  'Sub-Location': string
+  Qty: string
+  Unit: string
+  'Min Qty': string
+  'Max Qty': string
+  'Last Used': string
+  Notes: string
+  'Photo URL': string
+  'Created At': string
+  'Created By': string
+}
+
+export type SupplyItem = {
+  rowIndex: number
+  ID: string
+  Item: string
+  Category: string
+  Brand: string
   Location: string
   'Sub-Location': string
   Qty: string
@@ -185,6 +204,47 @@ export const TOOL_CONDITIONS = [
   'Fair',
   'Needs Service',
   'Broken',
+]
+
+// Supplies — non-consumable supplies (deck supplies, fenders, ropes, paint, hardware, etc.)
+export const SUPPLY_CATEGORIES = [
+  'Deck Supplies',
+  'Lines & Fenders',
+  'Cleaning',
+  'Safety',
+  'Paint & Coatings',
+  'Hardware',
+  'Fasteners',
+  'Lubricants',
+  'Electrical',
+  'Plumbing',
+  'Galley',
+  'Office',
+  'Other',
+]
+
+export const SUPPLY_LOCATIONS = [
+  'Engine Room',
+  'Lazarette',
+  'Bridge',
+  'Interior',
+  'Exterior',
+  'Other',
+]
+
+export const SUPPLY_SUB_LOCATIONS = [
+  'Port Locker',
+  'STBD Locker',
+  'Forward Bin',
+  'Aft Bin',
+  'Aft Deck Locker - Port',
+  'Aft Deck Locker - STBD',
+  'Anchor Locker',
+  'Bridge Deck Locker',
+  'Fly Storage',
+  'Workbench',
+  'Garage',
+  'Other',
 ]
 
 async function jsonOrError(res: Response) {

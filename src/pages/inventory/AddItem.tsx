@@ -22,6 +22,9 @@ import {
   TOOL_LOCATIONS,
   TOOL_SUB_LOCATIONS,
   TOOL_CONDITIONS,
+  SUPPLY_CATEGORIES,
+  SUPPLY_LOCATIONS,
+  SUPPLY_SUB_LOCATIONS,
   type InventoryTab,
 } from '@/lib/inventory'
 
@@ -60,6 +63,19 @@ const CONSUMABLE_FIELDS: FieldDef[] = [
   { key: 'Notes', label: 'Notes', type: 'textarea' },
 ]
 
+const SUPPLY_FIELDS: FieldDef[] = [
+  { key: 'Item', label: 'Item *', placeholder: 'e.g. 3/4 inch dock line' },
+  { key: 'Category', label: 'Category', combo: 'category' },
+  { key: 'Brand', label: 'Brand', placeholder: 'optional' },
+  { key: 'Location', label: 'Location', combo: 'location' },
+  { key: 'Sub-Location', label: 'Sub-Location', combo: 'subLocation' },
+  { key: 'Qty', label: 'Quantity', type: 'number' },
+  { key: 'Unit', label: 'Unit', placeholder: 'ea, m, ft, box…' },
+  { key: 'Min Qty', label: 'Min Qty', type: 'number' },
+  { key: 'Max Qty', label: 'Max Qty', type: 'number' },
+  { key: 'Notes', label: 'Notes', type: 'textarea' },
+]
+
 const TOOL_FIELDS: FieldDef[] = [
   { key: 'Name', label: 'Name *', placeholder: 'e.g. Fluke 117 Multimeter' },
   { key: 'Category', label: 'Category', combo: 'category' },
@@ -75,23 +91,27 @@ const TOOL_FIELDS: FieldDef[] = [
 function fieldsFor(tab: InventoryTab): FieldDef[] {
   if (tab === 'Spares') return SPARE_FIELDS
   if (tab === 'Tools') return TOOL_FIELDS
+  if (tab === 'Supplies') return SUPPLY_FIELDS
   return CONSUMABLE_FIELDS
 }
 
 function presetLocations(tab: InventoryTab): string[] {
   if (tab === 'Spares') return SPARE_LOCATIONS
   if (tab === 'Tools') return TOOL_LOCATIONS
+  if (tab === 'Supplies') return SUPPLY_LOCATIONS
   return CONSUMABLE_LOCATIONS
 }
 
 function presetSubLocations(tab: InventoryTab): string[] {
   if (tab === 'Spares') return SPARE_SUB_LOCATIONS
   if (tab === 'Tools') return TOOL_SUB_LOCATIONS
+  if (tab === 'Supplies') return SUPPLY_SUB_LOCATIONS
   return CONSUMABLE_SUB_LOCATIONS
 }
 
 function presetCategories(tab: InventoryTab): string[] {
   if (tab === 'Tools') return TOOL_CATEGORIES
+  if (tab === 'Supplies') return SUPPLY_CATEGORIES
   return CONSUMABLE_CATEGORIES
 }
 
@@ -111,12 +131,18 @@ function emptyDraft(tab: InventoryTab): Draft {
     d.Location = 'Engine Room'
     d.Condition = 'Good'
   }
+  if (tab === 'Supplies') {
+    d.Qty = '1'
+    d.Unit = 'ea'
+    d.Location = 'Exterior'
+  }
   return d
 }
 
 function titleFor(tab: InventoryTab): string {
   if (tab === 'Spares') return 'Add Spare'
   if (tab === 'Tools') return 'Add Tool'
+  if (tab === 'Supplies') return 'Add Supply'
   return 'Add Consumable'
 }
 
@@ -198,6 +224,12 @@ export function AddItemPage({ tab }: { tab: InventoryTab }) {
           d.Brand = String(it.brand || '')
           d['Model / Serial'] = String(it.model_serial || '')
           d.Condition = String(it.condition || 'Good')
+        } else if (tab === 'Supplies') {
+          d.Item = String(it.item || '')
+          d.Category = String(it.category || '')
+          d.Brand = String(it.brand || '')
+          d.Qty = String(it.qty || 1)
+          d.Unit = String(it.unit || 'ea')
         } else {
           d.Item = String(it.item || '')
           d.Category = String(it.category || '')

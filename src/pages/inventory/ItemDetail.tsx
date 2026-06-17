@@ -21,6 +21,9 @@ import {
   TOOL_LOCATIONS,
   TOOL_SUB_LOCATIONS,
   TOOL_CONDITIONS,
+  SUPPLY_CATEGORIES,
+  SUPPLY_LOCATIONS,
+  SUPPLY_SUB_LOCATIONS,
   type InventoryTab,
 } from '@/lib/inventory'
 
@@ -57,6 +60,19 @@ const CONSUMABLE_FIELDS: FieldDef[] = [
   { key: 'Notes', label: 'Notes', type: 'textarea' },
 ]
 
+const SUPPLY_FIELDS: FieldDef[] = [
+  { key: 'Item', label: 'Item name', placeholder: 'e.g. 3/4 inch dock line' },
+  { key: 'Category', label: 'Category', combo: 'category' },
+  { key: 'Brand', label: 'Brand', placeholder: 'optional' },
+  { key: 'Location', label: 'Location', combo: 'location' },
+  { key: 'Sub-Location', label: 'Sub-Location', combo: 'subLocation' },
+  { key: 'Qty', label: 'Quantity on hand', type: 'number' },
+  { key: 'Unit', label: 'Unit', placeholder: 'ea, m, ft, box…' },
+  { key: 'Min Qty', label: 'Min Qty', type: 'number' },
+  { key: 'Max Qty', label: 'Max Qty', type: 'number' },
+  { key: 'Notes', label: 'Notes', type: 'textarea' },
+]
+
 const TOOL_FIELDS: FieldDef[] = [
   { key: 'Name', label: 'Name', placeholder: 'e.g. Fluke 117 Multimeter' },
   { key: 'Category', label: 'Category', combo: 'category' },
@@ -72,28 +88,32 @@ const TOOL_FIELDS: FieldDef[] = [
 function fieldsFor(tab: InventoryTab): FieldDef[] {
   if (tab === 'Spares') return SPARE_FIELDS
   if (tab === 'Tools') return TOOL_FIELDS
+  if (tab === 'Supplies') return SUPPLY_FIELDS
   return CONSUMABLE_FIELDS
 }
 
 function presetLocations(tab: InventoryTab): string[] {
   if (tab === 'Spares') return SPARE_LOCATIONS
   if (tab === 'Tools') return TOOL_LOCATIONS
+  if (tab === 'Supplies') return SUPPLY_LOCATIONS
   return CONSUMABLE_LOCATIONS
 }
 
 function presetSubLocations(tab: InventoryTab): string[] {
   if (tab === 'Spares') return SPARE_SUB_LOCATIONS
   if (tab === 'Tools') return TOOL_SUB_LOCATIONS
+  if (tab === 'Supplies') return SUPPLY_SUB_LOCATIONS
   return CONSUMABLE_SUB_LOCATIONS
 }
 
 function presetCategories(tab: InventoryTab): string[] {
   if (tab === 'Tools') return TOOL_CATEGORIES
+  if (tab === 'Supplies') return SUPPLY_CATEGORIES
   return CONSUMABLE_CATEGORIES
 }
 
 function isQtyTab(tab: InventoryTab) {
-  return tab === 'Spares' || tab === 'Consumables'
+  return tab === 'Spares' || tab === 'Consumables' || tab === 'Supplies'
 }
 
 function titleFor(tab: InventoryTab, item: any): string {
@@ -107,9 +127,11 @@ export function ItemDetailPage({ tab }: { tab: InventoryTab }) {
   const [, paramsSpare] = useRoute('/inventory/spares/:row')
   const [, paramsCons] = useRoute('/inventory/consumables/:row')
   const [, paramsTools] = useRoute('/inventory/tools/:row')
+  const [, paramsSupplies] = useRoute('/inventory/supplies/:row')
   const params: { row?: string } | null =
     tab === 'Spares' ? (paramsSpare as any)
     : tab === 'Tools' ? (paramsTools as any)
+    : tab === 'Supplies' ? (paramsSupplies as any)
     : (paramsCons as any)
   const [, setLocation] = useLocation()
   const queryClient = useQueryClient()

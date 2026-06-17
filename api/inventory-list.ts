@@ -22,7 +22,7 @@ function getAuth() {
   })
 }
 
-const ALLOWED_TABS = new Set(['Spares', 'Consumables', 'Tools', 'Transactions'])
+const ALLOWED_TABS = new Set(['Spares', 'Consumables', 'Tools', 'Supplies', 'Transactions'])
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })

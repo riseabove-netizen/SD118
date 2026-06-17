@@ -18,7 +18,7 @@ You will be given:
 
 Apply the instruction to the list and return the FULL revised list. You may:
   - modify any field on any item
-  - change an item's type between "Spare", "Consumable", and "Tool"
+  - change an item's type between "Spare", "Consumable", "Supply", and "Tool"
   - delete items (omit them from the output)
   - add items (only if explicitly requested)
   - merge duplicates
@@ -47,6 +47,18 @@ Consumable fields:
   qty          = integer (default 1)
   unit         = "ea", "bottle", "roll", "L", "kg", "box" (default "ea")
   notes        = string
+
+Supply fields:
+  type         = "Supply"
+  item         = item name
+  category     = one of: "Deck Supplies", "Lines & Fenders", "Cleaning", "Safety", "Paint & Coatings", "Hardware", "Fasteners", "Lubricants", "Electrical", "Plumbing", "Galley", "Office", "Other"
+  brand        = brand if known, else ""
+  location     = "Engine Room", "Lazarette", "Bridge", "Interior", "Exterior", or "Other"
+  sub_location = string
+  qty          = integer
+  unit         = unit of measure (default "ea")
+  notes        = string
+  photo_url    = PRESERVE VERBATIM — do not modify or remove
 
 Tool fields:
   type         = "Tool"

@@ -37,6 +37,11 @@ const TOOL_HEADERS = [
   'Location', 'Sub-Location', 'Condition', 'Last Checked', 'Notes', 'Photo URL',
   'Created At', 'Created By',
 ]
+const SUPPLY_HEADERS = [
+  'ID', 'Item', 'Category', 'Brand', 'Location', 'Sub-Location', 'Qty', 'Unit',
+  'Min Qty', 'Max Qty', 'Last Used', 'Notes', 'Photo URL',
+  'Created At', 'Created By',
+]
 const TRANSACTION_HEADERS = [
   'Timestamp', 'Tab', 'Item ID', 'Item Name', 'Delta', 'Qty After',
   'Reason', 'User', 'Notes',
@@ -46,6 +51,7 @@ function headersFor(tab: string) {
   if (tab === 'Spares') return SPARE_HEADERS
   if (tab === 'Consumables') return CONSUMABLE_HEADERS
   if (tab === 'Tools') return TOOL_HEADERS
+  if (tab === 'Supplies') return SUPPLY_HEADERS
   return null
 }
 

@@ -42,6 +42,11 @@ const TOOL_HEADERS = [
   'Location', 'Sub-Location', 'Condition', 'Last Checked', 'Notes', 'Photo URL',
   'Created At', 'Created By',
 ]
+const SUPPLY_HEADERS = [
+  'ID', 'Item', 'Category', 'Brand', 'Location', 'Sub-Location', 'Qty', 'Unit',
+  'Min Qty', 'Max Qty', 'Last Used', 'Notes', 'Photo URL',
+  'Created At', 'Created By',
+]
 
 function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
@@ -63,6 +68,7 @@ function locationForConsumable(sub: string): string {
 type SpareDraft = Record<string, string>
 type ConsumableDraft = Record<string, string>
 type ToolDraft = Record<string, string>
+type SupplyDraft = Record<string, string>
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -74,17 +80,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   }
 
-  const { spares, consumables, tools, user } = (req.body || {}) as {
+  const { spares, consumables, tools, supplies, user } = (req.body || {}) as {
     spares?: SpareDraft[]
     consumables?: ConsumableDraft[]
     tools?: ToolDraft[]
+    supplies?: SupplyDraft[]
     user?: string
   }
 
   if (
     (!spares || spares.length === 0) &&
     (!consumables || consumables.length === 0) &&
-    (!tools || tools.length === 0)
+    (!tools || tools.length === 0) &&
+    (!supplies || supplies.length === 0)
   ) {
     return res.status(400).json({ error: 'No items to save' })
   }
@@ -99,6 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let savedSpares = 0
     let savedConsumables = 0
     let savedTools = 0
+    let savedSupplies = 0
 
     if (spares && spares.length > 0) {
       const rows = spares
@@ -168,7 +177,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    return res.status(200).json({ ok: true, savedSpares, savedConsumables, savedTools })
+    if (supplies && supplies.length > 0) {
+      const rows = supplies
+        .filter(s => (s.Item || '').trim())
+        .map(s => {
+          const merged: SupplyDraft = { ...s }
+          if (!merged.ID) merged.ID = newId()
+          if (!merged.Location) merged.Location = 'Exterior'
+          if (!merged.Unit) merged.Unit = 'ea'
+          merged['Created At'] = now
+          merged['Created By'] = userName
+          return SUPPLY_HEADERS.map(h => (merged[h] !== undefined && merged[h] !== null ? String(merged[h]) : ''))
+        })
+      if (rows.length > 0) {
+        await sheets.spreadsheets.values.append({
+          spreadsheetId: INVENTORY_ID,
+          range: 'Supplies!A:A',
+          valueInputOption: 'USER_ENTERED',
+          requestBody: { values: rows },
+        })
+        savedSupplies = rows.length
+      }
+    }
+
+    return res.status(200).json({ ok: true, savedSpares, savedConsumables, savedTools, savedSupplies })
   } catch (error: any) {
     console.error('inventory-bulk-save error:', error)
     const detail =

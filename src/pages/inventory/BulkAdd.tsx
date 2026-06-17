@@ -20,6 +20,9 @@ import {
   TOOL_LOCATIONS,
   TOOL_SUB_LOCATIONS,
   TOOL_CONDITIONS,
+  SUPPLY_CATEGORIES,
+  SUPPLY_LOCATIONS,
+  SUPPLY_SUB_LOCATIONS,
 } from '@/lib/inventory'
 
 type Stage = 'input' | 'extracting' | 'review' | 'saving' | 'done'
@@ -62,7 +65,20 @@ type ToolDraft = {
   'Photo URL': string
 }
 
-type DraftItem = SpareDraft | ConsumableDraft | ToolDraft
+type SupplyDraft = {
+  type: 'Supply'
+  Item: string
+  Category: string
+  Brand: string
+  Location: string
+  'Sub-Location': string
+  Qty: string
+  Unit: string
+  Notes: string
+  'Photo URL': string
+}
+
+type DraftItem = SpareDraft | ConsumableDraft | ToolDraft | SupplyDraft
 
 function emptySpare(): SpareDraft {
   return {
@@ -83,6 +99,12 @@ function emptyTool(): ToolDraft {
     type: 'Tool', Name: '', Category: '', Brand: '', 'Model / Serial': '',
     Location: 'Engine Room', 'Sub-Location': '', Condition: 'Good', Notes: '',
     'Photo URL': '',
+  }
+}
+function emptySupply(): SupplyDraft {
+  return {
+    type: 'Supply', Item: '', Category: '', Brand: '', Location: 'Exterior',
+    'Sub-Location': '', Qty: '1', Unit: 'ea', Notes: '', 'Photo URL': '',
   }
 }
 
@@ -111,6 +133,20 @@ function draftToAi(d: DraftItem): any {
       location: d.Location,
       sub_location: d['Sub-Location'],
       condition: d.Condition,
+      notes: d.Notes,
+      photo_url: d['Photo URL'],
+    }
+  }
+  if (d.type === 'Supply') {
+    return {
+      type: 'Supply',
+      item: d.Item,
+      category: d.Category,
+      brand: d.Brand,
+      location: d.Location,
+      sub_location: d['Sub-Location'],
+      qty: parseInt(d.Qty || '1', 10) || 1,
+      unit: d.Unit,
       notes: d.Notes,
       photo_url: d['Photo URL'],
     }
@@ -171,6 +207,20 @@ function aiToDraft(item: any): DraftItem | null {
       'Photo URL': String(item.photo_url || ''),
     }
   }
+  if (item.type === 'Supply') {
+    return {
+      type: 'Supply',
+      Item: String(item.item || ''),
+      Category: String(item.category || ''),
+      Brand: String(item.brand || ''),
+      Location: String(item.location || 'Exterior'),
+      'Sub-Location': String(item.sub_location || ''),
+      Qty: String(item.qty ?? 1),
+      Unit: String(item.unit || 'ea'),
+      Notes: String(item.notes || ''),
+      'Photo URL': String(item.photo_url || ''),
+    }
+  }
   return null
 }
 
@@ -186,7 +236,7 @@ export function BulkAddPage() {
   const [summary, setSummary] = useState('')
   const [drafts, setDrafts] = useState<DraftItem[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [savedInfo, setSavedInfo] = useState<{ spares: number; consumables: number; tools: number } | null>(null)
+  const [savedInfo, setSavedInfo] = useState<{ spares: number; consumables: number; tools: number; supplies: number } | null>(null)
 
   // AI revise on the review page
   const [reviseInstruction, setReviseInstruction] = useState('')
@@ -198,6 +248,7 @@ export function BulkAddPage() {
   const { data: existingSpares } = useQuery({ queryKey: ['spares'], queryFn: () => fetchInventory('Spares') })
   const { data: existingCons } = useQuery({ queryKey: ['consumables'], queryFn: () => fetchInventory('Consumables') })
   const { data: existingTools } = useQuery({ queryKey: ['tools'], queryFn: () => fetchInventory('Tools') })
+  const { data: existingSupplies } = useQuery({ queryKey: ['supplies'], queryFn: () => fetchInventory('Supplies') })
 
   const usedSpareLocs = useMemo(() => new Set(((existingSpares || []) as any[]).map(it => (it.Location || '').trim()).filter(Boolean)), [existingSpares])
   const usedSpareSubs = useMemo(() => new Set(((existingSpares || []) as any[]).map(it => (it['Sub-Location'] || '').trim()).filter(Boolean)), [existingSpares])
@@ -210,6 +261,9 @@ export function BulkAddPage() {
   const usedSpareSystems = useMemo(() => new Set(((existingSpares || []) as any[]).map(it => (it.System || '').trim()).filter(Boolean)), [existingSpares])
   const usedConsCats = useMemo(() => new Set(((existingCons || []) as any[]).map(it => (it.Category || '').trim()).filter(Boolean)), [existingCons])
   const usedToolCats = useMemo(() => new Set(((existingTools || []) as any[]).map(it => (it.Category || '').trim()).filter(Boolean)), [existingTools])
+  const usedSupplyLocs = useMemo(() => new Set(((existingSupplies || []) as any[]).map(it => (it.Location || '').trim()).filter(Boolean)), [existingSupplies])
+  const usedSupplySubs = useMemo(() => new Set(((existingSupplies || []) as any[]).map(it => (it['Sub-Location'] || '').trim()).filter(Boolean)), [existingSupplies])
+  const usedSupplyCats = useMemo(() => new Set(((existingSupplies || []) as any[]).map(it => (it.Category || '').trim()).filter(Boolean)), [existingSupplies])
 
   const spareLocOpts = useMemo(() => mergeOptions(SPARE_LOCATIONS, usedSpareLocs), [usedSpareLocs])
   const spareSubOpts = useMemo(() => mergeOptions(SPARE_SUB_LOCATIONS, usedSpareSubs), [usedSpareSubs])
@@ -220,6 +274,9 @@ export function BulkAddPage() {
   const spareSystemOpts = useMemo(() => mergeOptions(SPARE_SYSTEMS, usedSpareSystems), [usedSpareSystems])
   const consCategoryOpts = useMemo(() => mergeOptions(CONSUMABLE_CATEGORIES, usedConsCats), [usedConsCats])
   const toolCategoryOpts = useMemo(() => mergeOptions(TOOL_CATEGORIES, usedToolCats), [usedToolCats])
+  const supplyLocOpts = useMemo(() => mergeOptions(SUPPLY_LOCATIONS, usedSupplyLocs), [usedSupplyLocs])
+  const supplySubOpts = useMemo(() => mergeOptions(SUPPLY_SUB_LOCATIONS, usedSupplySubs), [usedSupplySubs])
+  const supplyCategoryOpts = useMemo(() => mergeOptions(SUPPLY_CATEGORIES, usedSupplyCats), [usedSupplyCats])
 
   async function handlePhotos(files: FileList | null) {
     if (!files || files.length === 0) return
@@ -347,7 +404,7 @@ export function BulkAddPage() {
     setDrafts(prev => prev.filter((_, idx) => idx !== i))
   }
 
-  // Cycle Spare → Consumable → Tool → Spare
+  // Cycle Spare → Consumable → Supply → Tool → Spare
   function toggleType(i: number) {
     setDrafts(prev => prev.map((d, idx) => {
       if (idx !== i) return d
@@ -362,8 +419,21 @@ export function BulkAddPage() {
         return next
       }
       if (d.type === 'Consumable') {
+        const next = emptySupply()
+        next.Item = d.Item
+        next.Category = d.Category
+        next.Qty = d.Qty
+        next.Unit = d.Unit
+        next.Notes = d.Notes
+        next.Location = d.Location || 'Exterior'
+        next['Sub-Location'] = d['Sub-Location']
+        next['Photo URL'] = d['Photo URL']
+        return next
+      }
+      if (d.type === 'Supply') {
         const next = emptyTool()
         next.Name = d.Item
+        next.Brand = d.Brand
         next.Notes = d.Notes
         next.Location = d.Location || 'Engine Room'
         next['Sub-Location'] = d['Sub-Location']
@@ -385,6 +455,7 @@ export function BulkAddPage() {
   function addBlankSpare() { setDrafts(prev => [...prev, emptySpare()]) }
   function addBlankConsumable() { setDrafts(prev => [...prev, emptyConsumable()]) }
   function addBlankTool() { setDrafts(prev => [...prev, emptyTool()]) }
+  function addBlankSupply() { setDrafts(prev => [...prev, emptySupply()]) }
 
   async function runRevise() {
     setReviseError(null)
@@ -433,9 +504,10 @@ export function BulkAddPage() {
       const spares = drafts.filter(d => d.type === 'Spare' && ((d as SpareDraft)['Part Number'].trim() || (d as SpareDraft).Description.trim())) as SpareDraft[]
       const consumables = drafts.filter(d => d.type === 'Consumable' && (d as ConsumableDraft).Item.trim()) as ConsumableDraft[]
       const tools = drafts.filter(d => d.type === 'Tool' && (d as ToolDraft).Name.trim()) as ToolDraft[]
+      const supplies = drafts.filter(d => d.type === 'Supply' && (d as SupplyDraft).Item.trim()) as SupplyDraft[]
 
-      if (spares.length === 0 && consumables.length === 0 && tools.length === 0) {
-        setError('Nothing to save. Spares need a Part Number or Description; Consumables need an Item name; Tools need a Name.')
+      if (spares.length === 0 && consumables.length === 0 && tools.length === 0 && supplies.length === 0) {
+        setError('Nothing to save. Spares need a Part Number or Description; Consumables, Supplies, and Tools need a name.')
         setStage('review')
         return
       }
@@ -444,6 +516,7 @@ export function BulkAddPage() {
       const sparePayload = spares.map(({ type, ...rest }) => { void type; return rest })
       const consumablePayload = consumables.map(({ type, ...rest }) => { void type; return rest })
       const toolPayload = tools.map(({ type, ...rest }) => { void type; return rest })
+      const supplyPayload = supplies.map(({ type, ...rest }) => { void type; return rest })
 
       const res = await fetch('/api/inventory-bulk-save', {
         method: 'POST',
@@ -452,6 +525,7 @@ export function BulkAddPage() {
           spares: sparePayload,
           consumables: consumablePayload,
           tools: toolPayload,
+          supplies: supplyPayload,
           user: getCrewName() || 'crew',
         }),
       })
@@ -463,10 +537,12 @@ export function BulkAddPage() {
       await queryClient.invalidateQueries({ queryKey: ['spares'] })
       await queryClient.invalidateQueries({ queryKey: ['consumables'] })
       await queryClient.invalidateQueries({ queryKey: ['tools'] })
+      await queryClient.invalidateQueries({ queryKey: ['supplies'] })
       setSavedInfo({
         spares: data.savedSpares || 0,
         consumables: data.savedConsumables || 0,
         tools: data.savedTools || 0,
+        supplies: data.savedSupplies || 0,
       })
       setStage('done')
     } catch (e: any) {
@@ -484,7 +560,7 @@ export function BulkAddPage() {
           <div className="p-4 rounded-xl border border-emerald-900/50 bg-emerald-950/30">
             <div className="text-emerald-400 font-medium mb-1">Items saved</div>
             <div className="text-sm">
-              {savedInfo?.spares ?? 0} spare(s), {savedInfo?.consumables ?? 0} consumable(s), {savedInfo?.tools ?? 0} tool(s).
+              {savedInfo?.spares ?? 0} spare(s), {savedInfo?.consumables ?? 0} consumable(s), {savedInfo?.supplies ?? 0} supply/supplies, {savedInfo?.tools ?? 0} tool(s).
             </div>
           </div>
           <Button onClick={() => setLocation('/inventory/spares')} className="w-full">
@@ -518,6 +594,7 @@ export function BulkAddPage() {
   if (stage === 'review' || stage === 'saving') {
     const spareCount = drafts.filter(d => d.type === 'Spare').length
     const consumableCount = drafts.filter(d => d.type === 'Consumable').length
+    const supplyCount = drafts.filter(d => d.type === 'Supply').length
     const toolCount = drafts.filter(d => d.type === 'Tool').length
     return (
       <MenuLayout title="Review items" showBack backHref="/inventory/bulk-add">
@@ -566,7 +643,7 @@ export function BulkAddPage() {
           </div>
 
           <div className="text-xs text-muted-foreground">
-            {drafts.length} item(s) ready · {spareCount} spare · {consumableCount} consumable · {toolCount} tool
+            {drafts.length} item(s) ready · {spareCount} spare · {consumableCount} consumable · {supplyCount} supply · {toolCount} tool
           </div>
 
           {error && (
@@ -579,16 +656,18 @@ export function BulkAddPage() {
                 ? 'bg-primary text-primary-foreground border-primary'
                 : d.type === 'Consumable'
                 ? 'bg-emerald-700 text-white border-emerald-700'
+                : d.type === 'Supply'
+                ? 'bg-blue-700 text-white border-blue-700'
                 : 'bg-amber-600 text-white border-amber-600'
             const typeLabel =
-              d.type === 'Spare' ? '🔧 Spare' : d.type === 'Consumable' ? '📦 Consumable' : '🛠️ Tool'
+              d.type === 'Spare' ? '🔧 Spare' : d.type === 'Consumable' ? '📦 Consumable' : d.type === 'Supply' ? '🧰 Supply' : '🛠️ Tool'
             return (
               <div key={i} className="p-3 rounded-xl border border-border bg-card space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <button
                     onClick={() => toggleType(i)}
                     className={`px-2 h-7 rounded-md text-xs font-medium border ${typeBtnCls}`}
-                    title="Tap to cycle through Spare / Consumable / Tool"
+                    title="Tap to cycle through Spare / Consumable / Supply / Tool"
                   >
                     {typeLabel}
                   </button>
@@ -632,6 +711,19 @@ export function BulkAddPage() {
                     </div>
                     <FieldArea label="Notes" value={d.Notes} onChange={v => updateDraft(i, 'Notes', v)} />
                   </>
+                ) : d.type === 'Supply' ? (
+                  <>
+                    <Field label="Item *" value={d.Item} onChange={v => updateDraft(i, 'Item', v)} />
+                    <FieldCombo h={10} label="Category" value={d.Category} options={supplyCategoryOpts} onChange={v => updateDraft(i, 'Category', v)} />
+                    <Field label="Brand" value={d.Brand} onChange={v => updateDraft(i, 'Brand', v)} />
+                    <FieldCombo h={10} label="Location" value={d.Location} options={supplyLocOpts} onChange={v => updateDraft(i, 'Location', v)} />
+                    <FieldCombo h={10} label="Sub-Location" value={d['Sub-Location']} options={supplySubOpts} onChange={v => updateDraft(i, 'Sub-Location', v)} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="Qty" value={d.Qty} type="number" onChange={v => updateDraft(i, 'Qty', v)} />
+                      <Field label="Unit" value={d.Unit} onChange={v => updateDraft(i, 'Unit', v)} />
+                    </div>
+                    <FieldArea label="Notes" value={d.Notes} onChange={v => updateDraft(i, 'Notes', v)} />
+                  </>
                 ) : (
                   <>
                     <Field label="Name *" value={d.Name} onChange={v => updateDraft(i, 'Name', v)} />
@@ -650,9 +742,10 @@ export function BulkAddPage() {
             )
           })}
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button onClick={addBlankSpare} className="h-10 rounded-lg border border-dashed border-border text-sm text-muted-foreground">+ Spare</button>
             <button onClick={addBlankConsumable} className="h-10 rounded-lg border border-dashed border-border text-sm text-muted-foreground">+ Consumable</button>
+            <button onClick={addBlankSupply} className="h-10 rounded-lg border border-dashed border-border text-sm text-muted-foreground">+ Supply</button>
             <button onClick={addBlankTool} className="h-10 rounded-lg border border-dashed border-border text-sm text-muted-foreground">+ Tool</button>
           </div>
 
