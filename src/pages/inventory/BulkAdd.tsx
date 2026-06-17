@@ -192,6 +192,7 @@ export function BulkAddPage() {
   const [reviseInstruction, setReviseInstruction] = useState('')
   const [revising, setRevising] = useState(false)
   const [reviseError, setReviseError] = useState<string | null>(null)
+  const [photoWarning, setPhotoWarning] = useState<string | null>(null)
 
   // Pull existing values for combo dropdowns
   const { data: existingSpares } = useQuery({ queryKey: ['spares'], queryFn: () => fetchInventory('Spares') })
@@ -255,13 +256,16 @@ export function BulkAddPage() {
         // attached to every item the AI extracts from THAT photo.
         // Photo upload + AI extraction run in parallel per photo, and all
         // photos run in parallel with each other.
+        const uploadErrors: string[] = []
         const photoTasks = photos.map(async (p, idx) => {
           const uploadPromise = uploadInventoryPhoto({
             base64: p.base64,
             tab: 'Spares',
             label: `bulk-${new Date().toISOString().slice(0, 10)}-${idx + 1}`,
           }).catch(err => {
-            console.warn('Bulk photo upload failed:', err)
+            const msg = err?.message || String(err)
+            console.warn('Bulk photo upload failed:', msg)
+            uploadErrors.push(msg)
             return null
           })
 
@@ -292,6 +296,16 @@ export function BulkAddPage() {
         for (const r of results) {
           allDrafts.push(...r.tagged)
           if (r.summary) summaries.push(r.summary)
+        }
+        if (uploadErrors.length > 0) {
+          // Surface upload failures so user knows photos didn't attach
+          const unique = Array.from(new Set(uploadErrors))
+          const hint = unique.some(m => /INVENTORY_PHOTOS_FOLDER_ID/i.test(m))
+            ? ' — set the INVENTORY_PHOTOS_FOLDER_ID env var on Vercel and redeploy.'
+            : ''
+          setPhotoWarning(`${uploadErrors.length} of ${photos.length} photo(s) failed to upload to Drive. Items saved without photos.${hint} (${unique[0]})`)
+        } else {
+          setPhotoWarning(null)
         }
       } else {
         // Text-only path: single extraction, no photo
@@ -508,6 +522,12 @@ export function BulkAddPage() {
     return (
       <MenuLayout title="Review items" showBack backHref="/inventory/bulk-add">
         <div className="space-y-4">
+          {photoWarning && (
+            <div className="p-3 rounded-xl border border-orange-700/60 bg-orange-950/30 text-orange-200 text-sm">
+              <div className="font-medium mb-1">⚠️ Photo upload failed</div>
+              <div className="text-xs leading-relaxed">{photoWarning}</div>
+            </div>
+          )}
           {summary && (
             <div className="p-3 rounded-xl border border-border bg-card">
               <div className="text-xs text-muted-foreground mb-1">AI summary</div>

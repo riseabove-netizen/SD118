@@ -1,25 +1,66 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { useLocation } from 'wouter'
 import { useQuery } from '@tanstack/react-query'
 import { MenuLayout } from '@/components/MenuLayout'
 import { Button } from '@/components/ui/button'
-import { fetchInventory, SPARE_SYSTEMS, type SpareItem } from '@/lib/inventory'
+import { MultiSelectFilter } from '@/components/MultiSelectFilter'
+import {
+  fetchInventory,
+  mergeOptions,
+  SPARE_SYSTEMS,
+  SPARE_LOCATIONS,
+  SPARE_SUB_LOCATIONS,
+  type SpareItem,
+} from '@/lib/inventory'
+import {
+  useUrlParams,
+  getParam,
+  getMultiParam,
+  setSingle,
+  setMulti,
+} from '@/lib/listUrlState'
 
 export function SparesListPage() {
   const [, setLocation] = useLocation()
-  const [query, setQuery] = useState('')
-  const [system, setSystem] = useState<string>('All')
-  const [lowOnly, setLowOnly] = useState(false)
+  const [params, updateParams] = useUrlParams()
+
+  const query = getParam(params, 'q')
+  const systems = getMultiParam(params, 'system')
+  const locations = getMultiParam(params, 'loc')
+  const subLocations = getMultiParam(params, 'subloc')
+  const lowOnly = getParam(params, 'low') === '1'
+
+  function setQuery(v: string) { updateParams(p => setSingle(p, 'q', v)) }
+  function setSystems(v: string[]) { updateParams(p => setMulti(p, 'system', v)) }
+  function setLocations(v: string[]) { updateParams(p => setMulti(p, 'loc', v)) }
+  function setSubLocations(v: string[]) { updateParams(p => setMulti(p, 'subloc', v)) }
+  function setLowOnly(v: boolean) { updateParams(p => setSingle(p, 'low', v ? '1' : '')) }
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['spares'],
     queryFn: () => fetchInventory('Spares') as Promise<SpareItem[]>,
   })
 
+  // Derive filter options from preset list + values actually used in data.
+  const list = data || []
+  const systemOptions = useMemo(
+    () => mergeOptions(SPARE_SYSTEMS, list.map(it => it.System || '')),
+    [list]
+  )
+  const locationOptions = useMemo(
+    () => mergeOptions(SPARE_LOCATIONS, list.map(it => it.Location || '')),
+    [list]
+  )
+  const subLocationOptions = useMemo(
+    () => mergeOptions(SPARE_SUB_LOCATIONS, list.map(it => it['Sub-Location'] || '')),
+    [list]
+  )
+
   const items = useMemo(() => {
-    const list = data || []
     return list.filter(it => {
-      if (system !== 'All' && it.System !== system) return false
+      if (systems.length > 0 && !systems.includes(it.System || '')) return false
+      if (locations.length > 0 && !locations.includes(it.Location || '')) return false
+      if (subLocations.length > 0 && !subLocations.includes(it['Sub-Location'] || '')) return false
       if (lowOnly) {
         const q = parseFloat(it.Qty || '0')
         const min = parseFloat(it['Min Qty'] || '0')
@@ -27,13 +68,21 @@ export function SparesListPage() {
       }
       if (query.trim()) {
         const q = query.toLowerCase()
-        const hay = [it['Part Number'], it.Description, it.Manufacturer, it['Sub-Location'], it.Notes]
+        const hay = [it['Part Number'], it.Description, it.Manufacturer, it.System, it.Location, it['Sub-Location'], it.Notes]
           .join(' ').toLowerCase()
         if (!hay.includes(q)) return false
       }
       return true
     })
-  }, [data, query, system, lowOnly])
+  }, [list, query, systems, locations, subLocations, lowOnly])
+
+  const activeFilterCount = systems.length + locations.length + subLocations.length + (lowOnly ? 1 : 0)
+
+  function clearAllFilters() {
+    updateParams(p => {
+      p.delete('system'); p.delete('loc'); p.delete('subloc'); p.delete('low')
+    })
+  }
 
   return (
     <MenuLayout title="Spares" showBack backHref="/inventory">
@@ -50,21 +99,26 @@ export function SparesListPage() {
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-          {['All', ...SPARE_SYSTEMS].map(s => (
+          <MultiSelectFilter label="System" options={systemOptions} selected={systems} onChange={setSystems} />
+          <MultiSelectFilter label="Location" options={locationOptions} selected={locations} onChange={setLocations} />
+          <MultiSelectFilter label="Sub-Location" options={subLocationOptions} selected={subLocations} onChange={setSubLocations} />
+          <button
+            type="button"
+            onClick={() => setLowOnly(!lowOnly)}
+            className={`shrink-0 px-3 h-9 rounded-full text-sm border ${lowOnly ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary text-foreground border-border'}`}
+          >
+            Low stock
+          </button>
+          {activeFilterCount > 0 && (
             <button
-              key={s}
-              onClick={() => setSystem(s)}
-              className={`shrink-0 px-3 h-9 rounded-full text-sm border ${system === s ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary text-foreground border-border'}`}
+              type="button"
+              onClick={clearAllFilters}
+              className="shrink-0 px-3 h-9 rounded-full text-sm border border-border bg-transparent text-muted-foreground hover:text-foreground"
             >
-              {s}
+              Clear all
             </button>
-          ))}
+          )}
         </div>
-
-        <label className="flex items-center gap-2 text-sm select-none">
-          <input type="checkbox" checked={lowOnly} onChange={e => setLowOnly(e.target.checked)} className="h-4 w-4 accent-red-600" />
-          Low stock only
-        </label>
 
         {isLoading && <div className="text-muted-foreground text-sm">Loading…</div>}
         {error && (

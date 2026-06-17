@@ -1,25 +1,66 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { useLocation } from 'wouter'
 import { useQuery } from '@tanstack/react-query'
 import { MenuLayout } from '@/components/MenuLayout'
 import { Button } from '@/components/ui/button'
-import { fetchInventory, CONSUMABLE_CATEGORIES, type ConsumableItem } from '@/lib/inventory'
+import { MultiSelectFilter } from '@/components/MultiSelectFilter'
+import {
+  fetchInventory,
+  mergeOptions,
+  CONSUMABLE_CATEGORIES,
+  CONSUMABLE_LOCATIONS,
+  CONSUMABLE_SUB_LOCATIONS,
+  type ConsumableItem,
+} from '@/lib/inventory'
+import {
+  useUrlParams,
+  getParam,
+  getMultiParam,
+  setSingle,
+  setMulti,
+} from '@/lib/listUrlState'
 
 export function ConsumablesListPage() {
   const [, setLocation] = useLocation()
-  const [query, setQuery] = useState('')
-  const [category, setCategory] = useState<string>('All')
-  const [lowOnly, setLowOnly] = useState(false)
+  const [params, updateParams] = useUrlParams()
+
+  const query = getParam(params, 'q')
+  const categories = getMultiParam(params, 'category')
+  const locations = getMultiParam(params, 'loc')
+  const subLocations = getMultiParam(params, 'subloc')
+  const lowOnly = getParam(params, 'low') === '1'
+
+  function setQuery(v: string) { updateParams(p => setSingle(p, 'q', v)) }
+  function setCategories(v: string[]) { updateParams(p => setMulti(p, 'category', v)) }
+  function setLocations(v: string[]) { updateParams(p => setMulti(p, 'loc', v)) }
+  function setSubLocations(v: string[]) { updateParams(p => setMulti(p, 'subloc', v)) }
+  function setLowOnly(v: boolean) { updateParams(p => setSingle(p, 'low', v ? '1' : '')) }
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['consumables'],
     queryFn: () => fetchInventory('Consumables') as Promise<ConsumableItem[]>,
   })
 
+  const list = data || []
+
+  const categoryOptions = useMemo(
+    () => mergeOptions(CONSUMABLE_CATEGORIES, list.map(it => it.Category || '')),
+    [list]
+  )
+  const locationOptions = useMemo(
+    () => mergeOptions(CONSUMABLE_LOCATIONS, list.map(it => it.Location || '')),
+    [list]
+  )
+  const subLocationOptions = useMemo(
+    () => mergeOptions(CONSUMABLE_SUB_LOCATIONS, list.map(it => it['Sub-Location'] || '')),
+    [list]
+  )
+
   const items = useMemo(() => {
-    const list = data || []
     return list.filter(it => {
-      if (category !== 'All' && it.Category !== category) return false
+      if (categories.length > 0 && !categories.includes(it.Category || '')) return false
+      if (locations.length > 0 && !locations.includes(it.Location || '')) return false
+      if (subLocations.length > 0 && !subLocations.includes(it['Sub-Location'] || '')) return false
       if (lowOnly) {
         const q = parseFloat(it.Qty || '0')
         const min = parseFloat(it['Min Qty'] || '0')
@@ -27,17 +68,24 @@ export function ConsumablesListPage() {
       }
       if (query.trim()) {
         const q = query.toLowerCase()
-        const hay = [it.Item, it.Category, it['Sub-Location'], it.Notes]
+        const hay = [it.Item, it.Category, it.Location, it['Sub-Location'], it.Notes]
           .join(' ').toLowerCase()
         if (!hay.includes(q)) return false
       }
       return true
     })
-  }, [data, query, category, lowOnly])
+  }, [list, query, categories, locations, subLocations, lowOnly])
+
+  const activeFilterCount = categories.length + locations.length + subLocations.length + (lowOnly ? 1 : 0)
+
+  function clearAllFilters() {
+    updateParams(p => {
+      p.delete('category'); p.delete('loc'); p.delete('subloc'); p.delete('low')
+    })
+  }
 
   // Restock list
   const restockList = useMemo(() => {
-    const list = data || []
     return list
       .filter(it => {
         const q = parseFloat(it.Qty || '0')
@@ -51,7 +99,7 @@ export function ConsumablesListPage() {
         return `${it.Item} — ${need} ${it.Unit || 'ea'} (${it.Category}, ${it['Sub-Location']})`
       })
       .join('\n')
-  }, [data])
+  }, [list])
 
   function copyRestockList() {
     if (!restockList) {
@@ -78,22 +126,28 @@ export function ConsumablesListPage() {
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-          {['All', ...CONSUMABLE_CATEGORIES].map(c => (
+          <MultiSelectFilter label="Category" options={categoryOptions} selected={categories} onChange={setCategories} />
+          <MultiSelectFilter label="Location" options={locationOptions} selected={locations} onChange={setLocations} />
+          <MultiSelectFilter label="Sub-Location" options={subLocationOptions} selected={subLocations} onChange={setSubLocations} />
+          <button
+            type="button"
+            onClick={() => setLowOnly(!lowOnly)}
+            className={`shrink-0 px-3 h-9 rounded-full text-sm border ${lowOnly ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary text-foreground border-border'}`}
+          >
+            Low stock
+          </button>
+          {activeFilterCount > 0 && (
             <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={`shrink-0 px-3 h-9 rounded-full text-sm border ${category === c ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary text-foreground border-border'}`}
+              type="button"
+              onClick={clearAllFilters}
+              className="shrink-0 px-3 h-9 rounded-full text-sm border border-border bg-transparent text-muted-foreground hover:text-foreground"
             >
-              {c}
+              Clear all
             </button>
-          ))}
+          )}
         </div>
 
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 text-sm select-none">
-            <input type="checkbox" checked={lowOnly} onChange={e => setLowOnly(e.target.checked)} className="h-4 w-4 accent-red-600" />
-            Low stock only
-          </label>
+        <div className="flex justify-end">
           <button onClick={copyRestockList} className="text-sm text-primary underline underline-offset-2">
             Copy restock list
           </button>
