@@ -19,6 +19,19 @@ function cleanEnv(v: string | undefined): string | undefined {
 const FOLDER_ID = cleanEnv(process.env.INVENTORY_PHOTOS_FOLDER_ID)
 
 function getAuth() {
+  // Prefer OAuth user delegation when configured. Files land in the user's
+  // own Drive, owned by them, on their quota. Service accounts cannot own
+  // files in personal Drive (no storage quota), so OAuth is required for
+  // personal Gmail / consumer Workspace accounts.
+  const oauthClientId = cleanEnv(process.env.GOOGLE_OAUTH_CLIENT_ID)
+  const oauthClientSecret = cleanEnv(process.env.GOOGLE_OAUTH_CLIENT_SECRET)
+  const oauthRefreshToken = cleanEnv(process.env.GOOGLE_OAUTH_REFRESH_TOKEN)
+  if (oauthClientId && oauthClientSecret && oauthRefreshToken) {
+    const client = new google.auth.OAuth2(oauthClientId, oauthClientSecret)
+    client.setCredentials({ refresh_token: oauthRefreshToken })
+    return client
+  }
+
   const keyJson = cleanEnv(process.env.GOOGLE_SERVICE_ACCOUNT_KEY)
   if (!keyJson) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY not set')
   const key = JSON.parse(keyJson)
