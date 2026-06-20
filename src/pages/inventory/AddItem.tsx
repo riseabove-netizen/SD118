@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { MenuLayout } from '@/components/MenuLayout'
 import { Button } from '@/components/ui/button'
 import { FieldCombo } from '@/components/FieldCombo'
+import { PhotoSourcePicker } from '@/components/PhotoSourcePicker'
 import { getCrewName } from '@/lib/auth'
 import { compressImageToJpegBase64 } from '@/lib/imageCompress'
 import {
@@ -160,7 +161,7 @@ export function AddItemPage({ tab }: { tab: InventoryTab }) {
   // Per-draft photo state: each draft slot tracks an optional thumb URL, view URL
   const [photos, setPhotos] = useState<Array<{ thumbUrl: string; viewUrl: string } | null>>([null])
   const [uploadingPhoto, setUploadingPhoto] = useState<number | null>(null)
-  const photoInputRefs = useRef<Array<HTMLInputElement | null>>([])
+  const [pickerOpenIdx, setPickerOpenIdx] = useState<number | null>(null)
 
   // Pull existing items to harvest distinct Location / Sub-Location values
   const { data: existing } = useQuery({
@@ -400,7 +401,7 @@ export function AddItemPage({ tab }: { tab: InventoryTab }) {
                 <div className="flex-1 flex flex-col gap-1">
                   <button
                     type="button"
-                    onClick={() => photoInputRefs.current[i]?.click()}
+                    onClick={() => setPickerOpenIdx(i)}
                     disabled={uploadingPhoto === i}
                     className="h-9 px-3 rounded-lg bg-secondary border border-border text-sm hover:bg-secondary/80"
                   >
@@ -416,13 +417,11 @@ export function AddItemPage({ tab }: { tab: InventoryTab }) {
                     </button>
                   )}
                 </div>
-                <input
-                  ref={el => { photoInputRefs.current[i] = el }}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={e => { handleItemPhoto(i, e.target.files); e.target.value = '' }}
+                <PhotoSourcePicker
+                  open={pickerOpenIdx === i}
+                  onClose={() => setPickerOpenIdx(null)}
+                  onPick={files => handleItemPhoto(i, files)}
+                  allowAnyFile
                 />
               </div>
               {fieldsFor(tab).map(f => (

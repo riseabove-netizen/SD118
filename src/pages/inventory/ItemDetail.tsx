@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useLocation, useRoute } from 'wouter'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { MenuLayout } from '@/components/MenuLayout'
 import { Button } from '@/components/ui/button'
 import { FieldCombo } from '@/components/FieldCombo'
+import { PhotoSourcePicker } from '@/components/PhotoSourcePicker'
 import { getCrewName } from '@/lib/auth'
 import { compressImageToJpegBase64 } from '@/lib/imageCompress'
 import {
@@ -174,7 +175,7 @@ export function ItemDetailPage({ tab }: { tab: InventoryTab }) {
   const [error, setError] = useState<string | null>(null)
   const [photoState, setPhotoState] = useState<{ thumbUrl: string; viewUrl: string } | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  const photoInputRef = useRef<HTMLInputElement | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   useEffect(() => {
     if (item) {
@@ -341,7 +342,7 @@ export function ItemDetailPage({ tab }: { tab: InventoryTab }) {
             <div className="flex flex-col gap-2 flex-1">
               <button
                 type="button"
-                onClick={() => photoInputRef.current?.click()}
+                onClick={() => setPickerOpen(true)}
                 disabled={uploadingPhoto}
                 className="h-10 px-3 rounded-lg bg-secondary border border-border text-sm hover:bg-secondary/80 self-start"
               >
@@ -358,13 +359,11 @@ export function ItemDetailPage({ tab }: { tab: InventoryTab }) {
               )}
             </div>
           </div>
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={e => { handlePhoto(e.target.files); e.target.value = '' }}
+          <PhotoSourcePicker
+            open={pickerOpen}
+            onClose={() => setPickerOpen(false)}
+            onPick={files => handlePhoto(files)}
+            allowAnyFile
           />
         </div>
 
