@@ -46,13 +46,13 @@ async function jsonOrError(res: Response): Promise<any> {
 }
 
 export async function fetchGuides(): Promise<GuideSummary[]> {
-  const res = await fetch('/api/guides-list')
+  const res = await fetch('/api/guides')
   const data = await jsonOrError(res)
   return data.guides || []
 }
 
 export async function fetchGuide(id: string): Promise<Guide> {
-  const res = await fetch(`/api/guides-list?id=${encodeURIComponent(id)}`)
+  const res = await fetch(`/api/guides?id=${encodeURIComponent(id)}`)
   const data = await jsonOrError(res)
   return data.guide
 }
@@ -65,7 +65,7 @@ export async function saveGuide(args: {
   note?: string
   user?: string
 }): Promise<{ ok: true; id: string; version: number }> {
-  const res = await fetch('/api/guides-upsert', {
+  const res = await fetch('/api/guides?action=upsert', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(args),
@@ -79,7 +79,7 @@ export async function prettifyGuide(args: {
   draft: string
   photos?: { url: string; caption?: string }[]
 }): Promise<{ ok: true; markdown: string }> {
-  const res = await fetch('/api/guides-ai-prettify', {
+  const res = await fetch('/api/guides?action=prettify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(args),
