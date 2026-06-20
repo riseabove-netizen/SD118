@@ -83,7 +83,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const mime = detectImageMime(body.base64)
     const ext = mime === 'image/png' ? 'png' : 'jpg'
-    const tag = [body.tab, body.itemId, body.label].filter(Boolean).map(safeName).join(' - ')
+    const tag = [body.tab, body.itemId, body.label]
+      .filter((v): v is string => typeof v === 'string' && v.length > 0)
+      .map(safeName)
+      .join(' - ')
     const ts = new Date().toISOString().replace(/[:.]/g, '-')
     const fileName = `${tag || 'inv-photo'}-${ts}.${ext}`
 

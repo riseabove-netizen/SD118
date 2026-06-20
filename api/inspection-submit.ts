@@ -181,7 +181,7 @@ async function buildPdf(body: InspectionBody, inspectionId: string): Promise<Uin
       for (const photo of section.photos) {
         try {
           const mime = detectImageMime(photo.base64)
-          const bytes = Buffer.from(photo.base64, 'base64')
+          const bytes = new Uint8Array(Buffer.from(photo.base64, 'base64'))
           const img = mime === 'image/png' ? await pdf.embedPng(bytes) : await pdf.embedJpg(bytes)
           // Fit image to contentWidth max, max height 360
           const maxW = contentWidth
