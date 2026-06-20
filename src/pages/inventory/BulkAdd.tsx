@@ -328,7 +328,7 @@ export function BulkAddPage() {
 
           // Only feed the text prompt on the first photo so it isn't repeated
           const extractText = idx === 0 ? text : ''
-          const extractPromise = fetch('/api/inventory-bulk-extract', {
+          const extractPromise = fetch('/api/inventory-bulk?action=extract', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: extractText, imagesBase64: [p.base64] }),
@@ -366,7 +366,7 @@ export function BulkAddPage() {
         }
       } else {
         // Text-only path: single extraction, no photo
-        const res = await fetch('/api/inventory-bulk-extract', {
+        const res = await fetch('/api/inventory-bulk?action=extract', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text, imagesBase64: [] }),
@@ -493,7 +493,7 @@ export function BulkAddPage() {
     }
     setRevising(true)
     try {
-      const res = await fetch('/api/inventory-bulk-revise', {
+      const res = await fetch('/api/inventory-bulk?action=revise', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -542,7 +542,7 @@ export function BulkAddPage() {
       const toolPayload = tools.map(({ type, ...rest }) => { void type; return rest })
       const supplyPayload = supplies.map(({ type, ...rest }) => { void type; return rest })
 
-      const res = await fetch('/api/inventory-bulk-save', {
+      const res = await fetch('/api/inventory-bulk?action=save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
