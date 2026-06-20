@@ -6,9 +6,15 @@ interface MenuLayoutProps {
   title?: string
   showBack?: boolean
   backHref?: string
+  rightAction?: {
+    icon?: React.ReactNode
+    label?: string
+    ariaLabel?: string
+    onClick: () => void
+  }
 }
 
-export function MenuLayout({ children, title, showBack, backHref }: MenuLayoutProps) {
+export function MenuLayout({ children, title, showBack, backHref, rightAction }: MenuLayoutProps) {
   const [, setLocation] = useLocation()
 
   return (
@@ -36,6 +42,15 @@ export function MenuLayout({ children, title, showBack, backHref }: MenuLayoutPr
             <h1 className="text-base font-semibold truncate">{title}</h1>
           )}
         </div>
+        {rightAction && (
+          <button
+            onClick={rightAction.onClick}
+            aria-label={rightAction.ariaLabel || rightAction.label}
+            className="flex items-center justify-center h-11 min-w-[44px] px-3 -mr-2 rounded-lg hover:bg-secondary active:bg-secondary/80 transition-colors text-xl font-semibold"
+          >
+            {rightAction.icon ?? rightAction.label}
+          </button>
+        )}
       </header>
 
       {/* Content */}

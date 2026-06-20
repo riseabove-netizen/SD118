@@ -38,6 +38,11 @@ import { BulkAddPage } from '@/pages/inventory/BulkAdd'
 import { ScheduleHubPage } from '@/pages/schedule/Hub'
 import { TripDetailPage } from '@/pages/schedule/TripDetail'
 
+// Operational Guides
+import { GuidesListPage } from '@/pages/guides/GuidesList'
+import { GuideViewPage } from '@/pages/guides/GuideView'
+import { GuideEditorPage } from '@/pages/guides/GuideEditor'
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -169,6 +174,20 @@ function AppRoutes() {
       </Route>
       <Route path="/schedule/:id">
         <AuthGuard><TripDetailPage /></AuthGuard>
+      </Route>
+
+      {/* Operational Guides */}
+      <Route path="/guides">
+        <AuthGuard><GuidesListPage /></AuthGuard>
+      </Route>
+      <Route path="/guides/new">
+        <AuthGuard><GuideEditorPage /></AuthGuard>
+      </Route>
+      <Route path="/guides/:id/edit">
+        <AuthGuard><GuideEditorPage /></AuthGuard>
+      </Route>
+      <Route path="/guides/:id">
+        <AuthGuard><GuideViewPage /></AuthGuard>
       </Route>
 
       {/* Fallback */}

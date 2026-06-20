@@ -81,6 +81,12 @@ export function MenuPage() {
           description="Spares & consumables onboard"
         />
         <MenuItem
+          icon="📖"
+          label="Operational Guides"
+          href="/guides"
+          description="Crew procedures & how-tos"
+        />
+        <MenuItem
           icon="🗓️"
           label="Schedule"
           href="/schedule"
