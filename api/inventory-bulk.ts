@@ -137,7 +137,7 @@ async function extractHandler(req: VercelRequest, res: VercelResponse) {
     if (text && text.trim()) {
       userContent.push({ type: 'text', text: `USER TEXT:\n${text.trim()}\n\n${EXTRACT_PROMPT}` })
     } else {
-      userContent.push({ type: 'text', text: PROMPT })
+      userContent.push({ type: 'text', text: EXTRACT_PROMPT })
     }
 
     const message = await extractClient.messages.create({
@@ -276,7 +276,7 @@ async function reviseHandler(req: VercelRequest, res: VercelResponse) {
       `CURRENT LIST (${items.length} items):\n` +
       JSON.stringify(items, null, 2) +
       `\n\nUSER INSTRUCTION:\n${instruction.trim()}\n\n` +
-      PROMPT
+      REVISE_PROMPT
 
     const message = await reviseClient.messages.create({
       model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5',
