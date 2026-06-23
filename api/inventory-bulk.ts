@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import extractHandler from './_bulk/extract'
-import reviseHandler from './_bulk/revise'
-import saveHandler from './_bulk/save'
+import extractHandler from '../lib/bulk-extract'
+import reviseHandler from '../lib/bulk-revise'
+import saveHandler from '../lib/bulk-save'
 
 export const config = {
   api: { bodyParser: { sizeLimit: '40mb' } },
