@@ -18,9 +18,10 @@ type CalendarResponse =
   | { ok: false; needsAccess?: true; detail?: string; calendarId?: string; error?: string }
 
 const SERVICE_ACCOUNT_EMAIL = 'sd118-log@charged-curve-498217-c1.iam.gserviceaccount.com'
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const MAX_EVENTS_PER_DAY = 2
 
 function parseLocal(iso: string): Date {
-  // 'YYYY-MM-DD' (all-day) needs to be parsed as local midnight, not UTC.
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
     const [y, m, d] = iso.split('-').map(Number)
     return new Date(y, m - 1, d)
@@ -32,26 +33,38 @@ function dayKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-function formatDayHeader(d: Date): { weekday: string; date: string; relative: string } {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const target = new Date(d)
-  target.setHours(0, 0, 0, 0)
-  const diff = Math.round((target.getTime() - today.getTime()) / 86400000)
-  let relative = ''
-  if (diff === 0) relative = 'Today'
-  else if (diff === 1) relative = 'Tomorrow'
-  else if (diff === -1) relative = 'Yesterday'
-  else if (diff > 1 && diff <= 7) relative = `in ${diff} days`
-  else if (diff < -1 && diff >= -7) relative = `${-diff} days ago`
-  return {
-    weekday: d.toLocaleDateString(undefined, { weekday: 'long' }),
-    date: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-    relative,
-  }
+function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
-function formatTime(iso: string): string {
+// All days an event covers (handles multi-day events). For all-day events, the
+// Google API end date is exclusive, so we subtract 1 day from the end.
+function expandEventDays(ev: WatchEvent): string[] {
+  const start = parseLocal(ev.start)
+  const end = parseLocal(ev.end)
+  const last = new Date(end)
+  if (ev.allDay) last.setDate(last.getDate() - 1)
+  const days: string[] = []
+  const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const stop = new Date(last.getFullYear(), last.getMonth(), last.getDate())
+  while (cur <= stop) {
+    days.push(dayKey(cur))
+    cur.setDate(cur.getDate() + 1)
+  }
+  return days.length ? days : [dayKey(start)]
+}
+
+function startOfMonthGrid(year: number, month: number): Date {
+  // Grid starts on Monday before (or equal to) the 1st.
+  const first = new Date(year, month, 1)
+  const dow = (first.getDay() + 6) % 7 // 0 = Monday
+  const start = new Date(first)
+  start.setDate(first.getDate() - dow)
+  return start
+}
+
+function formatTime(iso: string, allDay: boolean): string {
+  if (allDay) return ''
   return parseLocal(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }
 
@@ -61,10 +74,44 @@ function copyText(text: string): Promise<boolean> {
     : Promise.resolve(false)
 }
 
+const PRINT_CSS = `
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  html, body { background: #ffffff !important; color: #000000 !important; }
+  body * { visibility: hidden !important; }
+  .print-area, .print-area * { visibility: visible !important; }
+  .print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 0; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .print-area .cal-grid { gap: 1px !important; background: #000 !important; border: 1px solid #000 !important; }
+  .print-area .cal-cell { background: #ffffff !important; color: #000 !important; min-height: 90px !important; }
+  .print-area .cal-cell * { color: #000 !important; }
+  .print-area .cal-cell.out-of-month { background: #f5f5f5 !important; }
+  .print-area .cal-weekday { background: #e5e5e5 !important; color: #000 !important; border: 1px solid #000 !important; }
+  .print-area .event-chip { background: #ffffff !important; border: 1px solid #000 !important; color: #000 !important; }
+  .print-area .event-chip.event-color-0 { border-left: 4px solid #000 !important; }
+  .print-area .event-chip.event-color-1 { border-left: 4px solid #555 !important; }
+}
+.print-only { display: none; }
+`
+
+const EVENT_TONES = [
+  'border-l-2 border-l-primary bg-primary/15 text-foreground',
+  'border-l-2 border-l-amber-500 bg-amber-500/15 text-foreground',
+]
+
 export function WatchCalendarPage() {
+  const today = useMemo(() => {
+    const t = new Date()
+    t.setHours(0, 0, 0, 0)
+    return t
+  }, [])
+
   const [data, setData] = useState<CalendarResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [cursor, setCursor] = useState<{ y: number; m: number }>({ y: today.getFullYear(), m: today.getMonth() })
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -85,20 +132,51 @@ export function WatchCalendarPage() {
     }
   }, [])
 
-  const grouped = useMemo(() => {
-    if (!data?.ok) return [] as { key: string; date: Date; events: WatchEvent[] }[]
-    const byDay = new Map<string, { date: Date; events: WatchEvent[] }>()
+  // Build map: dayKey -> events on that day
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, WatchEvent[]>()
+    if (!data?.ok) return map
     for (const ev of data.events) {
-      const d = parseLocal(ev.start)
-      const k = dayKey(d)
-      const bucket = byDay.get(k) || { date: new Date(d.getFullYear(), d.getMonth(), d.getDate()), events: [] }
-      bucket.events.push(ev)
-      byDay.set(k, bucket)
+      const days = expandEventDays(ev)
+      for (const k of days) {
+        const arr = map.get(k) || []
+        arr.push(ev)
+        map.set(k, arr)
+      }
     }
-    return Array.from(byDay.entries())
-      .sort(([a], [b]) => (a < b ? -1 : 1))
-      .map(([key, v]) => ({ key, ...v }))
+    return map
   }, [data])
+
+  // 6-week grid for current cursor month
+  const grid = useMemo(() => {
+    const start = startOfMonthGrid(cursor.y, cursor.m)
+    const cells: { date: Date; inMonth: boolean; key: string }[] = []
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start)
+      d.setDate(start.getDate() + i)
+      cells.push({ date: d, inMonth: d.getMonth() === cursor.m, key: dayKey(d) })
+    }
+    return cells
+  }, [cursor])
+
+  function gotoPrev() {
+    setCursor(c => {
+      const d = new Date(c.y, c.m - 1, 1)
+      return { y: d.getFullYear(), m: d.getMonth() }
+    })
+    setSelectedKey(null)
+  }
+  function gotoNext() {
+    setCursor(c => {
+      const d = new Date(c.y, c.m + 1, 1)
+      return { y: d.getFullYear(), m: d.getMonth() }
+    })
+    setSelectedKey(null)
+  }
+  function gotoToday() {
+    setCursor({ y: today.getFullYear(), m: today.getMonth() })
+    setSelectedKey(dayKey(today))
+  }
 
   async function handleCopyEmail() {
     const ok = await copyText(SERVICE_ACCOUNT_EMAIL)
@@ -108,30 +186,81 @@ export function WatchCalendarPage() {
     }
   }
 
+  const monthLabel = new Date(cursor.y, cursor.m, 1).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  })
+  const printedOn = new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  const selectedEvents = selectedKey ? eventsByDay.get(selectedKey) || [] : []
+
   return (
     <MenuLayout title="Watch Calendar" showBack backHref="/watch">
-      <div className="space-y-3">
-        {/* Hero */}
-        <div className="rounded-2xl overflow-hidden border border-border bg-gradient-to-br from-red-900 via-red-800 to-amber-700 relative">
+      <style>{PRINT_CSS}</style>
+      <div className="space-y-3 print-area">
+        {/* Print-only header */}
+        <div className="print-only" style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>M/Y Rise Above — Watch Calendar</div>
+          <div style={{ fontSize: 11 }}>{monthLabel} · Europe/Madrid · Printed {printedOn}</div>
+        </div>
+
+        {/* Hero / nav */}
+        <div className="rounded-2xl overflow-hidden border border-border bg-gradient-to-br from-red-900 via-red-800 to-amber-700 relative no-print">
           <div className="absolute inset-0 bg-black/40" />
-          <div className="relative p-4">
-            <div className="text-[10px] uppercase tracking-widest text-white/80 font-semibold">M/Y Rise Above</div>
-            <div className="text-xl font-bold text-white">Watch Calendar</div>
-            <div className="text-xs text-white/85 mt-0.5">Next 60 days · Europe/Madrid</div>
+          <div className="relative p-3">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={gotoPrev}
+                className="w-9 h-9 rounded-lg bg-white/15 hover:bg-white/25 border border-white/30 text-white flex items-center justify-center"
+                aria-label="Previous month"
+              >
+                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+              </button>
+              <div className="text-center flex-1 min-w-0">
+                <div className="text-[10px] uppercase tracking-widest text-white/80 font-semibold">M/Y Rise Above · Watch</div>
+                <div className="text-lg font-bold text-white truncate">{monthLabel}</div>
+              </div>
+              <button
+                onClick={gotoNext}
+                className="w-9 h-9 rounded-lg bg-white/15 hover:bg-white/25 border border-white/30 text-white flex items-center justify-center"
+                aria-label="Next month"
+              >
+                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+            </div>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <button
+                onClick={gotoToday}
+                className="h-7 px-3 rounded-md bg-white/15 hover:bg-white/25 border border-white/30 text-white text-[11px] font-semibold"
+              >
+                Today
+              </button>
+              {data?.ok && (
+                <button
+                  onClick={() => window.print()}
+                  className="h-7 px-3 rounded-md bg-white/15 hover:bg-white/25 border border-white/30 text-white text-[11px] font-semibold inline-flex items-center gap-1"
+                  aria-label="Print calendar"
+                >
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <rect x="6" y="14" width="12" height="8" />
+                  </svg>
+                  Print
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         {loading && (
-          <div className="text-sm text-muted-foreground text-center py-8">Loading calendar…</div>
+          <div className="text-sm text-muted-foreground text-center py-8 no-print">Loading calendar…</div>
         )}
 
         {!loading && data && !data.ok && data.needsAccess && (
-          <div className="rounded-2xl border border-primary/40 bg-primary/5 p-4 space-y-3">
+          <div className="rounded-2xl border border-primary/40 bg-primary/5 p-4 space-y-3 no-print">
             <div className="text-sm font-semibold text-primary">One-time setup required</div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              The app reads your calendar through a Google service account. Share the watch
-              calendar with this email (any view-only permission is enough), then refresh this
-              page:
+              Share the watch calendar with this service account email (view-only), then refresh:
             </p>
             <div className="rounded-lg bg-card border border-border p-3 font-mono text-[11px] break-all">
               {SERVICE_ACCOUNT_EMAIL}
@@ -142,16 +271,6 @@ export function WatchCalendarPage() {
             >
               {copied ? 'Copied' : 'Copy email'}
             </button>
-            <details className="text-xs text-muted-foreground">
-              <summary className="cursor-pointer font-medium">How to share</summary>
-              <ol className="list-decimal list-inside mt-2 space-y-1 leading-relaxed">
-                <li>Open Google Calendar on desktop, signed in to the calendar's owner account.</li>
-                <li>Hover the watch calendar in the left sidebar → three-dot menu → Settings and sharing.</li>
-                <li>Scroll to "Share with specific people or groups" → Add people and groups.</li>
-                <li>Paste the email above. Permission: "See all event details". Send.</li>
-                <li>Service accounts auto-accept — refresh this page.</li>
-              </ol>
-            </details>
             <button
               onClick={() => window.location.reload()}
               className="w-full h-10 rounded-lg border border-border bg-card text-foreground font-medium text-sm"
@@ -162,7 +281,7 @@ export function WatchCalendarPage() {
         )}
 
         {!loading && data && !data.ok && !data.needsAccess && (
-          <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4 text-sm space-y-2">
+          <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4 text-sm space-y-2 no-print">
             <div className="font-semibold text-destructive">Could not load calendar</div>
             {data.detail && <div className="text-xs text-muted-foreground break-all">{data.detail}</div>}
             <button
@@ -174,88 +293,130 @@ export function WatchCalendarPage() {
           </div>
         )}
 
-        {!loading && data?.ok && grouped.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-            No watches scheduled in the next 60 days.
-          </div>
-        )}
-
-        {!loading && data?.ok && grouped.length > 0 && (
-          <div className="space-y-3">
-            {grouped.map(group => {
-              const h = formatDayHeader(group.date)
-              const isToday = h.relative === 'Today'
-              return (
+        {/* Month grid */}
+        {(!loading && (!data || data.ok)) && (
+          <>
+            {/* Weekday header */}
+            <div className="cal-grid grid grid-cols-7 gap-px bg-border rounded-t-xl overflow-hidden border border-border border-b-0">
+              {WEEKDAYS.map(w => (
                 <div
-                  key={group.key}
-                  className={`rounded-2xl border bg-card overflow-hidden ${isToday ? 'border-primary/60' : 'border-border'}`}
+                  key={w}
+                  className="cal-weekday bg-secondary text-muted-foreground text-[10px] uppercase tracking-wider font-semibold text-center py-1.5"
                 >
-                  <div className={`px-4 py-2.5 flex items-baseline gap-2 ${isToday ? 'bg-primary/10' : 'bg-gradient-to-r from-secondary to-card'} border-b border-border`}>
-                    <span className={`text-sm font-bold ${isToday ? 'text-primary' : 'text-foreground'}`}>
-                      {h.weekday}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{h.date}</span>
-                    {h.relative && (
-                      <span className={`ml-auto text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full ${isToday ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}>
-                        {h.relative}
+                  {w}
+                </div>
+              ))}
+            </div>
+
+            {/* Day cells */}
+            <div className="cal-grid grid grid-cols-7 gap-px bg-border rounded-b-xl overflow-hidden border border-border -mt-3 pt-3 [&]:mt-0">
+              {grid.map(cell => {
+                const evs = eventsByDay.get(cell.key) || []
+                const visible = evs.slice(0, MAX_EVENTS_PER_DAY)
+                const overflow = evs.length - visible.length
+                const isToday = sameDay(cell.date, today)
+                const isSelected = selectedKey === cell.key
+                return (
+                  <button
+                    key={cell.key}
+                    onClick={() => setSelectedKey(cell.key)}
+                    className={`cal-cell text-left p-1 min-h-[78px] flex flex-col gap-1 transition-colors ${
+                      cell.inMonth ? 'bg-card' : 'out-of-month bg-secondary/30'
+                    } ${isSelected ? 'ring-2 ring-primary ring-inset' : ''} hover:bg-secondary/50`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-[11px] font-semibold leading-none ${
+                          isToday
+                            ? 'bg-primary text-primary-foreground rounded-full w-5 h-5 flex items-center justify-center'
+                            : cell.inMonth
+                              ? 'text-foreground'
+                              : 'text-muted-foreground/60'
+                        }`}
+                      >
+                        {cell.date.getDate()}
                       </span>
-                    )}
+                    </div>
+                    <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
+                      {visible.map((ev, i) => {
+                        const time = formatTime(ev.start, ev.allDay)
+                        return (
+                          <div
+                            key={ev.id}
+                            className={`event-chip event-color-${i} rounded px-1 py-0.5 text-[10px] leading-tight truncate ${EVENT_TONES[i] || EVENT_TONES[0]}`}
+                            title={`${time ? time + ' · ' : ''}${ev.summary}${ev.location ? ' · ' + ev.location : ''}`}
+                          >
+                            {time && <span className="font-mono mr-1 opacity-80">{time}</span>}
+                            <span className="font-medium">{ev.summary || '(no title)'}</span>
+                          </div>
+                        )
+                      })}
+                      {overflow > 0 && (
+                        <div className="text-[9px] text-muted-foreground font-medium">+{overflow} more</div>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Selected day detail */}
+            {selectedKey && (
+              <div className="rounded-2xl border border-border bg-card p-3 no-print">
+                <div className="flex items-baseline justify-between mb-2">
+                  <div className="text-sm font-bold text-foreground">
+                    {parseLocal(selectedKey).toLocaleDateString(undefined, {
+                      weekday: 'long',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
                   </div>
-                  <ul className="divide-y divide-border">
-                    {group.events.map(ev => (
-                      <li key={ev.id} className="px-4 py-3">
-                        <div className="flex items-start gap-3">
-                          <div className="w-16 flex-shrink-0 text-right">
-                            {ev.allDay ? (
-                              <span className="text-[10px] uppercase tracking-wide text-primary font-semibold">All day</span>
-                            ) : (
-                              <div>
-                                <div className="text-xs font-mono text-primary font-semibold">{formatTime(ev.start)}</div>
-                                <div className="text-[10px] text-muted-foreground font-mono">{formatTime(ev.end)}</div>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold text-foreground">{ev.summary || '(no title)'}</div>
-                            {ev.location && (
-                              <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                                <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z" />
-                                  <circle cx="12" cy="10" r="3" />
-                                </svg>
-                                {ev.location}
-                              </div>
-                            )}
-                            {ev.description && (
-                              <div className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap leading-relaxed">
-                                {ev.description}
-                              </div>
-                            )}
-                            {ev.attendees.length > 0 && (
-                              <div className="text-[11px] text-muted-foreground mt-1.5 flex flex-wrap gap-1">
-                                {ev.attendees.map((a, i) => (
-                                  <span
-                                    key={i}
-                                    className="px-1.5 py-0.5 rounded bg-secondary/60 border border-border"
-                                  >
-                                    {a.displayName || a.email}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                  <button
+                    onClick={() => setSelectedKey(null)}
+                    className="text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground"
+                  >
+                    Close
+                  </button>
+                </div>
+                {selectedEvents.length === 0 ? (
+                  <div className="text-xs text-muted-foreground py-3 text-center">No watch entries.</div>
+                ) : (
+                  <ul className="space-y-2">
+                    {selectedEvents.map((ev, i) => (
+                      <li
+                        key={ev.id}
+                        className={`rounded-lg p-2 ${EVENT_TONES[i % EVENT_TONES.length]}`}
+                      >
+                        <div className="flex items-baseline gap-2">
+                          {!ev.allDay && (
+                            <span className="text-[10px] font-mono text-primary font-semibold">
+                              {formatTime(ev.start, false)}
+                            </span>
+                          )}
+                          {ev.allDay && (
+                            <span className="text-[9px] uppercase tracking-wide text-primary font-semibold">All day</span>
+                          )}
+                          <span className="text-sm font-semibold flex-1">{ev.summary || '(no title)'}</span>
                         </div>
+                        {ev.location && (
+                          <div className="text-[11px] text-muted-foreground mt-0.5">{ev.location}</div>
+                        )}
+                        {ev.description && (
+                          <div className="text-[11px] text-muted-foreground mt-1 whitespace-pre-wrap leading-relaxed">
+                            {ev.description}
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
-                </div>
-              )
-            })}
-          </div>
+                )}
+              </div>
+            )}
+          </>
         )}
 
-        <div className="text-xs text-muted-foreground text-center pt-2 pb-1">
-          M/Y Rise Above · Watch rotation
+        <div className="text-[10px] text-muted-foreground text-center pt-2 pb-1 no-print">
+          M/Y Rise Above · Tap a day for details · Up to {MAX_EVENTS_PER_DAY} events shown per cell
         </div>
       </div>
     </MenuLayout>
