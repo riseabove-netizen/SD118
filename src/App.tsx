@@ -168,13 +168,9 @@ function AppRoutes() {
         <AuthGuard><TransactionsListPage /></AuthGuard>
       </Route>
 
-      {/* Schedule */}
-      <Route path="/schedule">
-        <AuthGuard><ScheduleHubPage /></AuthGuard>
-      </Route>
-      <Route path="/schedule/:id">
-        <AuthGuard><TripDetailPage /></AuthGuard>
-      </Route>
+      {/* Schedule — PUBLIC (anyone with link can view). Editing requires login (gated in-page). */}
+      <Route path="/schedule" component={ScheduleHubPage} />
+      <Route path="/schedule/:id" component={TripDetailPage} />
 
       {/* Operational Guides */}
       <Route path="/guides">

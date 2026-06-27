@@ -25,7 +25,11 @@ function buildTripHtml(trip: Trip): string {
       const eventsHtml = day.events
         .map(e => {
           const time = e.time ? `<span class="time">${escapeHtml(e.time)}</span>` : ''
-          const title = `<span class="ev-title ${e.highlight ? 'hl' : ''}">${escapeHtml(e.title)}</span>`
+          const titleText = escapeHtml(e.title)
+          const titleInner = e.link
+            ? `<a href="${escapeHtml(e.link)}" target="_blank" rel="noopener">${titleText}</a>`
+            : titleText
+          const title = `<span class="ev-title ${e.highlight ? 'hl' : ''}">${titleInner}</span>`
           const details = e.details && e.details.length
             ? `<ul class="details">${e.details.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>`
             : ''
@@ -189,7 +193,8 @@ function buildTripHtml(trip: Trip): string {
     font-size: 8.5pt;
     text-align: center;
   }
-  @media print { a { color: #111; text-decoration: none; } }
+  .ev-title a { color: #b91c1c; text-decoration: underline; }
+  @media print { .ev-title a { color: #111; text-decoration: underline; } }
 </style>
 </head>
 <body>
