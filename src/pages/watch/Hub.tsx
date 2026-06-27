@@ -45,7 +45,6 @@ export function WatchHubPage() {
           label="Watch Calendar"
           href="/watch/calendar"
           description="Who's on watch — by day"
-          comingSoon
         />
         <Tile
           icon="✅"
