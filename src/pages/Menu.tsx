@@ -93,6 +93,12 @@ export function MenuPage() {
           description="Upcoming trips & itineraries"
         />
         <MenuItem
+          icon="🕒"
+          label="Watch Duties"
+          href="/watch"
+          description="Daily checklist & watch calendar"
+        />
+        <MenuItem
           icon="⚙️"
           label="Settings"
           href="/settings"

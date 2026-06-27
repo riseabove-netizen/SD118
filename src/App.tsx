@@ -38,6 +38,11 @@ import { BulkAddPage } from '@/pages/inventory/BulkAdd'
 import { ScheduleHubPage } from '@/pages/schedule/Hub'
 import { TripDetailPage } from '@/pages/schedule/TripDetail'
 
+// Watch Duties
+import { WatchHubPage } from '@/pages/watch/Hub'
+import { WatchCalendarPage } from '@/pages/watch/Calendar'
+import { WatchDutiesPage } from '@/pages/watch/Duties'
+
 // Operational Guides
 import { GuidesListPage } from '@/pages/guides/GuidesList'
 import { GuideViewPage } from '@/pages/guides/GuideView'
@@ -171,6 +176,17 @@ function AppRoutes() {
       {/* Schedule — PUBLIC (anyone with link can view). Editing requires login (gated in-page). */}
       <Route path="/schedule" component={ScheduleHubPage} />
       <Route path="/schedule/:id" component={TripDetailPage} />
+
+      {/* Watch Duties */}
+      <Route path="/watch">
+        <AuthGuard><WatchHubPage /></AuthGuard>
+      </Route>
+      <Route path="/watch/calendar">
+        <AuthGuard><WatchCalendarPage /></AuthGuard>
+      </Route>
+      <Route path="/watch/duties">
+        <AuthGuard><WatchDutiesPage /></AuthGuard>
+      </Route>
 
       {/* Operational Guides */}
       <Route path="/guides">
