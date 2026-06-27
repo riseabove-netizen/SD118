@@ -34,12 +34,12 @@ export const WATCH_DUTY_SECTIONS: WatchDutySection[] = [
     items: [
       { id: 'm1', label: 'Complete a full walk through of ALL areas of vessel INTERIOR AND DECK.' },
       { id: 'm2', label: 'Check Fridges and Freezer temps and fill in Fridge Log, TO BE DONE EVERY ROUND.' },
-      { id: 'm3', label: 'Check Engineroom and report anything out of the ordinary to the Engineer.' },
+      { id: 'm3', label: 'Check Engine Room and report anything out of the ordinary to the Engineer.' },
       { id: 'm4', label: 'Check lines, fenders and gangway.' },
       { id: 'm5', label: 'Interior — Please make sure dishwasher is turned on if empty, not loaded before lunch.' },
       { id: 'm6', label: 'Turn off Exterior Lights.' },
       { id: 'm7', label: 'Bridge External Light Panel — Wheel house Panel.' },
-      { id: 'm8', label: 'Put the Flag up — SUNDECK.' },
+      { id: 'm8', label: 'Remove cover from flag pole — SUNDECK.' },
     ],
     signoff: true,
     signoffRange: '08:00 – 10:00',
@@ -51,7 +51,6 @@ export const WATCH_DUTY_SECTIONS: WatchDutySection[] = [
       { id: 'l1', label: 'Interior — Please assist the chef in setting up for lunch.' },
       { id: 'l2', label: 'Complete Round — Check lines, fenders and gangway.' },
       { id: 'l3', label: 'CREW ON WATCH — Pack away after lunch, food in tupperwares, crew mess cleaned up.' },
-      { id: 'l4', label: 'Complete Full Round.' },
     ],
     signoff: true,
     signoffRange: '12:00 – 14:00',
@@ -66,23 +65,6 @@ export const WATCH_DUTY_SECTIONS: WatchDutySection[] = [
         label:
           'Lock all exterior doors but leave the crew door until 21:00. This should be completed as soon as the working day has come to a close.',
       },
-      { id: 'a3', label: 'Initial Watch Log in the bridge.' },
-    ],
-  },
-  {
-    id: 'sunset',
-    time: '17:00',
-    subtime: 'SUNSET',
-    title: 'Set up for crew dinner (mats, food, plates, cutlery, condiments etc.)',
-    items: [
-      { id: 's1', label: '20 minutes before Sunset — Exterior lights turned on.' },
-      { id: 's2', label: 'Bridge External Light Panel (Marked).' },
-      { id: 's3', label: 'Take Flag down at Sunset (GOOGLE THE TIME).' },
-      {
-        id: 's4',
-        label:
-          'All lights in the interior guest areas must be switched off except corridors and ensure that all the interior doors are closed.',
-      },
     ],
   },
   {
@@ -92,6 +74,22 @@ export const WATCH_DUTY_SECTIONS: WatchDutySection[] = [
       { id: 'e1', label: 'Put all food away in Tupperware, in Galley fridge (food to be thrown away in CM bins only).' },
       { id: 'e2', label: 'Wash dishes, if you use Galley dishwasher, dry and put away.' },
       { id: 'e3', label: 'Wipe down all surfaces in Crew Mess. Hoover floor and wipe down seats if necessary.' },
+    ],
+  },
+  {
+    id: 'sunset',
+    time: '10 min before sunset',
+    subtime: 'SUNSET',
+    title: 'Set up for crew dinner (mats, food, plates, cutlery, condiments etc.)',
+    items: [
+      { id: 's1', label: 'Turn on exterior lights.' },
+      { id: 's2', label: 'Bridge External Light Panel (Marked).' },
+      { id: 's3', label: 'Take Flag down at Sunset.' },
+      {
+        id: 's4',
+        label:
+          'All lights in the interior guest areas must be switched off except corridors and ensure that all the interior doors are closed.',
+      },
     ],
   },
   {
