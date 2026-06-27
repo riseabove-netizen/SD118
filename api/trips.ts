@@ -36,8 +36,81 @@ function getSheetsAuth() {
       'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/drive.file',
       'https://www.googleapis.com/auth/drive',
+      'https://www.googleapis.com/auth/calendar.readonly',
     ],
   })
+}
+
+/** Watch rotation calendar (Europe/Madrid). Service account must be granted read access. */
+const WATCH_CALENDAR_ID =
+  cleanEnv(process.env.WATCH_CALENDAR_ID) ||
+  'c_73f50e718a59d11e5c7b773356918294dc20b765db2abf207e55d3c6449adece@group.calendar.google.com'
+
+async function handleWatchCalendar(req: VercelRequest, res: VercelResponse) {
+  const auth = getSheetsAuth()
+  const calendar = google.calendar({ version: 'v3', auth })
+
+  // Optional window: ?from=YYYY-MM-DD&to=YYYY-MM-DD (defaults: today — today+60d)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const defaultFrom = today.toISOString()
+  const future = new Date(today)
+  future.setDate(future.getDate() + 60)
+  const defaultTo = future.toISOString()
+
+  const fromQ = String(req.query.from || '').trim()
+  const toQ = String(req.query.to || '').trim()
+  const timeMin = fromQ ? new Date(fromQ).toISOString() : defaultFrom
+  const timeMax = toQ ? new Date(toQ).toISOString() : defaultTo
+
+  try {
+    const resp = await calendar.events.list({
+      calendarId: WATCH_CALENDAR_ID,
+      timeMin,
+      timeMax,
+      singleEvents: true,
+      orderBy: 'startTime',
+      maxResults: 250,
+    })
+    const items = (resp.data.items || []).map(ev => ({
+      id: ev.id || '',
+      summary: ev.summary || '',
+      description: ev.description || '',
+      location: ev.location || '',
+      start: ev.start?.dateTime || ev.start?.date || '',
+      end: ev.end?.dateTime || ev.end?.date || '',
+      allDay: !!ev.start?.date && !ev.start?.dateTime,
+      htmlLink: ev.htmlLink || '',
+      attendees: (ev.attendees || []).map(a => ({
+        email: a.email || '',
+        displayName: a.displayName || '',
+        responseStatus: a.responseStatus || '',
+      })),
+    }))
+    return res.status(200).json({
+      ok: true,
+      events: items,
+      timeZone: resp.data.timeZone || 'Europe/Madrid',
+      calendarId: WATCH_CALENDAR_ID,
+    })
+  } catch (error: any) {
+    const status = error?.code || error?.response?.status || 500
+    const detail =
+      error?.errors?.[0]?.message ||
+      error?.response?.data?.error?.message ||
+      error?.message ||
+      String(error)
+    // 404 from Calendar API = service account doesn't have access to this calendar
+    if (status === 404 || status === 403) {
+      return res.status(200).json({
+        ok: false,
+        needsAccess: true,
+        detail,
+        calendarId: WATCH_CALENDAR_ID,
+      })
+    }
+    return res.status(500).json({ ok: false, error: 'Calendar request failed', detail })
+  }
 }
 
 async function ensureSheetExists(sheets: any, title: string, headers: string[]) {
@@ -589,6 +662,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const action = String(req.query.action || '').trim()
     if (req.method === 'GET') {
       if (action === 'watch-get') return await handleWatchGet(req, res)
+      if (action === 'watch-calendar') return await handleWatchCalendar(req, res)
       // default: trips get
       return await handleTripsGet(req, res)
     }
