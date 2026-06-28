@@ -33,10 +33,11 @@ function getAuth() {
 // Engine Log column layout — verified against the actual 2-row merged header
 // on the master "Engine Log" tab (46 columns, A..AT).
 //
-// `protected: true` means the sheet column has a formula that must NEVER be
-// overwritten. Newly appended rows skip these columns entirely so the user's
-// formulas stay intact.
-const ENGINE_LOG_COLUMNS: { col: string; key: string; protected?: boolean }[] = [
+// `formula: (row)=>...` means the column holds a computed formula that we
+// write explicitly for each new row (so the formula propagates even when the
+// user has not manually filled it down). The cell value is preserved when the
+// row already contains data; the formula is only emitted for brand-new rows.
+const ENGINE_LOG_COLUMNS: { col: string; key: string; formula?: (row: number) => string }[] = [
   { col: 'A',  key: '__datetime' },                  // Date/Time "YYYY/MM/DD HHMM"
   { col: 'B',  key: 'entry_type' },                  // Type
   { col: 'C',  key: 'gen_running' },                 // Running Gen
@@ -44,7 +45,8 @@ const ENGINE_LOG_COLUMNS: { col: string; key: string; protected?: boolean }[] = 
   { col: 'E',  key: 'gen_stbd_hours' },              // Gen Hours STBD
   { col: 'F',  key: 'port_engine_hours' },           // Engine Hours Port
   { col: 'G',  key: 'stbd_engine_hours' },           // Engine Hours STBD
-  { col: 'H',  key: '', protected: true },           // Fuel Total — FORMULA, do not overwrite
+  { col: 'H',  key: '',                              // Fuel Total = SUM(I:K) when all three tank readings present
+    formula: (r) => `=if(or(I${r}="",J${r}="",K${r}=""),"",SUM(I${r}:K${r}))` },
   { col: 'I',  key: 'fuel_daily' },                  // Fuel: Daily tank
   { col: 'J',  key: 'fuel_aft' },                    // Fuel: Aft Main
   { col: 'K',  key: 'fuel_fwd' },                    // Fuel: FWD Main
@@ -56,8 +58,10 @@ const ENGINE_LOG_COLUMNS: { col: string; key: string; protected?: boolean }[] = 
   { col: 'Q',  key: 'stbd_rpm' },                    // RPM STBD
   { col: 'R',  key: 'port_fuel_rate' },              // Fuel Rate Port
   { col: 'S',  key: 'stbd_fuel_rate' },              // Fuel Rate STBD
-  { col: 'T',  key: '', protected: true },           // Gal/hr total — FORMULA, do not overwrite
-  { col: 'U',  key: '', protected: true },           // L/NM         — FORMULA, do not overwrite
+  { col: 'T',  key: '',                              // Gal/hr total — converts fuel-rate sum + 4 gal/hr gen to gal
+    formula: (r) => `=O${r}/(((left(S${r},2)+left(R${r},2)+4))/3.78541)` },
+  { col: 'U',  key: '',                              // L/NM — litres consumed per nautical mile
+    formula: (r) => `=(left(S${r},2)+left(R${r},2)+4)/O${r}` },
   { col: 'V',  key: 'port_coolant_temp' },           // Coolant Temp Port
   { col: 'W',  key: 'stbd_coolant_temp' },           // Coolant Temp STBD
   { col: 'X',  key: 'port_trans_oil_temp' },         // Trans Oil Temp Port
@@ -174,21 +178,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    // 2) Build contiguous segments of non-protected columns (skipping A).
-    type Seg = { cols: string[]; vals: string[] }
-    const segments: Seg[] = []
-    let cur: Seg | null = null
+    // 2) Write per-cell ranges for the remaining columns (skipping A which
+    //    we already appended). Columns flagged with `formula` get the
+    //    formula string computed for this row number; everything else gets
+    //    the value from buildRow(). Each column is sent as its own range so
+    //    the formula columns reliably contain a formula even when adjacent
+    //    value columns are blank.
+    const data: { range: string; values: string[][] }[] = []
     ENGINE_LOG_COLUMNS.forEach((c, i) => {
-      if (i === 0) { cur = null; return }
-      if (c.protected) { cur = null; return }
-      if (!cur) { cur = { cols: [c.col], vals: [row[i]] }; segments.push(cur) }
-      else { cur.cols.push(c.col); cur.vals.push(row[i]) }
+      if (i === 0) return // column A already appended
+      const v = c.formula ? c.formula(rowNum) : row[i]
+      if (v === '' || v === undefined || v === null) {
+        // skip empties for value cells, but ALWAYS write formulas
+        if (!c.formula) return
+      }
+      data.push({
+        range: `${SHEET_TAB}!${c.col}${rowNum}:${c.col}${rowNum}`,
+        values: [[v]],
+      })
     })
-
-    const data = segments.map(s => ({
-      range: `${SHEET_TAB}!${s.cols[0]}${rowNum}:${s.cols[s.cols.length - 1]}${rowNum}`,
-      values: [s.vals],
-    }))
 
     if (data.length > 0) {
       await sheets.spreadsheets.values.batchUpdate({
