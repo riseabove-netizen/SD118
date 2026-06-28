@@ -26,8 +26,16 @@ Fields per engine (prefix with port_ or stbd_):
 Also extract from the navigation / chartplotter screen if visible:
   date         — date shown on the display, formatted as YYYY-MM-DD
   time         — time shown on the display, formatted as HH:MM (24-hour)
-  latitude     — decimal degrees, negative for South (convert from DMS if shown that way)
-  longitude    — decimal degrees, negative for West (convert from DMS if shown that way)
+  latitude     — STRING in degrees + decimal-minutes format with hemisphere letter, e.g. "39°27.479'N" or "40°12.227'N".
+                 Format: DD°MM.MMM'H where H is N or S. Pad degrees to 2 digits.
+                 If the display shows decimal degrees instead (e.g. 39.477768), convert to DM:
+                   sign → N/S (positive = N, negative = S)
+                   degrees = integer part of absolute value
+                   minutes = (absolute value − degrees) × 60, keep 3 decimal places
+                 If the display shows D°M'S" (degrees/minutes/seconds), convert seconds to decimal minutes: minutes_decimal = M + S/60.
+  longitude    — STRING in degrees + decimal-minutes format with hemisphere letter, e.g. "002°32.569'E" or "003°24.540'W".
+                 Format: DDD°MM.MMM'H where H is E or W. Pad degrees to 3 digits.
+                 Same conversion rules as latitude (positive = E, negative = W).
   cog          — course over ground in degrees
   sog          — speed over ground in knots
 
@@ -83,6 +91,65 @@ function detectMediaType(b64: string): 'image/jpeg' | 'image/png' | 'image/webp'
   return 'image/jpeg'
 }
 
+// Convert a coordinate value to DM format "DD°MM.MMM'H" (lat) or "DDD°MM.MMM'H" (lon).
+// Accepts:
+//   - already-DM strings ("39°27.479'N") → pass through (re-formatted to canonical padding)
+//   - decimal numbers or numeric strings (39.477768 or "-2.6502") → convert
+//   - D°M'S" strings (39°27'28.7"N) → convert seconds to decimal minutes
+//   - null / empty → return as-is
+function normalizeCoord(value: unknown, kind: 'lat' | 'lon'): unknown {
+  if (value === null || value === undefined || value === '') return value
+  const str = String(value).trim()
+  if (!str) return value
+
+  const posHem = kind === 'lat' ? 'N' : 'E'
+  const negHem = kind === 'lat' ? 'S' : 'W'
+  const degPad = kind === 'lat' ? 2 : 3
+
+  // Parse degrees + decimal minutes + optional hemisphere: "39°27.479'N" or "39 27.479 N"
+  const dmMatch = str.match(/^\s*(-?)(\d{1,3})[°\s:]+(\d{1,2}(?:\.\d+)?)['′\s]*([NSEWnsew])?\s*$/)
+  if (dmMatch) {
+    const sign = dmMatch[1] === '-' ? -1 : 1
+    const deg = parseInt(dmMatch[2], 10)
+    const min = parseFloat(dmMatch[3])
+    let hem = (dmMatch[4] || '').toUpperCase()
+    if (!hem) hem = sign < 0 ? negHem : posHem
+    return formatDM(deg, min, hem, degPad)
+  }
+
+  // Parse degrees, minutes, seconds: "39°27'28.7\"N"
+  const dmsMatch = str.match(/^\s*(-?)(\d{1,3})[°\s:]+(\d{1,2})['′\s:]+(\d{1,2}(?:\.\d+)?)["″\s]*([NSEWnsew])?\s*$/)
+  if (dmsMatch) {
+    const sign = dmsMatch[1] === '-' ? -1 : 1
+    const deg = parseInt(dmsMatch[2], 10)
+    const min = parseInt(dmsMatch[3], 10) + parseFloat(dmsMatch[4]) / 60
+    let hem = (dmsMatch[5] || '').toUpperCase()
+    if (!hem) hem = sign < 0 ? negHem : posHem
+    return formatDM(deg, min, hem, degPad)
+  }
+
+  // Parse decimal-degree number ("-2.6502" or 39.477768)
+  const decMatch = str.match(/^\s*(-?\d+(?:\.\d+)?)\s*([NSEWnsew])?\s*$/)
+  if (decMatch) {
+    const num = parseFloat(decMatch[1])
+    let hem = (decMatch[2] || '').toUpperCase()
+    if (!hem) hem = num < 0 ? negHem : posHem
+    const abs = Math.abs(num)
+    const deg = Math.floor(abs)
+    const min = (abs - deg) * 60
+    return formatDM(deg, min, hem, degPad)
+  }
+
+  // Unrecognised format — return original string
+  return str
+}
+
+function formatDM(deg: number, min: number, hem: string, degPad: number): string {
+  const degStr = String(deg).padStart(degPad, '0')
+  const minStr = min.toFixed(3).padStart(6, '0') // "05.430" or "27.479"
+  return `${degStr}°${minStr}'${hem}`
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -136,6 +203,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch (e) {
       console.error('JSON parse failed. Raw text:', text)
       return res.status(502).json({ error: 'AI returned non-JSON response', raw: text.slice(0, 500) })
+    }
+
+    // Safety net: convert any decimal-degree coordinates the model returned
+    // into the DM format the sheet expects: DD°MM.MMM'H / DDD°MM.MMM'H.
+    // Existing DM strings pass through untouched.
+    const nav = (data as any)?.navigation
+    if (nav && typeof nav === 'object') {
+      nav.latitude = normalizeCoord(nav.latitude, 'lat')
+      nav.longitude = normalizeCoord(nav.longitude, 'lon')
     }
 
     // Attach a small debug echo so the client (and you) can confirm how
