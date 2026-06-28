@@ -19,11 +19,20 @@ const ENGINE_FIELDS: { suffix: string; label: string; unit?: string }[] = [
   { suffix: 'oil_temp', label: 'Engine Oil Temp', unit: '°C' },
   { suffix: 'trans_oil_press', label: 'Trans Oil Pressure', unit: 'kPa' },
   { suffix: 'fuel_temp', label: 'Fuel Temp', unit: '°C' },
+  { suffix: 'fuel_pressure', label: 'Fuel Pressure', unit: 'kPa' },
   { suffix: 'engine_load', label: 'Engine Load', unit: '%' },
   { suffix: 'coolant_level', label: 'Coolant Level' },
   { suffix: 'battery_voltage', label: 'ECU Batt Voltage', unit: 'V' },
   { suffix: 'exhaust_temp_l', label: 'Exhaust Temp Left', unit: '°C' },
   { suffix: 'exhaust_temp_r', label: 'Exhaust Temp Right', unit: '°C' },
+  { suffix: 'inlet_manifold_temp', label: 'Inlet Manifold Temp', unit: '°C' },
+]
+
+const ENTRY_TYPES = [
+  { value: '', label: 'Running (default)' },
+  { value: 'Bunkering', label: 'Bunkering' },
+  { value: 'Departure', label: 'Departure' },
+  { value: 'Arrival', label: 'Arrival' },
 ]
 
 const GEN_OPTIONS = [
@@ -44,7 +53,11 @@ export function ReviewPage() {
     const defaults: FormValues = {
       date: '',
       time: '',
+      entry_type: '',
       gen_running: '',
+      fuel_daily: '',
+      fuel_aft: '',
+      fuel_fwd: '',
       gen_port_hours: '',
       gen_stbd_hours: '',
       latitude: '',
@@ -143,6 +156,40 @@ export function ReviewPage() {
             <div className="space-y-1">
               <Label htmlFor="time">Time</Label>
               <Input id="time" type="time" value={values.time || ''} onChange={e => set('time', e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="entry_type">Entry Type</Label>
+            <select
+              id="entry_type"
+              value={values.entry_type || ''}
+              onChange={e => set('entry_type', e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              {ENTRY_TYPES.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Fuel Tanks */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider border-b border-border pb-2">
+            Fuel Tanks
+          </h3>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="fuel_daily">Daily [L]</Label>
+              <Input id="fuel_daily" type="text" inputMode="decimal" value={values.fuel_daily || ''} onChange={e => set('fuel_daily', e.target.value)} placeholder="L" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="fuel_aft">Aft Main [L]</Label>
+              <Input id="fuel_aft" type="text" inputMode="decimal" value={values.fuel_aft || ''} onChange={e => set('fuel_aft', e.target.value)} placeholder="L" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="fuel_fwd">FWD Main [L]</Label>
+              <Input id="fuel_fwd" type="text" inputMode="decimal" value={values.fuel_fwd || ''} onChange={e => set('fuel_fwd', e.target.value)} placeholder="L" />
             </div>
           </div>
         </div>

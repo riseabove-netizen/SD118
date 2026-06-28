@@ -20,8 +20,8 @@ For each engine (Port and Starboard), extract the following readings from the en
 
 Fields per engine (prefix with port_ or stbd_):
   engine_hours, rpm, fuel_rate, coolant_temp, trans_oil_temp, oil_temp,
-  trans_oil_press, fuel_temp, engine_load, coolant_level, battery_voltage,
-  exhaust_temp_l, exhaust_temp_r
+  trans_oil_press, fuel_temp, fuel_pressure, engine_load, coolant_level,
+  battery_voltage, exhaust_temp_l, exhaust_temp_r, inlet_manifold_temp
 
 Also extract from the navigation / chartplotter screen if visible:
   date         — date shown on the display, formatted as YYYY-MM-DD
@@ -39,16 +39,16 @@ Return a JSON object in this exact shape (all fields included, null when missing
   "port_engine": {
     "port_engine_hours": null, "port_rpm": null, "port_fuel_rate": null,
     "port_coolant_temp": null, "port_trans_oil_temp": null, "port_oil_temp": null,
-    "port_trans_oil_press": null, "port_fuel_temp": null, "port_engine_load": null,
-    "port_coolant_level": null, "port_battery_voltage": null,
-    "port_exhaust_temp_l": null, "port_exhaust_temp_r": null
+    "port_trans_oil_press": null, "port_fuel_temp": null, "port_fuel_pressure": null,
+    "port_engine_load": null, "port_coolant_level": null, "port_battery_voltage": null,
+    "port_exhaust_temp_l": null, "port_exhaust_temp_r": null, "port_inlet_manifold_temp": null
   },
   "stbd_engine": {
     "stbd_engine_hours": null, "stbd_rpm": null, "stbd_fuel_rate": null,
     "stbd_coolant_temp": null, "stbd_trans_oil_temp": null, "stbd_oil_temp": null,
-    "stbd_trans_oil_press": null, "stbd_fuel_temp": null, "stbd_engine_load": null,
-    "stbd_coolant_level": null, "stbd_battery_voltage": null,
-    "stbd_exhaust_temp_l": null, "stbd_exhaust_temp_r": null
+    "stbd_trans_oil_press": null, "stbd_fuel_temp": null, "stbd_fuel_pressure": null,
+    "stbd_engine_load": null, "stbd_coolant_level": null, "stbd_battery_voltage": null,
+    "stbd_exhaust_temp_l": null, "stbd_exhaust_temp_r": null, "stbd_inlet_manifold_temp": null
   }
 }
 
