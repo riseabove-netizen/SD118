@@ -20,14 +20,62 @@ const ENGINE_FIELDS_LIST = [
 const engineKeys = (prefix: 'port' | 'stbd'): string[] =>
   ENGINE_FIELDS_LIST.map(s => `${prefix}_${s}`)
 
-// Each target maps to a set of field keys in the form.
-// User picks which targets the newly-uploaded photos should fill.
-const MERGE_TARGETS = [
-  { id: 'datetime', label: 'Date / Time', keys: ['date', 'time'] },
-  { id: 'nav',      label: 'Navigation (Lat/Lon/COG/SOG)', keys: ['latitude', 'longitude', 'cog', 'sog'] },
-  { id: 'port',     label: 'Port Engine',  keys: engineKeys('port') },
-  { id: 'stbd',     label: 'Starboard Engine', keys: engineKeys('stbd') },
-] as const
+// Field labels used by the re-upload picker so the user can choose
+// individual missing fields (e.g. "Exhaust Temp Right Port" only).
+const ENGINE_FIELD_LABELS: Record<string, string> = {
+  engine_hours: 'Engine Hours',
+  rpm: 'RPM',
+  fuel_rate: 'Fuel Rate',
+  coolant_temp: 'Coolant Temp',
+  trans_oil_temp: 'Trans Oil Temp',
+  oil_temp: 'Engine Oil Temp',
+  trans_oil_press: 'Trans Oil Pressure',
+  fuel_temp: 'Fuel Temp',
+  fuel_pressure: 'Fuel Pressure',
+  engine_load: 'Engine Load',
+  coolant_level: 'Coolant Level',
+  battery_voltage: 'Batt Voltage',
+  exhaust_temp_l: 'Exhaust Temp Left',
+  exhaust_temp_r: 'Exhaust Temp Right',
+  inlet_manifold_temp: 'Inlet Manifold Temp',
+}
+
+type FieldDef = { key: string; label: string }
+type FieldGroup = { id: string; label: string; fields: FieldDef[] }
+
+const FIELD_GROUPS: FieldGroup[] = [
+  {
+    id: 'datetime', label: 'Date / Time',
+    fields: [{ key: 'date', label: 'Date' }, { key: 'time', label: 'Time' }],
+  },
+  {
+    id: 'nav', label: 'Navigation',
+    fields: [
+      { key: 'latitude',  label: 'Latitude' },
+      { key: 'longitude', label: 'Longitude' },
+      { key: 'cog',       label: 'COG' },
+      { key: 'sog',       label: 'SOG' },
+    ],
+  },
+  {
+    id: 'tanks', label: 'Fuel Tanks',
+    fields: [
+      { key: 'fuel_daily', label: 'Daily Tank' },
+      { key: 'fuel_aft',   label: 'Aft Main Tank' },
+      { key: 'fuel_fwd',   label: 'FWD Main Tank' },
+    ],
+  },
+  {
+    id: 'port', label: 'Port Engine',
+    fields: ENGINE_FIELDS_LIST.map(s => ({ key: `port_${s}`, label: ENGINE_FIELD_LABELS[s] || s })),
+  },
+  {
+    id: 'stbd', label: 'Starboard Engine',
+    fields: ENGINE_FIELDS_LIST.map(s => ({ key: `stbd_${s}`, label: ENGINE_FIELD_LABELS[s] || s })),
+  },
+]
+
+const ALL_MERGEABLE_KEYS: string[] = FIELD_GROUPS.flatMap(g => g.fields.map(f => f.key))
 
 // Per-engine fields (rendered once for Port and once for Starboard)
 const ENGINE_FIELDS: { suffix: string; label: string; unit?: string }[] = [
@@ -95,7 +143,8 @@ export function ReviewPage() {
     if (raw) {
       try {
         const extracted = JSON.parse(raw) as Record<string, unknown>
-        for (const section of Object.values(extracted)) {
+        for (const [sectionKey, section] of Object.entries(extracted)) {
+          if (sectionKey === '_meta') continue
           if (section && typeof section === 'object') {
             for (const [k, v] of Object.entries(section as Record<string, unknown>)) {
               if (typeof v === 'string' || typeof v === 'number') {
@@ -105,6 +154,7 @@ export function ReviewPage() {
           }
         }
         for (const [k, v] of Object.entries(extracted)) {
+          if (k === '_meta') continue
           if (typeof v === 'string' || typeof v === 'number') {
             defaults[k] = String(v)
           }
@@ -125,13 +175,52 @@ export function ReviewPage() {
   })
 
   // —————————— Re-upload: add more photos & merge ——————————
+  const [moreOpen, setMoreOpen] = useState(false)
   const [moreFiles, setMoreFiles] = useState<File[]>([])
-  const [mergeTargets, setMergeTargets] = useState<string[]>(['port', 'stbd'])
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
+  const [imagesProcessed, setImagesProcessed] = useState<number | null>(null)
   const moreCameraRef = useRef<HTMLInputElement>(null)
   const moreLibraryRef = useRef<HTMLInputElement>(null)
 
-  const toggleTarget = (id: string) =>
-    setMergeTargets(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  const toggleKey = (key: string) =>
+    setSelectedKeys(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key); else next.add(key)
+      return next
+    })
+
+  const toggleGroup = (groupId: string) => {
+    const grp = FIELD_GROUPS.find(g => g.id === groupId)
+    if (!grp) return
+    const groupKeys = grp.fields.map(f => f.key)
+    const allOn = groupKeys.every(k => selectedKeys.has(k))
+    setSelectedKeys(prev => {
+      const next = new Set(prev)
+      if (allOn) groupKeys.forEach(k => next.delete(k))
+      else groupKeys.forEach(k => next.add(k))
+      return next
+    })
+  }
+
+  const toggleGroupOpen = (groupId: string) =>
+    setOpenGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId); else next.add(groupId)
+      return next
+    })
+
+  const selectMissing = () => {
+    const missing = ALL_MERGEABLE_KEYS.filter(k => !values[k] || values[k] === '')
+    setSelectedKeys(new Set(missing))
+    const groups = new Set<string>()
+    for (const g of FIELD_GROUPS) {
+      if (g.fields.some(f => missing.includes(f.key))) groups.add(g.id)
+    }
+    setOpenGroups(groups)
+  }
+
+  const clearSelection = () => setSelectedKeys(new Set())
 
   const addMoreFiles = (newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return
@@ -151,9 +240,16 @@ export function ReviewPage() {
       return extractFromImages(images)
     },
     onSuccess: (data: Record<string, unknown>) => {
-      // Flatten the AI response (it nests under date_time / navigation / port_engine / stbd_engine)
+      // Capture image-count debug echo from server
+      const meta = (data as any)._meta
+      if (meta && typeof meta === 'object') {
+        setImagesProcessed(typeof meta.images_processed === 'number' ? meta.images_processed : null)
+      }
+
+      // Flatten the AI response (nested under date_time / navigation / fuel_tanks / port_engine / stbd_engine)
       const flat: Record<string, string> = {}
-      for (const section of Object.values(data)) {
+      for (const [sectionKey, section] of Object.entries(data)) {
+        if (sectionKey === '_meta') continue
         if (section && typeof section === 'object') {
           for (const [k, v] of Object.entries(section as Record<string, unknown>)) {
             if (typeof v === 'string' || typeof v === 'number') flat[k] = String(v)
@@ -161,27 +257,21 @@ export function ReviewPage() {
         }
       }
       for (const [k, v] of Object.entries(data)) {
+        if (k === '_meta') continue
         if (typeof v === 'string' || typeof v === 'number') flat[k] = String(v)
       }
 
-      // Only write keys belonging to the selected merge targets,
-      // and only when the AI actually returned a non-empty value.
-      const allowedKeys = new Set<string>()
-      for (const t of MERGE_TARGETS) {
-        if (mergeTargets.includes(t.id)) {
-          for (const k of t.keys) allowedKeys.add(k)
-        }
-      }
-
+      // Merge ONLY the user-selected individual fields
       setValues(prev => {
         const next = { ...prev }
-        for (const k of allowedKeys) {
+        selectedKeys.forEach(k => {
           const v = flat[k]
           if (v !== undefined && v !== null && v !== '') next[k] = v
-        }
+        })
         return next
       })
       setMoreFiles([])
+      setSelectedKeys(new Set())
     },
   })
   // —————————— end re-upload ——————————
@@ -225,101 +315,185 @@ export function ReviewPage() {
           </p>
         </div>
 
-        {/* Add more photos & merge */}
-        <div className="space-y-3 rounded-xl border border-border bg-card p-4">
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider">Add more photos</h3>
-            <p className="text-xs text-muted-foreground mt-1">
-              Upload extra engine / nav screen photos and pick which sections they should fill.
-              Empty fields will be filled; existing values overwrite only when the AI reads a new value.
-            </p>
-          </div>
-
-          <input
-            ref={moreCameraRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={e => { addMoreFiles(e.target.files); e.target.value = '' }}
-            className="hidden"
-          />
-          <input
-            ref={moreLibraryRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={e => { addMoreFiles(e.target.files); e.target.value = '' }}
-            className="hidden"
-          />
-
-          <div className="grid grid-cols-2 gap-2">
-            <Button type="button" onClick={() => moreCameraRef.current?.click()} className="h-11">
-              Take Photo
-            </Button>
-            <Button type="button" variant="outline" onClick={() => moreLibraryRef.current?.click()} className="h-11">
-              Choose Photos
-            </Button>
-          </div>
-
-          {moreFiles.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground">
-                {moreFiles.length} file{moreFiles.length > 1 ? 's' : ''} ready
-              </p>
-              {moreFiles.map((f, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs rounded-md border border-border px-2 py-1.5">
-                  <span className="truncate flex-1">{f.name}</span>
-                  <span className="text-muted-foreground">{(f.size / 1024).toFixed(0)} KB</span>
-                  <button
-                    type="button"
-                    onClick={() => removeMoreFile(i)}
-                    className="text-muted-foreground hover:text-destructive px-1"
-                    aria-label="Remove"
-                  >✕</button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Fill these sections from new photos:</p>
-            <div className="grid grid-cols-2 gap-2">
-              {MERGE_TARGETS.map(t => {
-                const checked = mergeTargets.includes(t.id)
-                return (
-                  <label
-                    key={t.id}
-                    className={`flex items-center gap-2 text-sm rounded-md border px-3 py-2 cursor-pointer transition-colors ${
-                      checked ? 'border-primary bg-primary/10' : 'border-border bg-background'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleTarget(t.id)}
-                      className="accent-primary"
-                    />
-                    <span>{t.label}</span>
-                  </label>
-                )
-              })}
-            </div>
-          </div>
-
-          {mergeMutation.isError && (
-            <p className="text-xs text-destructive">
-              {mergeMutation.error instanceof Error ? mergeMutation.error.message : 'Extraction failed.'}
-            </p>
-          )}
-
-          <Button
+        {/* Add more photos & merge — collapsed by default, expands on click */}
+        <div className="rounded-xl border border-border bg-card">
+          <button
             type="button"
-            onClick={() => mergeMutation.mutate()}
-            disabled={moreFiles.length === 0 || mergeTargets.length === 0 || mergeMutation.isPending}
-            className="w-full h-11"
+            onClick={() => setMoreOpen(o => !o)}
+            className="w-full flex items-center justify-between px-4 py-3 text-left"
+            aria-expanded={moreOpen}
           >
-            {mergeMutation.isPending ? 'Extracting…' : 'Extract & Merge'}
-          </Button>
+            <div className="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" className="w-4 h-4 text-primary" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              <span className="text-sm font-semibold uppercase tracking-wider">Add more photos</span>
+              {selectedKeys.size > 0 && (
+                <span className="text-xs rounded-full bg-primary/20 text-primary px-2 py-0.5">{selectedKeys.size} field{selectedKeys.size > 1 ? 's' : ''}</span>
+              )}
+            </div>
+            <svg viewBox="0 0 24 24" className={`w-4 h-4 text-muted-foreground transition-transform ${moreOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+
+          {moreOpen && (
+            <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+              <p className="text-xs text-muted-foreground">
+                Pick the exact fields you want the AI to fill, then upload photos of those gauges.
+              </p>
+
+              <input
+                ref={moreCameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={e => { addMoreFiles(e.target.files); e.target.value = '' }}
+                className="hidden"
+              />
+              <input
+                ref={moreLibraryRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={e => { addMoreFiles(e.target.files); e.target.value = '' }}
+                className="hidden"
+              />
+
+              {/* Field picker — collapsible groups with per-field checkboxes */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground">Fields to fill:</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={selectMissing} className="text-xs text-primary hover:underline">
+                      All missing
+                    </button>
+                    <span className="text-xs text-muted-foreground">·</span>
+                    <button type="button" onClick={clearSelection} className="text-xs text-muted-foreground hover:underline">
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 rounded-md border border-border overflow-hidden">
+                  {FIELD_GROUPS.map(g => {
+                    const groupKeys = g.fields.map(f => f.key)
+                    const selectedInGroup = groupKeys.filter(k => selectedKeys.has(k)).length
+                    const totalInGroup = groupKeys.length
+                    const allOn = selectedInGroup === totalInGroup
+                    const expanded = openGroups.has(g.id)
+                    return (
+                      <div key={g.id} className="bg-background">
+                        <div className="flex items-center px-3 py-2 hover:bg-card/50">
+                          <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={allOn}
+                              ref={el => { if (el) el.indeterminate = selectedInGroup > 0 && !allOn }}
+                              onChange={() => toggleGroup(g.id)}
+                              className="accent-primary"
+                            />
+                            <span className="text-sm font-medium">{g.label}</span>
+                            {selectedInGroup > 0 && (
+                              <span className="text-xs text-muted-foreground">({selectedInGroup}/{totalInGroup})</span>
+                            )}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => toggleGroupOpen(g.id)}
+                            className="text-muted-foreground hover:text-foreground px-2"
+                            aria-label={expanded ? 'Collapse' : 'Expand'}
+                          >
+                            <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                          </button>
+                        </div>
+                        {expanded && (
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 px-3 pb-3 pt-1 border-t border-border bg-card/30">
+                            {g.fields.map(f => {
+                              const checked = selectedKeys.has(f.key)
+                              const hasValue = !!values[f.key]
+                              return (
+                                <label
+                                  key={f.key}
+                                  className={`flex items-center gap-2 text-xs py-1 cursor-pointer ${
+                                    hasValue ? 'text-muted-foreground' : ''
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleKey(f.key)}
+                                    className="accent-primary"
+                                  />
+                                  <span>{f.label}</span>
+                                  {hasValue && <span className="text-[10px] text-muted-foreground/70">(filled)</span>}
+                                </label>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Upload buttons */}
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" onClick={() => moreCameraRef.current?.click()} className="h-11">
+                  Take Photo
+                </Button>
+                <Button type="button" variant="outline" onClick={() => moreLibraryRef.current?.click()} className="h-11">
+                  Choose Photos
+                </Button>
+              </div>
+
+              {moreFiles.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {moreFiles.length} photo{moreFiles.length > 1 ? 's' : ''} ready
+                  </p>
+                  {moreFiles.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs rounded-md border border-border px-2 py-1.5">
+                      <span className="truncate flex-1">{f.name}</span>
+                      <span className="text-muted-foreground">{(f.size / 1024).toFixed(0)} KB</span>
+                      <button
+                        type="button"
+                        onClick={() => removeMoreFile(i)}
+                        className="text-muted-foreground hover:text-destructive px-1"
+                        aria-label="Remove"
+                      >✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {mergeMutation.isError && (
+                <p className="text-xs text-destructive">
+                  {mergeMutation.error instanceof Error ? mergeMutation.error.message : 'Extraction failed.'}
+                </p>
+              )}
+
+              {imagesProcessed !== null && (
+                <p className="text-xs text-muted-foreground">
+                  Last run: AI processed {imagesProcessed} photo{imagesProcessed !== 1 ? 's' : ''}.
+                </p>
+              )}
+
+              <Button
+                type="button"
+                onClick={() => mergeMutation.mutate()}
+                disabled={moreFiles.length === 0 || selectedKeys.size === 0 || mergeMutation.isPending}
+                className="w-full h-11"
+              >
+                {mergeMutation.isPending ? 'Extracting…' : `Extract & Fill ${selectedKeys.size} Field${selectedKeys.size !== 1 ? 's' : ''}`}
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Date / Time */}

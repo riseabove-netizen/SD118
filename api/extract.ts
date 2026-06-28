@@ -31,11 +31,20 @@ Also extract from the navigation / chartplotter screen if visible:
   cog          — course over ground in degrees
   sog          — speed over ground in knots
 
+Also extract fuel TANK level readings from any tank monitor / Naviop / SeaTouch / tank-gauge screen if visible.
+These are TANK LEVELS in litres, NOT engine fuel rate. Look for labels like "Daily",
+"Daily Tank", "Service", "Aft", "Aft Main", "FWD", "Forward", "Forward Main" on a tank/gauge page:
+  fuel_daily   — Daily / Service tank level in litres
+  fuel_aft     — Aft Main tank level in litres
+  fuel_fwd     — Forward (FWD) Main tank level in litres
+Return just the number (no "L" suffix). Use null if no tank screen is visible.
+
 Return a JSON object in this exact shape (all fields included, null when missing):
 
 {
   "date_time": { "date": null, "time": null },
   "navigation": { "latitude": null, "longitude": null, "cog": null, "sog": null },
+  "fuel_tanks": { "fuel_daily": null, "fuel_aft": null, "fuel_fwd": null },
   "port_engine": {
     "port_engine_hours": null, "port_rpm": null, "port_fuel_rate": null,
     "port_coolant_temp": null, "port_trans_oil_temp": null, "port_oil_temp": null,
@@ -129,6 +138,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(502).json({ error: 'AI returned non-JSON response', raw: text.slice(0, 500) })
     }
 
+    // Attach a small debug echo so the client (and you) can confirm how
+    // many photos were actually sent to the model in this request.
+    ;(data as Record<string, unknown>)._meta = {
+      images_received: images.length,
+      images_processed: imageContent.length,
+    }
     return res.status(200).json(data)
   } catch (error: any) {
     console.error('Extract error:', error)
