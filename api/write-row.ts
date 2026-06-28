@@ -30,59 +30,60 @@ function getAuth() {
   })
 }
 
-// Engine Log column layout — 50 columns (A..AX).
-// Order MUST match the existing 2-row merged header.
+// Engine Log column layout — verified against the actual 2-row merged header
+// on the master "Engine Log" tab (46 columns, A..AT).
+//
+// `protected: true` means the sheet column has a formula that must NEVER be
+// overwritten. Newly appended rows skip these columns entirely so the user's
+// formulas stay intact.
 const ENGINE_LOG_COLUMNS: { col: string; key: string; protected?: boolean }[] = [
   { col: 'A',  key: '__datetime' },                  // Date/Time "YYYY/MM/DD HHMM"
-  { col: 'B',  key: 'entry_type' },                  // Type (Bunkering / Departure / Arrival / blank)
+  { col: 'B',  key: 'entry_type' },                  // Type
   { col: 'C',  key: 'gen_running' },                 // Running Gen
   { col: 'D',  key: 'gen_port_hours' },              // Gen Hours Port
   { col: 'E',  key: 'gen_stbd_hours' },              // Gen Hours STBD
   { col: 'F',  key: 'port_engine_hours' },           // Engine Hours Port
   { col: 'G',  key: 'stbd_engine_hours' },           // Engine Hours STBD
-  { col: 'H',  key: 'fuel_daily', protected: true }, // Fuel: Daily tank — FORMULA, do not overwrite
-  { col: 'I',  key: 'fuel_aft' },                    // Fuel: Aft Main
-  { col: 'J',  key: 'fuel_fwd' },                    // Fuel: FWD Main
-  { col: 'K',  key: 'latitude' },                    // Lat
-  { col: 'L',  key: 'longitude' },                   // Long
-  { col: 'M',  key: 'cog' },                         // COG
-  { col: 'N',  key: 'sog' },                         // Ground speed (kt)
-  { col: 'O',  key: 'port_rpm' },                    // RPM Port
-  { col: 'P',  key: 'stbd_rpm' },                    // RPM STBD
-  { col: 'Q',  key: 'port_fuel_rate' },              // Fuel Rate Port
-  { col: 'R',  key: 'stbd_fuel_rate' },              // Fuel Rate STBD
-  { col: 'S',  key: '' },                            // Gal/hr total (computed)
-  { col: 'T',  key: '', protected: true },           // L/NM — FORMULA, do not overwrite
-  { col: 'U',  key: 'port_coolant_temp', protected: true }, // Coolant Temp Port — FORMULA, do not overwrite
-  { col: 'V',  key: 'stbd_coolant_temp' },           // Coolant Temp STBD
-  { col: 'W',  key: 'port_trans_oil_temp' },         // Trans Oil Temp Port
-  { col: 'X',  key: 'stbd_trans_oil_temp' },         // Trans Oil Temp STBD
-  { col: 'Y',  key: 'port_oil_temp' },               // Engine Oil Temp Port
-  { col: 'Z',  key: 'stbd_oil_temp' },               // Engine Oil Temp STBD
-  { col: 'AA', key: 'port_trans_oil_press' },        // Trans Oil Press Port
-  { col: 'AB', key: 'stbd_trans_oil_press' },        // Trans Oil Press STBD
-  { col: 'AC', key: 'port_fuel_temp' },              // Fuel Temp Port
-  { col: 'AD', key: 'stbd_fuel_temp' },              // Fuel Temp STBD
-  { col: 'AE', key: 'port_fuel_pressure' },          // Fuel Pressure Port (NEW)
-  { col: 'AF', key: 'stbd_fuel_pressure' },          // Fuel Pressure STBD (NEW)
-  { col: 'AG', key: 'port_engine_load' },            // Engine Load Port
-  { col: 'AH', key: 'stbd_engine_load' },            // Engine Load STBD
-  { col: 'AI', key: '' },                            // Fuel Rate (secondary) Port
-  { col: 'AJ', key: '' },                            // Fuel Rate (secondary) STBD
-  { col: 'AK', key: 'port_coolant_level' },          // Coolant Level Port
-  { col: 'AL', key: 'stbd_coolant_level' },          // Coolant Level STBD
-  { col: 'AM', key: 'port_battery_voltage' },        // ECU Batt Voltage Port
-  { col: 'AN', key: 'stbd_battery_voltage' },        // ECU Batt Voltage STBD
-  { col: 'AO', key: '' },                            // Engine Hours (secondary) Port
-  { col: 'AP', key: '' },                            // Engine Hours (secondary) STBD
-  { col: 'AQ', key: 'port_exhaust_temp_l' },         // Exhaust Temp Left Port
-  { col: 'AR', key: 'stbd_exhaust_temp_l' },         // Exhaust Temp Left STBD
-  { col: 'AS', key: 'port_exhaust_temp_r' },         // Exhaust Temp Right Port
-  { col: 'AT', key: 'stbd_exhaust_temp_r' },         // Exhaust Temp Right STBD
-  { col: 'AU', key: 'port_inlet_manifold_temp' },    // Inlet Manifold Temp Port (NEW)
-  { col: 'AV', key: 'stbd_inlet_manifold_temp' },    // Inlet Manifold Temp STBD (NEW)
-  { col: 'AW', key: '__waves' },                     // Sea / wind notes
-  { col: 'AX', key: '__comments' },                  // Comments + notes
+  { col: 'H',  key: '', protected: true },           // Fuel Total — FORMULA, do not overwrite
+  { col: 'I',  key: 'fuel_daily' },                  // Fuel: Daily tank
+  { col: 'J',  key: 'fuel_aft' },                    // Fuel: Aft Main
+  { col: 'K',  key: 'fuel_fwd' },                    // Fuel: FWD Main
+  { col: 'L',  key: 'latitude' },                    // Lat
+  { col: 'M',  key: 'longitude' },                   // Long
+  { col: 'N',  key: 'cog' },                         // COG
+  { col: 'O',  key: 'sog' },                         // Ground speed (kt)
+  { col: 'P',  key: 'port_rpm' },                    // RPM Port
+  { col: 'Q',  key: 'stbd_rpm' },                    // RPM STBD
+  { col: 'R',  key: 'port_fuel_rate' },              // Fuel Rate Port
+  { col: 'S',  key: 'stbd_fuel_rate' },              // Fuel Rate STBD
+  { col: 'T',  key: '', protected: true },           // Gal/hr total — FORMULA, do not overwrite
+  { col: 'U',  key: '', protected: true },           // L/NM         — FORMULA, do not overwrite
+  { col: 'V',  key: 'port_coolant_temp' },           // Coolant Temp Port
+  { col: 'W',  key: 'stbd_coolant_temp' },           // Coolant Temp STBD
+  { col: 'X',  key: 'port_trans_oil_temp' },         // Trans Oil Temp Port
+  { col: 'Y',  key: 'stbd_trans_oil_temp' },         // Trans Oil Temp STBD
+  { col: 'Z',  key: 'port_oil_temp' },               // Engine Oil Temp Port
+  { col: 'AA', key: 'stbd_oil_temp' },               // Engine Oil Temp STBD
+  { col: 'AB', key: 'port_trans_oil_press' },        // Trans Oil Press Port
+  { col: 'AC', key: 'stbd_trans_oil_press' },        // Trans Oil Press STBD
+  { col: 'AD', key: 'port_fuel_temp' },              // Fuel Temp Port
+  { col: 'AE', key: 'stbd_fuel_temp' },              // Fuel Temp STBD
+  { col: 'AF', key: 'port_fuel_pressure' },          // Fuel Pressure Port
+  { col: 'AG', key: 'stbd_fuel_pressure' },          // Fuel Pressure STBD
+  { col: 'AH', key: 'port_engine_load' },            // Engine Load Port
+  { col: 'AI', key: 'stbd_engine_load' },            // Engine Load STBD
+  { col: 'AJ', key: 'port_coolant_level' },          // Coolant Level Port
+  { col: 'AK', key: 'stbd_coolant_level' },          // Coolant Level STBD
+  { col: 'AL', key: 'port_battery_voltage' },        // ECU Batt Voltage Port
+  { col: 'AM', key: 'stbd_battery_voltage' },        // ECU Batt Voltage STBD
+  { col: 'AN', key: 'port_exhaust_temp_l' },         // Exhaust Temp Left Port
+  { col: 'AO', key: 'stbd_exhaust_temp_l' },         // Exhaust Temp Left STBD
+  { col: 'AP', key: 'port_exhaust_temp_r' },         // Exhaust Temp Right Port
+  { col: 'AQ', key: 'stbd_exhaust_temp_r' },         // Exhaust Temp Right STBD
+  { col: 'AR', key: 'port_inlet_manifold_temp' },    // Inlet Manifold Temp Port
+  { col: 'AS', key: 'stbd_inlet_manifold_temp' },    // Inlet Manifold Temp STBD
+  { col: 'AT', key: '__waves' },                     // Waves (sea + wind)
+  { col: 'AU', key: '__comments' },                  // Comments
 ]
 
 const LAST_COL = ENGINE_LOG_COLUMNS[ENGINE_LOG_COLUMNS.length - 1].col
@@ -196,7 +197,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    return res.status(200).json({ ok: true, tab: SHEET_TAB, row: rowNum })
+    return res.status(200).json({ ok: true, tab: SHEET_TAB, row: rowNum, lastCol: LAST_COL })
   } catch (error: any) {
     console.error('Write-row error:', error)
     const detail =
