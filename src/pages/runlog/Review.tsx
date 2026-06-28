@@ -1,13 +1,33 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { writeRow } from '@/lib/api'
+import { extractFromImages, writeRow } from '@/lib/api'
+import { compressImageToJpegBase64 } from '@/lib/imageCompress'
 import { useMutation } from '@tanstack/react-query'
 import { formatDate, formatTime } from '@/lib/utils'
+
+// Shared suffix list used by both ENGINE_FIELDS (UI) and MERGE_TARGETS (re-upload).
+const ENGINE_FIELDS_LIST = [
+  'engine_hours','rpm','fuel_rate','coolant_temp','trans_oil_temp','oil_temp',
+  'trans_oil_press','fuel_temp','fuel_pressure','engine_load','coolant_level',
+  'battery_voltage','exhaust_temp_l','exhaust_temp_r','inlet_manifold_temp',
+] as const
+
+const engineKeys = (prefix: 'port' | 'stbd'): string[] =>
+  ENGINE_FIELDS_LIST.map(s => `${prefix}_${s}`)
+
+// Each target maps to a set of field keys in the form.
+// User picks which targets the newly-uploaded photos should fill.
+const MERGE_TARGETS = [
+  { id: 'datetime', label: 'Date / Time', keys: ['date', 'time'] },
+  { id: 'nav',      label: 'Navigation (Lat/Lon/COG/SOG)', keys: ['latitude', 'longitude', 'cog', 'sog'] },
+  { id: 'port',     label: 'Port Engine',  keys: engineKeys('port') },
+  { id: 'stbd',     label: 'Starboard Engine', keys: engineKeys('stbd') },
+] as const
 
 // Per-engine fields (rendered once for Port and once for Starboard)
 const ENGINE_FIELDS: { suffix: string; label: string; unit?: string }[] = [
@@ -104,6 +124,68 @@ export function ReviewPage() {
     },
   })
 
+  // —————————— Re-upload: add more photos & merge ——————————
+  const [moreFiles, setMoreFiles] = useState<File[]>([])
+  const [mergeTargets, setMergeTargets] = useState<string[]>(['port', 'stbd'])
+  const moreCameraRef = useRef<HTMLInputElement>(null)
+  const moreLibraryRef = useRef<HTMLInputElement>(null)
+
+  const toggleTarget = (id: string) =>
+    setMergeTargets(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+  const addMoreFiles = (newFiles: FileList | null) => {
+    if (!newFiles || newFiles.length === 0) return
+    setMoreFiles(prev => [...prev, ...Array.from(newFiles)])
+  }
+
+  const removeMoreFile = (idx: number) =>
+    setMoreFiles(prev => prev.filter((_, i) => i !== idx))
+
+  const mergeMutation = useMutation({
+    mutationFn: async () => {
+      const images: string[] = []
+      for (const file of moreFiles) {
+        const b64 = await compressImageToJpegBase64(file, { maxDim: 1600, quality: 0.82 })
+        images.push(b64)
+      }
+      return extractFromImages(images)
+    },
+    onSuccess: (data: Record<string, unknown>) => {
+      // Flatten the AI response (it nests under date_time / navigation / port_engine / stbd_engine)
+      const flat: Record<string, string> = {}
+      for (const section of Object.values(data)) {
+        if (section && typeof section === 'object') {
+          for (const [k, v] of Object.entries(section as Record<string, unknown>)) {
+            if (typeof v === 'string' || typeof v === 'number') flat[k] = String(v)
+          }
+        }
+      }
+      for (const [k, v] of Object.entries(data)) {
+        if (typeof v === 'string' || typeof v === 'number') flat[k] = String(v)
+      }
+
+      // Only write keys belonging to the selected merge targets,
+      // and only when the AI actually returned a non-empty value.
+      const allowedKeys = new Set<string>()
+      for (const t of MERGE_TARGETS) {
+        if (mergeTargets.includes(t.id)) {
+          for (const k of t.keys) allowedKeys.add(k)
+        }
+      }
+
+      setValues(prev => {
+        const next = { ...prev }
+        for (const k of allowedKeys) {
+          const v = flat[k]
+          if (v !== undefined && v !== null && v !== '') next[k] = v
+        }
+        return next
+      })
+      setMoreFiles([])
+    },
+  })
+  // —————————— end re-upload ——————————
+
   const set = (key: string, val: string) =>
     setValues(prev => ({ ...prev, [key]: val }))
 
@@ -141,6 +223,103 @@ export function ReviewPage() {
           <p className="text-sm text-muted-foreground mt-1">
             Check and edit values before saving.
           </p>
+        </div>
+
+        {/* Add more photos & merge */}
+        <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+          <div>
+            <h3 className="text-sm font-semibold uppercase tracking-wider">Add more photos</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Upload extra engine / nav screen photos and pick which sections they should fill.
+              Empty fields will be filled; existing values overwrite only when the AI reads a new value.
+            </p>
+          </div>
+
+          <input
+            ref={moreCameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={e => { addMoreFiles(e.target.files); e.target.value = '' }}
+            className="hidden"
+          />
+          <input
+            ref={moreLibraryRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={e => { addMoreFiles(e.target.files); e.target.value = '' }}
+            className="hidden"
+          />
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" onClick={() => moreCameraRef.current?.click()} className="h-11">
+              Take Photo
+            </Button>
+            <Button type="button" variant="outline" onClick={() => moreLibraryRef.current?.click()} className="h-11">
+              Choose Photos
+            </Button>
+          </div>
+
+          {moreFiles.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">
+                {moreFiles.length} file{moreFiles.length > 1 ? 's' : ''} ready
+              </p>
+              {moreFiles.map((f, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs rounded-md border border-border px-2 py-1.5">
+                  <span className="truncate flex-1">{f.name}</span>
+                  <span className="text-muted-foreground">{(f.size / 1024).toFixed(0)} KB</span>
+                  <button
+                    type="button"
+                    onClick={() => removeMoreFile(i)}
+                    className="text-muted-foreground hover:text-destructive px-1"
+                    aria-label="Remove"
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Fill these sections from new photos:</p>
+            <div className="grid grid-cols-2 gap-2">
+              {MERGE_TARGETS.map(t => {
+                const checked = mergeTargets.includes(t.id)
+                return (
+                  <label
+                    key={t.id}
+                    className={`flex items-center gap-2 text-sm rounded-md border px-3 py-2 cursor-pointer transition-colors ${
+                      checked ? 'border-primary bg-primary/10' : 'border-border bg-background'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleTarget(t.id)}
+                      className="accent-primary"
+                    />
+                    <span>{t.label}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+
+          {mergeMutation.isError && (
+            <p className="text-xs text-destructive">
+              {mergeMutation.error instanceof Error ? mergeMutation.error.message : 'Extraction failed.'}
+            </p>
+          )}
+
+          <Button
+            type="button"
+            onClick={() => mergeMutation.mutate()}
+            disabled={moreFiles.length === 0 || mergeTargets.length === 0 || mergeMutation.isPending}
+            className="w-full h-11"
+          >
+            {mergeMutation.isPending ? 'Extracting…' : 'Extract & Merge'}
+          </Button>
         </div>
 
         {/* Date / Time */}

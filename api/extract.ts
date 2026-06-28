@@ -90,7 +90,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const imageContent: Anthropic.ImageBlockParam[] = images.slice(0, 5).map(img => ({
+    // Process all uploaded images (Claude supports up to 20 per request).
+    // Photos are pre-compressed client-side (compressImageToJpegBase64) so
+    // the combined payload stays under Vercel's body-size limit.
+    const imageContent: Anthropic.ImageBlockParam[] = images.slice(0, 20).map(img => ({
       type: 'image' as const,
       source: {
         type: 'base64' as const,
@@ -101,7 +104,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const message = await client.messages.create({
       model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      max_tokens: 4096,
       messages: [
         {
           role: 'user',

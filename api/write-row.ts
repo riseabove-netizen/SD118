@@ -32,7 +32,7 @@ function getAuth() {
 
 // Engine Log column layout — 50 columns (A..AX).
 // Order MUST match the existing 2-row merged header.
-const ENGINE_LOG_COLUMNS: { col: string; key: string }[] = [
+const ENGINE_LOG_COLUMNS: { col: string; key: string; protected?: boolean }[] = [
   { col: 'A',  key: '__datetime' },                  // Date/Time "YYYY/MM/DD HHMM"
   { col: 'B',  key: 'entry_type' },                  // Type (Bunkering / Departure / Arrival / blank)
   { col: 'C',  key: 'gen_running' },                 // Running Gen
@@ -40,7 +40,7 @@ const ENGINE_LOG_COLUMNS: { col: string; key: string }[] = [
   { col: 'E',  key: 'gen_stbd_hours' },              // Gen Hours STBD
   { col: 'F',  key: 'port_engine_hours' },           // Engine Hours Port
   { col: 'G',  key: 'stbd_engine_hours' },           // Engine Hours STBD
-  { col: 'H',  key: 'fuel_daily' },                  // Fuel: Daily tank
+  { col: 'H',  key: 'fuel_daily', protected: true }, // Fuel: Daily tank — FORMULA, do not overwrite
   { col: 'I',  key: 'fuel_aft' },                    // Fuel: Aft Main
   { col: 'J',  key: 'fuel_fwd' },                    // Fuel: FWD Main
   { col: 'K',  key: 'latitude' },                    // Lat
@@ -52,8 +52,8 @@ const ENGINE_LOG_COLUMNS: { col: string; key: string }[] = [
   { col: 'Q',  key: 'port_fuel_rate' },              // Fuel Rate Port
   { col: 'R',  key: 'stbd_fuel_rate' },              // Fuel Rate STBD
   { col: 'S',  key: '' },                            // Gal/hr total (computed)
-  { col: 'T',  key: '' },                            // L/NM (computed)
-  { col: 'U',  key: 'port_coolant_temp' },           // Coolant Temp Port
+  { col: 'T',  key: '', protected: true },           // L/NM — FORMULA, do not overwrite
+  { col: 'U',  key: 'port_coolant_temp', protected: true }, // Coolant Temp Port — FORMULA, do not overwrite
   { col: 'V',  key: 'stbd_coolant_temp' },           // Coolant Temp STBD
   { col: 'W',  key: 'port_trans_oil_temp' },         // Trans Oil Temp Port
   { col: 'X',  key: 'stbd_trans_oil_temp' },         // Trans Oil Temp STBD
@@ -151,15 +151,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const row = buildRow(values)
 
-    await sheets.spreadsheets.values.append({
+    // 1) Reserve a new row by appending only column A.
+    //    We then write the remaining columns in segments that skip the
+    //    protected formula columns (H, T, U) so any sheet formula there
+    //    is preserved.
+    const appendRes = await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: `${SHEET_TAB}!A:${LAST_COL}`,
+      range: `${SHEET_TAB}!A:A`,
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
-      requestBody: { values: [row] },
+      requestBody: { values: [[row[0]]] },
     })
 
-    return res.status(200).json({ ok: true, tab: SHEET_TAB })
+    const updatedRange = appendRes.data.updates?.updatedRange || ''
+    const rowMatch = updatedRange.match(/!.*?(\d+)(?::|$)/)
+    const rowNum = rowMatch ? parseInt(rowMatch[1], 10) : null
+    if (!rowNum) {
+      return res.status(500).json({
+        error: 'Failed to determine appended row number',
+        detail: `updatedRange=${updatedRange}`,
+      })
+    }
+
+    // 2) Build contiguous segments of non-protected columns (skipping A).
+    type Seg = { cols: string[]; vals: string[] }
+    const segments: Seg[] = []
+    let cur: Seg | null = null
+    ENGINE_LOG_COLUMNS.forEach((c, i) => {
+      if (i === 0) { cur = null; return }
+      if (c.protected) { cur = null; return }
+      if (!cur) { cur = { cols: [c.col], vals: [row[i]] }; segments.push(cur) }
+      else { cur.cols.push(c.col); cur.vals.push(row[i]) }
+    })
+
+    const data = segments.map(s => ({
+      range: `${SHEET_TAB}!${s.cols[0]}${rowNum}:${s.cols[s.cols.length - 1]}${rowNum}`,
+      values: [s.vals],
+    }))
+
+    if (data.length > 0) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: { valueInputOption: 'USER_ENTERED', data },
+      })
+    }
+
+    return res.status(200).json({ ok: true, tab: SHEET_TAB, row: rowNum })
   } catch (error: any) {
     console.error('Write-row error:', error)
     const detail =
