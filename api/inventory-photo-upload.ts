@@ -16,7 +16,24 @@ function cleanEnv(v: string | undefined): string | undefined {
   return s.trim()
 }
 
-const FOLDER_ID = cleanEnv(process.env.INVENTORY_PHOTOS_FOLDER_ID)
+const PHOTOS_FOLDER_ID = cleanEnv(process.env.INVENTORY_PHOTOS_FOLDER_ID)
+const ISM_FORMS_FOLDER_ID = cleanEnv(process.env.ISM_FORMS_FOLDER_ID)
+const ISM_ANCHOR_WATCH_FOLDER_ID = cleanEnv(process.env.ISM_ANCHOR_WATCH_FOLDER_ID)
+const ISM_DRILLS_FOLDER_ID = cleanEnv(process.env.ISM_DRILLS_FOLDER_ID)
+const ISM_SAFETY_EQUIPMENT_FOLDER_ID = cleanEnv(process.env.ISM_SAFETY_EQUIPMENT_FOLDER_ID)
+
+function pickFolder(label: string | undefined, isPdf: boolean): { folderId: string | undefined; bucket: string } {
+  // PDFs of known ISM forms route to their dedicated sub-folder.
+  if (isPdf && label) {
+    const l = label.toLowerCase()
+    if (l.includes('anchor') && ISM_ANCHOR_WATCH_FOLDER_ID) return { folderId: ISM_ANCHOR_WATCH_FOLDER_ID, bucket: 'ism-anchor-watch' }
+    if ((l.includes('drill') || l.includes('drillreport')) && ISM_DRILLS_FOLDER_ID) return { folderId: ISM_DRILLS_FOLDER_ID, bucket: 'ism-drills' }
+    if ((l.includes('safety') || l.includes('equipment')) && ISM_SAFETY_EQUIPMENT_FOLDER_ID) return { folderId: ISM_SAFETY_EQUIPMENT_FOLDER_ID, bucket: 'ism-safety-equipment' }
+    // Unknown ISM PDF? Fall back to ISM parent if defined.
+    if (ISM_FORMS_FOLDER_ID) return { folderId: ISM_FORMS_FOLDER_ID, bucket: 'ism-forms' }
+  }
+  return { folderId: PHOTOS_FOLDER_ID, bucket: 'inventory-photos' }
+}
 
 function getAuth() {
   // Prefer OAuth user delegation when configured. Files land in the user's
@@ -64,13 +81,6 @@ function safeName(s: string): string {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  if (!FOLDER_ID) {
-    return res.status(500).json({
-      error: 'Server not configured',
-      detail: 'Missing env: INVENTORY_PHOTOS_FOLDER_ID',
-    })
-  }
-
   const body = req.body as {
     base64: string
     tab?: string
@@ -91,6 +101,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const detected = detectMime(body.base64)
     const mime = body.mime || detected.mime
     const ext = body.ext || detected.ext
+    const isPdf = mime === 'application/pdf' || ext === 'pdf' || detected.isPdf
+    const { folderId, bucket } = pickFolder(body.label, isPdf)
+    if (!folderId) {
+      return res.status(500).json({
+        error: 'Server not configured',
+        detail: `Missing Drive folder env for bucket=${bucket}`,
+      })
+    }
     const tag = [body.tab, body.itemId, body.label]
       .filter((v): v is string => typeof v === 'string' && v.length > 0)
       .map(safeName)
@@ -104,7 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const uploadResp = await drive.files.create({
       requestBody: {
         name: fileName,
-        parents: [FOLDER_ID],
+        parents: [folderId],
       },
       media: {
         mimeType: mime,
@@ -136,6 +154,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fileId,
       thumbUrl,
       viewUrl,
+      bucket,
       // Store this in the "Photo URL" sheet column
       photoUrl: thumbUrl,
     })
