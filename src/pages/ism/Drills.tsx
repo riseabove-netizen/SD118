@@ -251,8 +251,18 @@ export function DrillsPage() {
 
         {/* Tests table */}
         <section className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-secondary/30">
+          <div className="px-4 py-3 border-b border-border bg-secondary/30 flex items-center justify-between gap-3">
             <h3 className="font-semibold text-base">Equipment testing schedule</h3>
+            <button
+              onClick={() => setLocation('/ism/safety-equipment-test')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/40 text-orange-300 text-xs font-semibold"
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 11l3 3 8-8"/>
+                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+              </svg>
+              Run equipment test
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
