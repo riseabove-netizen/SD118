@@ -44,7 +44,7 @@ export function LoginPage() {
             <path d="M16 28h16" stroke="hsl(0 72% 51%)" strokeWidth="2" strokeLinecap="round"/>
           </svg>
           <h1 className="text-2xl font-bold tracking-tight">Rise Above</h1>
-          <p className="text-muted-foreground text-sm mt-1">Engine Log & SMS</p>
+          <p className="text-muted-foreground text-sm mt-1">Engine Log &amp; SMS</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

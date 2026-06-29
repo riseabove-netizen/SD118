@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react'
 import { Switch, Route, useLocation } from 'wouter'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { isLoggedIn, getCrewName } from '@/lib/auth'
+import { isLoggedIn, getCrewName, isAdmin } from '@/lib/auth'
+import { TextOverridesProvider, useTextOverrides } from '@/lib/textOverrides'
 
 // Pages
 import { LoginPage } from '@/pages/Login'
@@ -266,10 +267,27 @@ function FallbackRedirect() {
   return null
 }
 
+function AdminEditBanner() {
+  const { saving } = useTextOverrides()
+  if (!isAdmin()) return null
+  return (
+    <div className="sticky top-0 z-40 bg-yellow-500/15 border-b border-yellow-500/40 text-yellow-200 text-xs px-3 py-1.5 flex items-center justify-center gap-2">
+      <span aria-hidden>✎</span>
+      <span>
+        Admin mode — <span className="font-mono">Alt+Click</span> any label to edit.{' '}
+        {saving && <span className="opacity-70">Saving…</span>}
+      </span>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppRoutes />
+      <TextOverridesProvider>
+        <AdminEditBanner />
+        <AppRoutes />
+      </TextOverridesProvider>
     </QueryClientProvider>
   )
 }

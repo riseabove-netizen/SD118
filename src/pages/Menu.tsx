@@ -1,15 +1,17 @@
 import React from 'react'
 import { useLocation } from 'wouter'
-import { getCrewName, logout } from '@/lib/auth'
+import { getCrewName, logout, getRole } from '@/lib/auth'
+import { EditableText } from '@/lib/textOverrides'
 
 interface MenuItemProps {
   icon: string
+  id: string
   label: string
   href: string
   description?: string
 }
 
-function MenuItem({ icon, label, href, description }: MenuItemProps) {
+function MenuItem({ icon, id, label, href, description }: MenuItemProps) {
   const [, setLocation] = useLocation()
   return (
     <button
@@ -18,9 +20,14 @@ function MenuItem({ icon, label, href, description }: MenuItemProps) {
     >
       <span className="text-2xl flex-shrink-0 w-10 text-center">{icon}</span>
       <div className="flex-1 min-w-0">
-        <div className="text-base font-semibold">{label}</div>
+        <EditableText id={`menu.${id}.label`} defaultText={label} as="div" className="text-base font-semibold" />
         {description && (
-          <div className="text-sm text-muted-foreground mt-0.5">{description}</div>
+          <EditableText
+            id={`menu.${id}.description`}
+            defaultText={description}
+            as="div"
+            className="text-sm text-muted-foreground mt-0.5"
+          />
         )}
       </div>
       <svg viewBox="0 0 24 24" className="w-5 h-5 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -33,6 +40,7 @@ function MenuItem({ icon, label, href, description }: MenuItemProps) {
 export function MenuPage() {
   const [, setLocation] = useLocation()
   const crewName = getCrewName()
+  const role = getRole()
 
   const handleLogout = () => {
     logout()
@@ -50,56 +58,64 @@ export function MenuPage() {
             <path d="M17 27h14" stroke="hsl(0 72% 51%)" strokeWidth="2" strokeLinecap="round"/>
           </svg>
         </div>
-        <h1 className="text-2xl font-bold">Rise Above</h1>
-        <p className="text-muted-foreground text-sm mt-1">Engine Log & SMS</p>
+        <EditableText id="menu.title" defaultText="Rise Above" as="h1" className="text-2xl font-bold" />
+        <EditableText id="menu.subtitle" defaultText="Engine Log & SMS" as="p" className="text-muted-foreground text-sm mt-1" />
       </header>
 
       {/* Menu items */}
       <div className="flex-1 px-4 max-w-lg mx-auto w-full space-y-3">
         <MenuItem
           icon="📋"
+          id="runlog"
           label="Running Log"
           href="/runlog/upload"
           description="Upload and log engine readings"
         />
         <MenuItem
           icon="🛡️"
+          id="ism"
           label="ISM"
           href="/ism"
           description="Operating, Emergency, Fire Safety & Drills"
         />
         <MenuItem
           icon="🔍"
+          id="inspection"
           label="Engine Room Inspection Log"
           href="/inspection"
           description="Walk-around inspection with PDF report"
         />
         <MenuItem
           icon="📦"
+          id="inventory"
           label="Inventory"
           href="/inventory"
           description="Spares & consumables onboard"
         />
         <MenuItem
           icon="📖"
+          id="guides"
           label="Operational Guides"
           href="/guides"
           description="Crew procedures & how-tos"
         />
         <MenuItem
           icon="🗓️"
+          id="schedule"
           label="Schedule"
           href="/schedule"
           description="Upcoming trips & itineraries"
         />
         <MenuItem
           icon="🕒"
+          id="watch"
           label="Watch Duties"
           href="/watch"
           description="Daily checklist & watch calendar"
         />
         <MenuItem
           icon="⚙️"
+          id="settings"
           label="Settings"
           href="/settings"
           description="Name, preferences"
@@ -111,6 +127,15 @@ export function MenuPage() {
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
             Signed in as <span className="text-foreground font-medium">{crewName || 'Crew'}</span>
+            {role !== 'crew' && (
+              <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold ${
+                role === 'admin'
+                  ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
+                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+              }`}>
+                {role === 'admin' ? 'Admin' : role === 'viewer' ? 'View only' : ''}
+              </span>
+            )}
           </div>
           <button
             onClick={handleLogout}

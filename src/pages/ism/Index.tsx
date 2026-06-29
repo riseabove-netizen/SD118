@@ -2,16 +2,18 @@ import React from 'react'
 import { useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { OPERATING_FORMS, EMERGENCY_FORMS } from '@/data/forms-catalog'
+import { EditableText } from '@/lib/textOverrides'
 
 interface TileProps {
   onClick: () => void
+  id: string
   title: string
   description: string
   tone: 'blue' | 'red' | 'orange' | 'amber'
   icon: React.ReactNode
 }
 
-function Tile({ onClick, title, description, tone, icon }: TileProps) {
+function Tile({ onClick, id, title, description, tone, icon }: TileProps) {
   const toneClasses: Record<TileProps['tone'], { border: string; bg: string; iconBg: string; iconColor: string; hover: string }> = {
     blue:   { border: 'border-border',           bg: 'bg-card', iconBg: 'bg-blue-500/10',    iconColor: 'text-blue-400',    hover: 'hover:bg-secondary active:bg-secondary/80' },
     red:    { border: 'border-destructive/30',   bg: 'bg-card', iconBg: 'bg-destructive/10', iconColor: 'text-destructive', hover: 'hover:bg-destructive/5 active:bg-destructive/10' },
@@ -28,8 +30,8 @@ function Tile({ onClick, title, description, tone, icon }: TileProps) {
         <span className={`w-6 h-6 ${t.iconColor}`}>{icon}</span>
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-base">{title}</div>
-        <div className="text-sm text-muted-foreground mt-0.5">{description}</div>
+        <EditableText id={`ism.tile.${id}.title`} defaultText={title} as="div" className="font-semibold text-base" />
+        <EditableText id={`ism.tile.${id}.description`} defaultText={description} as="div" className="text-sm text-muted-foreground mt-0.5" />
       </div>
       <svg viewBox="0 0 24 24" className="w-5 h-5 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 18l6-6-6-6" />
@@ -45,15 +47,14 @@ export function IsmIndexPage() {
     <MenuLayout title="ISM" showBack backHref="/menu">
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-bold">Safety Management System</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            M/Y Rise Above · All procedures
-          </p>
+          <EditableText id="ism.heading" defaultText="Safety Management System" as="h2" className="text-xl font-bold" />
+          <EditableText id="ism.subheading" defaultText="M/Y Rise Above · All procedures" as="p" className="text-sm text-muted-foreground mt-1" />
         </div>
 
         <div className="space-y-3">
           <Tile
             onClick={() => setLocation('/ism/operating')}
+            id="operating"
             title="Operating Procedures"
             description={`${OPERATING_FORMS.length} procedures`}
             tone="blue"
@@ -68,6 +69,7 @@ export function IsmIndexPage() {
 
           <Tile
             onClick={() => setLocation('/ism/emergency')}
+            id="emergency"
             title="Emergency Procedures"
             description={`${EMERGENCY_FORMS.length} procedures`}
             tone="red"
@@ -82,6 +84,7 @@ export function IsmIndexPage() {
 
           <Tile
             onClick={() => setLocation('/ism/fire-safety')}
+            id="fire-safety"
             title="Life Saving Equipment"
             description="Plan, life-saving appliances, equipment list"
             tone="orange"
@@ -94,6 +97,7 @@ export function IsmIndexPage() {
 
           <Tile
             onClick={() => setLocation('/ism/anchor-watch')}
+            id="anchor-watch"
             title="Anchor Watchkeeper Log"
             description="Shared hourly watch with PDF export to Drive"
             tone="red"
@@ -109,6 +113,7 @@ export function IsmIndexPage() {
 
           <Tile
             onClick={() => setLocation('/ism/drills')}
+            id="drills"
             title="Drills / Testing"
             description="Mandatory drills and equipment testing schedule"
             tone="amber"

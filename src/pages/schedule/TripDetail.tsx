@@ -235,6 +235,9 @@ export function TripDetailPage() {
   const [draft, setDraft] = useState<Trip | undefined>(undefined)
   const [saving, setSaving] = useState(false)
   const canEdit = isLoggedIn()
+  // Public guests (unauthenticated) reach this page only via a shared link.
+  // They must not be able to back-navigate to the schedule list and browse other trips.
+  const isGuest = !isLoggedIn()
 
   useEffect(() => {
     let cancelled = false
@@ -257,14 +260,14 @@ export function TripDetailPage() {
 
   if (!trip && !loading) {
     return (
-      <MenuLayout title="Trip" showBack backHref="/schedule">
+      <MenuLayout title="Trip" showBack={!isGuest} backHref={isGuest ? undefined : '/schedule'}>
         <div className="text-sm text-muted-foreground text-center py-8">Trip not found.</div>
       </MenuLayout>
     )
   }
   if (!trip) {
     return (
-      <MenuLayout title="Trip" showBack backHref="/schedule">
+      <MenuLayout title="Trip" showBack={!isGuest} backHref={isGuest ? undefined : '/schedule'}>
         <div className="text-sm text-muted-foreground text-center py-8">Loading…</div>
       </MenuLayout>
     )
@@ -331,8 +334,8 @@ export function TripDetailPage() {
   return (
     <MenuLayout
       title={showing.name}
-      showBack
-      backHref="/schedule"
+      showBack={!isGuest}
+      backHref={isGuest ? undefined : '/schedule'}
       rightAction={
         editMode
           ? undefined

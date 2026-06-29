@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { TRIPS } from '@/data/trips'
+import { isLoggedIn } from '@/lib/auth'
 
 function formatRange(startIso: string, endIso: string): string {
   const fmt = (iso: string) => {
@@ -22,6 +23,28 @@ function daysUntil(iso: string): number {
 
 export function ScheduleHubPage() {
   const [, setLocation] = useLocation()
+
+  // Public guests can only view a single itinerary via direct deep link.
+  // If they try to reach the schedule hub (the list of all trips), bounce them
+  // to the sign-in page so they can't browse other trips.
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      setLocation('/')
+    }
+  }, [setLocation])
+
+  if (!isLoggedIn()) {
+    return (
+      <div className="min-h-dvh bg-background flex items-center justify-center px-6">
+        <div className="max-w-sm text-center space-y-3">
+          <div className="text-base font-semibold">Sign in required</div>
+          <p className="text-sm text-muted-foreground">
+            Use a direct trip link to view a single itinerary, or sign in to see the full schedule.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <MenuLayout title="Schedule" showBack backHref="/menu">

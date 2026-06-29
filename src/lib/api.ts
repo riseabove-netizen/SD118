@@ -24,7 +24,7 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   return data as T
 }
 
-export async function login(code: string): Promise<{ token: string }> {
+export async function login(code: string): Promise<{ token: string; role?: 'admin' | 'viewer' | 'crew' }> {
   return request('/api/auth', {
     method: 'POST',
     body: JSON.stringify({ code }),
