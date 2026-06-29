@@ -238,7 +238,7 @@ async function readWatchRow(sheets: any, date: string) {
     range: `${WATCH_SHEET}!A:F`,
   })
   const rows = resp.data.values || []
-  const idx = rows.slice(1).findIndex(r => r[0] === date)
+  const idx = rows.slice(1).findIndex((r: any) => r[0] === date)
   return { rows, idx, sheetRow: idx >= 0 ? idx + 2 : -1 }
 }
 
@@ -562,12 +562,13 @@ async function buildWatchPdf(state: WatchState): Promise<Uint8Array> {
 
     // Signoff line
     const so = state.signoffs[section.id]
-    if (section.signoffRange || so) {
+    const signoffRange = (section as { signoffRange?: string }).signoffRange
+    if (signoffRange || so) {
       y -= 2
       const lineY = y - 4
       page.drawLine({ start: { x: margin, y: lineY }, end: { x: pageWidth - margin, y: lineY }, thickness: 0.4, color: rgb(0.85, 0.85, 0.85) })
       y -= 14
-      const range = section.signoffRange || section.time
+      const range = signoffRange || section.time
       page.drawText(`${range}  ·  Duties completed — Crew signature:`, { x: margin + 4, y, size: 8.5, font: bold, color: rgb(0.07, 0.13, 0.28) })
       const sigText = so?.name ? `${so.name}${so.time ? '  ·  ' + so.time : ''}` : '___________________________'
       page.drawText(sigText, { x: margin + 270, y, size: 9, font, color: rgb(0.1, 0.1, 0.1) })
