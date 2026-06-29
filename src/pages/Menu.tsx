@@ -64,9 +64,9 @@ export function MenuPage() {
         />
         <MenuItem
           icon="🛡️"
-          label="ISM Logs"
+          label="ISM"
           href="/ism"
-          description="Operating & Emergency procedures"
+          description="Operating, Emergency, Fire Safety & Drills"
         />
         <MenuItem
           icon="🔍"

@@ -66,7 +66,15 @@ async function handleList(req: VercelRequest, res: VercelResponse) {
 
   if (guideId) {
     guides = guides.filter(g => g.ID === guideId)
-    if (guides.length === 0) return res.status(404).json({ error: 'Guide not found' })
+    if (guides.length === 0) {
+      // Well-known caller-seeded IDs (e.g. FIRE-..., DRILLS-...) may not
+      // exist yet on first read — return null so the client can fall back
+      // to its seed data instead of erroring out.
+      if (!guideId.startsWith('G-')) {
+        return res.status(200).json({ guide: null })
+      }
+      return res.status(404).json({ error: 'Guide not found' })
+    }
   }
 
   if (!withContent) {
@@ -156,13 +164,23 @@ async function handleUpsert(req: VercelRequest, res: VercelResponse) {
   if (!isNew) {
     existingRowIdx = metaRows.slice(1).findIndex(r => r[0] === guideId)
     if (existingRowIdx < 0) {
-      return res.status(404).json({ error: 'Guide not found' })
+      // Allow callers to seed a record at a well-known ID (e.g. FIRE-...,
+      // DRILLS-...) the first time it's saved. Auto-generated IDs always
+      // start with "G-" so any non-G prefix is treated as caller-supplied
+      // and accepted as a new record.
+      if (!guideId.startsWith('G-')) {
+        isNew = true
+      } else {
+        return res.status(404).json({ error: 'Guide not found' })
+      }
+    } else {
+      const existing = metaRows[existingRowIdx + 1]
+      createdAt = existing[6] || nowIso
+      createdBy = existing[7] || user
+      nextVersion = Number(existing[3] || 0) + 1
     }
-    const existing = metaRows[existingRowIdx + 1]
-    createdAt = existing[6] || nowIso
-    createdBy = existing[7] || user
-    nextVersion = Number(existing[3] || 0) + 1
-  } else {
+  }
+  if (isNew && !guideId) {
     guideId = newId()
   }
 

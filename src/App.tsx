@@ -19,6 +19,10 @@ import { IsmIndexPage } from '@/pages/ism/Index'
 import { IsmListPage } from '@/pages/ism/List'
 import { IsmFormPage } from '@/pages/ism/Form'
 import { IsmPreviewPage } from '@/pages/ism/Preview'
+import { FireSafetyIndexPage } from '@/pages/ism/FireSafety'
+import { FireSafetyPlanPage } from '@/pages/ism/FireSafetyPlan'
+import { FireEquipmentPage } from '@/pages/ism/FireEquipment'
+import { DrillsPage } from '@/pages/ism/Drills'
 
 // Inspection
 import { InspectionPage } from '@/pages/inspection/Inspection'
@@ -47,6 +51,7 @@ import { WatchDutiesPage } from '@/pages/watch/Duties'
 import { GuidesListPage } from '@/pages/guides/GuidesList'
 import { GuideViewPage } from '@/pages/guides/GuideView'
 import { GuideEditorPage } from '@/pages/guides/GuideEditor'
+import { ManualPage } from '@/pages/guides/Manual'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -120,6 +125,18 @@ function AppRoutes() {
       <Route path="/ism/preview/:id">
         <AuthGuard><IsmPreviewPage /></AuthGuard>
       </Route>
+      <Route path="/ism/fire-safety">
+        <AuthGuard><FireSafetyIndexPage /></AuthGuard>
+      </Route>
+      <Route path="/ism/fire-safety/plan">
+        <AuthGuard><FireSafetyPlanPage /></AuthGuard>
+      </Route>
+      <Route path="/ism/fire-safety/equipment">
+        <AuthGuard><FireEquipmentPage /></AuthGuard>
+      </Route>
+      <Route path="/ism/drills">
+        <AuthGuard><DrillsPage /></AuthGuard>
+      </Route>
 
       {/* Engine Room Inspection */}
       <Route path="/inspection">
@@ -191,6 +208,9 @@ function AppRoutes() {
       {/* Operational Guides */}
       <Route path="/guides">
         <AuthGuard><GuidesListPage /></AuthGuard>
+      </Route>
+      <Route path="/guides/manual">
+        <AuthGuard><ManualPage /></AuthGuard>
       </Route>
       <Route path="/guides/new">
         <AuthGuard><GuideEditorPage /></AuthGuard>

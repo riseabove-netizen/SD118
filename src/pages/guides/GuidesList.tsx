@@ -13,7 +13,12 @@ export function GuidesListPage() {
   })
 
   const guides = useMemo(() => {
-    const list = data || []
+    // Hide records that are owned by other pages (Fire Equipment list, Drills
+    // / Testing) — they live under the ISM menu, not under Operational Guides.
+    const list = (data || []).filter(g => {
+      const id = g.ID || ''
+      return !id.startsWith('FIRE-') && !id.startsWith('DRILLS-')
+    })
     const q = search.trim().toLowerCase()
     if (!q) return list
     return list.filter(g =>
@@ -34,6 +39,24 @@ export function GuidesListPage() {
       }}
     >
       <div className="space-y-3">
+        {/* Permanent: Vessel Manual tile */}
+        <button
+          onClick={() => setLocation('/guides/manual')}
+          className="w-full text-left p-4 rounded-xl border border-red-500/30 bg-card hover:bg-red-500/5 active:bg-red-500/10 transition-colors"
+        >
+          <div className="flex items-start gap-3">
+            <span className="text-2xl flex-shrink-0">📕</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-base font-semibold">SD118 Vessel Manual</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Sanlorenzo SD118 · English</div>
+              <div className="text-xs text-muted-foreground mt-1">View inline or download to your device</div>
+            </div>
+            <svg viewBox="0 0 24 24" className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </div>
+        </button>
+
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
