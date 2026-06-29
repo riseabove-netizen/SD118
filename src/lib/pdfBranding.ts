@@ -101,22 +101,25 @@ export async function applyBranding(pdf: PDFDocument, opts: BrandingOptions = {}
       thickness: 0.4,
     })
 
-    // ----- Footer: boat illustration centered, page number bottom-right
-    const footerBaseY = margin / 2 // ~18pt from bottom edge
+    // ----- Footer: large boat illustration centered, page number + vessel
+    // name on a meta row above it.
+    const boatBaseY = 12 // boat sits ~12pt above page bottom
+    const boatH = 38 // displayed height in PDF points (bumped from 22pt)
+    const boatW = boatImg ? (RISE_ABOVE_BOAT_PNG_W / RISE_ABOVE_BOAT_PNG_H) * boatH : 0
     if (boatImg) {
-      const boatH = 22
-      const boatW = (RISE_ABOVE_BOAT_PNG_W / RISE_ABOVE_BOAT_PNG_H) * boatH
       page.drawImage(boatImg, {
         x: (w - boatW) / 2,
-        y: footerBaseY,
+        y: boatBaseY,
         width: boatW,
         height: boatH,
       })
     }
-    // Hairline rule above footer
+    // Meta row (vessel + page number) sits above the boat illustration
+    const metaY = boatBaseY + boatH + 6
+    // Hairline rule above the meta row
     page.drawLine({
-      start: { x: margin, y: footerBaseY + 26 },
-      end: { x: w - margin, y: footerBaseY + 26 },
+      start: { x: margin, y: metaY + 10 },
+      end: { x: w - margin, y: metaY + 10 },
       color: ruleColor,
       thickness: 0.4,
     })
@@ -125,7 +128,7 @@ export async function applyBranding(pdf: PDFDocument, opts: BrandingOptions = {}
       const pageSize = 8
       page.drawText(pageText, {
         x: w - margin - helv.widthOfTextAtSize(pageText, pageSize),
-        y: footerBaseY + 8,
+        y: metaY,
         size: pageSize,
         font: helvBold,
         color: muted,
@@ -133,7 +136,7 @@ export async function applyBranding(pdf: PDFDocument, opts: BrandingOptions = {}
       // Left side: vessel name in footer (small)
       page.drawText('M/Y Rise Above III', {
         x: margin,
-        y: footerBaseY + 8,
+        y: metaY,
         size: pageSize,
         font: helv,
         color: muted,
@@ -145,6 +148,10 @@ export async function applyBranding(pdf: PDFDocument, opts: BrandingOptions = {}
 /**
  * Reserve top/bottom margins so branding doesn't collide with content.
  * Use these constants in the page-content loop of each PDF builder.
+ *
+ * Footer now needs more room because the boat illustration is ~38pt tall and
+ * sits below a meta row with hairline rule (~16pt). 80pt gives a clean gap
+ * between content and footer.
  */
 export const PDF_BRANDING_TOP_MARGIN = 56 // top margin reserved for header band
-export const PDF_BRANDING_BOTTOM_MARGIN = 60 // bottom margin reserved for footer band
+export const PDF_BRANDING_BOTTOM_MARGIN = 80 // bottom margin reserved for footer band

@@ -271,8 +271,11 @@ export function AnchorWatchPage() {
   }
 
   // Captain close-out: chart photo upload, build PDF, upload to Drive, archive,
-  // then clear the active record.
-  const chartInputRef = useRef<HTMLInputElement | null>(null)
+  // then clear the active record. Two inputs so the user can choose between
+  // taking a fresh photo (camera) and uploading an existing one (gallery /
+  // desktop screenshot).
+  const chartCameraInputRef = useRef<HTMLInputElement | null>(null)
+  const chartUploadInputRef = useRef<HTMLInputElement | null>(null)
 
   const handleChartFile = async (file: File) => {
     setError(null)
@@ -431,7 +434,8 @@ export function AnchorWatchPage() {
             signWind={signWind} setSignWind={setSignWind}
             signNotes={signNotes} setSignNotes={setSignNotes}
             onSign={handleSign}
-            chartInputRef={chartInputRef}
+            chartCameraInputRef={chartCameraInputRef}
+            chartUploadInputRef={chartUploadInputRef}
             chartTrackPreview={chartTrackPreview || data.chartTrackPhotoUrl || null}
             onPickChart={(f) => handleChartFile(f)}
             captainName={captainName} setCaptainName={setCaptainName}
@@ -601,7 +605,8 @@ function ActivePanel(props: {
   signWind: string; setSignWind: (v: string) => void
   signNotes: string; setSignNotes: (v: string) => void
   onSign: () => void
-  chartInputRef: React.MutableRefObject<HTMLInputElement | null>
+  chartCameraInputRef: React.MutableRefObject<HTMLInputElement | null>
+  chartUploadInputRef: React.MutableRefObject<HTMLInputElement | null>
   chartTrackPreview: string | null
   onPickChart: (f: File) => void
   captainName: string; setCaptainName: (v: string) => void
@@ -609,7 +614,7 @@ function ActivePanel(props: {
   disabled: boolean
   onEditPosition: () => void
 }) {
-  const { data, wind, satelliteUrl, checklistDone, onToggle, signName, setSignName, signWind, setSignWind, signNotes, setSignNotes, onSign, chartInputRef, chartTrackPreview, onPickChart, captainName, setCaptainName, onClose, disabled, onEditPosition } = props
+  const { data, wind, satelliteUrl, checklistDone, onToggle, signName, setSignName, signWind, setSignWind, signNotes, setSignNotes, onSign, chartCameraInputRef, chartUploadInputRef, chartTrackPreview, onPickChart, captainName, setCaptainName, onClose, disabled, onEditPosition } = props
   const windSvg = useMemo(() => (wind ? buildWindSvg(wind) : null), [wind])
   const alarmKt = parseFloat(data.windAlarmKt || '16')
 
@@ -669,7 +674,20 @@ function ActivePanel(props: {
                 Edit position
               </button>
             </div>
-            <img src={satelliteUrl} alt="Satellite view" className="w-full h-56 object-cover" />
+            <div className="relative">
+              <img src={satelliteUrl} alt="Satellite view" className="w-full h-56 object-cover" />
+              {/* Anchor marker dead-center over the satellite image. */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-600/90 border-2 border-white shadow-lg">
+                  <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="5" r="2"/>
+                    <path d="M12 7v14"/>
+                    <path d="M5 18a7 7 0 0 0 14 0"/>
+                    <path d="M8 11h8"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
           </div>
         )}
         {windSvg && (
@@ -764,24 +782,50 @@ function ActivePanel(props: {
       {/* Captain close-out */}
       <div className="rounded-xl border border-amber-500/30 bg-card p-4 space-y-3">
         <h3 className="font-semibold">Close watch — captain only</h3>
-        <p className="text-xs text-muted-foreground">Take a photo of the chart tracks, then sign as captain. A PDF will be created and uploaded to Google Drive.</p>
+        <p className="text-xs text-muted-foreground">Add a photo or screenshot of the chart tracks, then sign as captain. A PDF will be created and uploaded to Google Drive.</p>
 
         <div>
+          {/* Hidden inputs: one opens the camera (mobile), one opens the file picker (gallery / desktop screenshots). */}
           <input
-            ref={chartInputRef}
+            ref={chartCameraInputRef}
             type="file"
             accept="image/*"
             capture="environment"
             className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickChart(f) }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickChart(f); e.currentTarget.value = '' }}
           />
-          <button
-            onClick={() => chartInputRef.current?.click()}
-            disabled={disabled}
-            className="w-full px-4 py-2.5 rounded-lg border border-border hover:bg-secondary disabled:opacity-50 text-sm font-medium"
-          >
-            {chartTrackPreview ? 'Replace chart photo' : 'Add chart-track photo'}
-          </button>
+          <input
+            ref={chartUploadInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onPickChart(f); e.currentTarget.value = '' }}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => chartUploadInputRef.current?.click()}
+              disabled={disabled}
+              className="px-3 py-2.5 rounded-lg border border-border hover:bg-secondary disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              {chartTrackPreview ? 'Replace — Upload' : 'Upload photo'}
+            </button>
+            <button
+              onClick={() => chartCameraInputRef.current?.click()}
+              disabled={disabled}
+              className="px-3 py-2.5 rounded-lg border border-border hover:bg-secondary disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2"
+            >
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+              {chartTrackPreview ? 'Replace — Camera' : 'Take photo'}
+            </button>
+          </div>
           {chartTrackPreview && (
             <img src={chartTrackPreview} alt="Chart tracks" className="mt-3 w-full rounded-lg border border-border" />
           )}
@@ -1019,8 +1063,30 @@ async function buildPdf(data: AnchorWatchData, wind: WindForecast | null, satell
     if (satelliteUrl) {
       const { bytes, mime } = await fetchImageBytes(satelliteUrl)
       const img = mime.includes('png') ? await pdf.embedPng(bytes) : await pdf.embedJpg(bytes)
-      page.drawImage(img, { x: margin, y: y - imgH, width: imgW, height: imgH })
-      page.drawText('Satellite view', { x: margin + 4, y: y - 10, size: 8, font: helvBold, color: rgb(1, 1, 1) })
+      const satX = margin
+      const satY = y - imgH
+      page.drawImage(img, { x: satX, y: satY, width: imgW, height: imgH })
+      page.drawText('Satellite view', { x: satX + 4, y: y - 10, size: 8, font: helvBold, color: rgb(1, 1, 1) })
+
+      // Anchor marker centered over the satellite image (matches on-screen overlay).
+      try {
+        const markerSize = 32 // pt — diameter of red disk
+        const anchorSvg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <circle cx="48" cy="48" r="30" fill="#dc2626" stroke="#ffffff" stroke-width="4"/>
+  <g transform="translate(24,24)" fill="none" stroke="#ffffff" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="24" cy="10" r="4"/>
+    <line x1="24" y1="14" x2="24" y2="42"/>
+    <path d="M10 36a14 14 0 0 0 28 0"/>
+    <line x1="16" y1="22" x2="32" y2="22"/>
+  </g>
+</svg>`
+        const markerPng = await svgToPngBytes(anchorSvg, 2)
+        const markerImg = await pdf.embedPng(markerPng)
+        const cx = satX + imgW / 2 - markerSize / 2
+        const cy = satY + imgH / 2 - markerSize / 2
+        page.drawImage(markerImg, { x: cx, y: cy, width: markerSize, height: markerSize })
+      } catch (e) { console.warn('Anchor marker embed failed', e) }
     }
   } catch (e) { console.warn('Satellite embed failed', e) }
   try {

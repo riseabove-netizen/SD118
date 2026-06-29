@@ -52,6 +52,12 @@ export function WatchHubPage() {
           href="/watch/duties"
           description="Today's checklist — resets at midnight"
         />
+        <Tile
+          icon="⚓"
+          label="Anchor Watchkeeper Log"
+          href="/ism/anchor-watch"
+          description="Shared hourly watch with PDF export to Drive"
+        />
       </div>
     </MenuLayout>
   )
