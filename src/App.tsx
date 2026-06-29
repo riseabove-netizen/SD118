@@ -23,6 +23,7 @@ import { FireSafetyIndexPage } from '@/pages/ism/FireSafety'
 import { FireSafetyPlanPage } from '@/pages/ism/FireSafetyPlan'
 import { FireEquipmentPage } from '@/pages/ism/FireEquipment'
 import { DrillsPage } from '@/pages/ism/Drills'
+import { AnchorWatchPage } from '@/pages/ism/AnchorWatch'
 
 // Inspection
 import { InspectionPage } from '@/pages/inspection/Inspection'
@@ -133,6 +134,9 @@ function AppRoutes() {
       </Route>
       <Route path="/ism/fire-safety/equipment">
         <AuthGuard><FireEquipmentPage /></AuthGuard>
+      </Route>
+      <Route path="/ism/anchor-watch">
+        <AuthGuard><AnchorWatchPage /></AuthGuard>
       </Route>
       <Route path="/ism/drills">
         <AuthGuard><DrillsPage /></AuthGuard>

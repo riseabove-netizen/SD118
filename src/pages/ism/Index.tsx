@@ -93,6 +93,21 @@ export function IsmIndexPage() {
           />
 
           <Tile
+            onClick={() => setLocation('/ism/anchor-watch')}
+            title="Anchor Watchkeeper Log"
+            description="Shared hourly watch with PDF export to Drive"
+            tone="red"
+            icon={
+              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="5" r="2"/>
+                <path d="M12 7v14"/>
+                <path d="M5 18a7 7 0 0014 0"/>
+                <path d="M8 11h8"/>
+              </svg>
+            }
+          />
+
+          <Tile
             onClick={() => setLocation('/ism/drills')}
             title="Drills / Testing"
             description="Mandatory drills and equipment testing schedule"

@@ -97,3 +97,13 @@ export async function uploadGuidePhoto(base64: string, guideTag?: string): Promi
   const data = await jsonOrError(res)
   return data.photoUrl
 }
+
+export async function uploadDrivePdf(base64: string, filename: string, label?: string): Promise<{ viewUrl: string; fileId: string }> {
+  const res = await fetch('/api/inventory-photo-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base64, filename, label: label || 'pdf', mime: 'application/pdf', ext: 'pdf' }),
+  })
+  const data = await jsonOrError(res)
+  return { viewUrl: data.viewUrl, fileId: data.fileId }
+}

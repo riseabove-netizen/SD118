@@ -44,13 +44,17 @@ function getAuth() {
   })
 }
 
-function detectImageMime(b64: string): 'image/jpeg' | 'image/png' {
+function detectMime(b64: string): { mime: string; ext: string; isPdf: boolean } {
   try {
     const head = atob(b64.slice(0, 16))
-    if (head.charCodeAt(0) === 0xff && head.charCodeAt(1) === 0xd8) return 'image/jpeg'
-    if (head.charCodeAt(0) === 0x89 && head.charCodeAt(1) === 0x50) return 'image/png'
+    if (head.charCodeAt(0) === 0xff && head.charCodeAt(1) === 0xd8) return { mime: 'image/jpeg', ext: 'jpg', isPdf: false }
+    if (head.charCodeAt(0) === 0x89 && head.charCodeAt(1) === 0x50) return { mime: 'image/png', ext: 'png', isPdf: false }
+    // PDF magic: '%PDF'
+    if (head.charCodeAt(0) === 0x25 && head.charCodeAt(1) === 0x50 && head.charCodeAt(2) === 0x44 && head.charCodeAt(3) === 0x46) {
+      return { mime: 'application/pdf', ext: 'pdf', isPdf: true }
+    }
   } catch {}
-  return 'image/jpeg'
+  return { mime: 'image/jpeg', ext: 'jpg', isPdf: false }
 }
 
 function safeName(s: string): string {
@@ -72,6 +76,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     tab?: string
     itemId?: string
     label?: string
+    mime?: string
+    ext?: string
+    filename?: string
   }
   if (!body || !body.base64) {
     return res.status(400).json({ error: 'Invalid body — base64 image required' })
@@ -81,14 +88,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const auth = getAuth()
     const drive = google.drive({ version: 'v3', auth })
 
-    const mime = detectImageMime(body.base64)
-    const ext = mime === 'image/png' ? 'png' : 'jpg'
+    const detected = detectMime(body.base64)
+    const mime = body.mime || detected.mime
+    const ext = body.ext || detected.ext
     const tag = [body.tab, body.itemId, body.label]
       .filter((v): v is string => typeof v === 'string' && v.length > 0)
       .map(safeName)
       .join(' - ')
     const ts = new Date().toISOString().replace(/[:.]/g, '-')
-    const fileName = `${tag || 'inv-photo'}-${ts}.${ext}`
+    const fileName = body.filename ? safeName(body.filename) : `${tag || 'inv-photo'}-${ts}.${ext}`
 
     const bytes = Buffer.from(body.base64, 'base64')
     const stream = Readable.from(bytes)
