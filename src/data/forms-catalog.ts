@@ -42,7 +42,11 @@ export interface ISMForm {
     columns: SpecificIncidentColumn[]
   }
   // Special sections for emergency-broadcast
-  sections?: { sectionLabel: string; items: FormItem[] }[]
+  sections?: {
+    sectionLabel: string
+    sectionDescription?: string
+    items: FormItem[]
+  }[]
 }
 
 export const FORMS_CATALOG: ISMForm[] = [
@@ -674,27 +678,31 @@ export const FORMS_CATALOG: ISMForm[] = [
     items: [],
     sections: [
       {
-        sectionLabel: 'PAN PAN PAN',
+        sectionLabel: 'Pan Pan — urgency call',
+        sectionDescription:
+          'Use when there is an urgent safety concern that is NOT immediately life-threatening, e.g. injury that is serious but stable, mechanical or steering failure, person overboard recovered, slow controllable leak, vessel drifting. Pan Pan takes priority over all traffic except a Mayday. Upgrade to Mayday if the situation becomes grave and imminent.',
         items: [
           { id: 'eb-pp-1', label: 'Pan Pan, Pan Pan, Pan Pan' },
-          { id: 'eb-pp-2', label: 'All stations x3 or Specific Coastguard x 3 or Specific Coast Station x 3' },
-          { id: 'eb-pp-3', label: 'This is "NAME OF YACHT" x 3' },
-          { id: 'eb-pp-4', label: 'Call Sign x 3' },
+          { id: 'eb-pp-2', label: 'All stations, all stations, all stations' },
+          { id: 'eb-pp-3', label: 'This is "Rise Above", "Rise Above", "Rise Above"' },
+          { id: 'eb-pp-4', label: 'Call sign Victor 7 Bravo 3 2 5 8, Victor 7 Bravo 3 2 5 8, Victor 7 Bravo 3 2 5 8' },
           { id: 'eb-pp-5', label: 'In position Lat……..Long……… or by reference to known point' },
-          { id: 'eb-pp-6', label: 'I require ………………………type of assistance' },
+          { id: 'eb-pp-6', label: 'I require ……………………type of assistance' },
           { id: 'eb-pp-7', label: 'We have …… Persons on board and …….. (Any further information)' },
           { id: 'eb-pp-8', label: 'Over' },
         ],
       },
       {
-        sectionLabel: 'MAYDAY',
+        sectionLabel: 'MAYDAY — distress call',
+        sectionDescription:
+          'Use ONLY when the vessel or a person on board is in grave and imminent danger and immediate assistance is required, e.g. uncontrolled fire, sinking, life-threatening medical emergency, abandoning ship, collision with major flooding. Mayday takes absolute priority over all radio traffic.',
         items: [
           { id: 'eb-md-1', label: 'MAYDAY, MAYDAY, MAYDAY' },
-          { id: 'eb-md-2', label: 'All stations x3 or Specific Coastguard x 3 or Specific Coast Station x 3' },
-          { id: 'eb-md-3', label: 'This is "NAME OF YACHT" x 3' },
-          { id: 'eb-md-4', label: 'Call Sign x 3' },
+          { id: 'eb-md-2', label: 'All stations, all stations, all stations' },
+          { id: 'eb-md-3', label: 'This is "Rise Above", "Rise Above", "Rise Above"' },
+          { id: 'eb-md-4', label: 'Call sign Victor 7 Bravo 3 2 5 8, Victor 7 Bravo 3 2 5 8, Victor 7 Bravo 3 2 5 8' },
           { id: 'eb-md-5', label: 'In position Lat……..Long……… or by reference to known point' },
-          { id: 'eb-md-6', label: 'I require ………………………type of assistance' },
+          { id: 'eb-md-6', label: 'I require ……………………type of assistance' },
           { id: 'eb-md-7', label: 'We have …… Persons on board and …….. (Any further information)' },
           { id: 'eb-md-8', label: 'Over' },
         ],

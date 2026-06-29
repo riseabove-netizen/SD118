@@ -162,23 +162,34 @@ export async function buildIsmFormPdf(args: BuildArgs): Promise<Uint8Array> {
   // Checklist
   const labels = itemLabelById(form)
   const checkedIds = Object.entries(checks).filter(([, v]) => v).map(([k]) => k)
+  const drawChecklistItem = (it: FormItem) => {
+    ensure(13)
+    const isChecked = !!checks[it.id]
+    const box = isChecked ? '☑' : '☐'
+    const indent = (it.indent || 0) * 12
+    page.drawText(box, { x: margin + indent, y: y - 10, size: 11, font: helv, color: isChecked ? accent : muted })
+    drawWrapped(it.label, margin + indent + 14, 10, helv, ink, width - indent - 14)
+  }
   if (Object.keys(labels).length > 0) {
     hr()
     const total = Object.keys(labels).length
     drawText(`Checklist — ${checkedIds.length} of ${total} confirmed`, margin, 11, helvBold, ink)
     y -= 14
-    // List items in catalog order
-    const ordered: FormItem[] = []
-    const walk = (items: FormItem[]) => { for (const it of items) if (!it.noCheckbox) ordered.push(it) }
-    walk(form.items)
-    if (form.sections) for (const s of form.sections) walk(s.items)
-    for (const it of ordered) {
-      ensure(13)
-      const isChecked = !!checks[it.id]
-      const box = isChecked ? '☑' : '☐'
-      const indent = (it.indent || 0) * 12
-      page.drawText(box, { x: margin + indent, y: y - 10, size: 11, font: helv, color: isChecked ? accent : muted })
-      drawWrapped(it.label, margin + indent + 14, 10, helv, ink, width - indent - 14)
+    // Top-level items
+    for (const it of form.items) if (!it.noCheckbox) drawChecklistItem(it)
+    // Sectioned items (e.g. Emergency Broadcast: Pan Pan / Mayday)
+    if (form.sections) {
+      for (const s of form.sections) {
+        ensure(20)
+        y -= 6
+        drawText(s.sectionLabel, margin, 10, helvBold, accent)
+        y -= 14
+        if (s.sectionDescription) {
+          drawWrapped(s.sectionDescription, margin, 9, helv, muted)
+          y -= 2
+        }
+        for (const it of s.items) if (!it.noCheckbox) drawChecklistItem(it)
+      }
     }
     y -= 4
   }

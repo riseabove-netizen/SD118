@@ -191,30 +191,64 @@ function SpecificIncidents({ form, selectedCol, onColChange, colChecks, onCheckC
   )
 }
 
-function EmergencyBroadcastForm({ form, checks, onCheck }: {
+function CoordsReference({ coords }: { coords: string }) {
+  return (
+    <div className="mt-1 mb-2 ml-7 p-3 rounded-lg border border-border bg-secondary/40">
+      <div className="flex items-start gap-2">
+        <svg viewBox="0 0 24 24" className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider">Phone GPS (reference only)</p>
+          <p className="text-sm font-mono mt-0.5 break-all">{coords || 'Acquiring…'}</p>
+          <p className="text-xs text-amber-400 mt-1">⚠ Verify against vessel electronics (chartplotter / GPS) before transmitting</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EmergencyBroadcastForm({ form, checks, onCheck, gpsCoords }: {
   form: ISMForm
   checks: Record<string, boolean>
   onCheck: (id: string, val: boolean) => void
+  gpsCoords: string
 }) {
   if (!form.sections) return null
   return (
     <div className="space-y-6">
-      {form.sections.map(section => (
-        <div key={section.sectionLabel} className="space-y-2">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider border-b border-border pb-2">
-            {section.sectionLabel}
-          </h3>
-          {section.items.map(item => (
-            <Checkbox
-              key={item.id}
-              id={item.id}
-              label={item.label}
-              checked={!!checks[item.id]}
-              onChange={e => onCheck(item.id, e.target.checked)}
-            />
-          ))}
-        </div>
-      ))}
+      {form.sections.map(section => {
+        const isPanPan = section.sectionLabel.toLowerCase().includes('pan')
+        const isMayday = section.sectionLabel.toLowerCase().includes('mayday')
+        const accent = isMayday ? 'text-destructive border-destructive/40' : isPanPan ? 'text-orange-400 border-orange-500/40' : 'text-muted-foreground border-border'
+        return (
+          <div key={section.sectionLabel} className="space-y-2">
+            <h3 className={`text-sm font-bold uppercase tracking-wider border-b pb-2 ${accent}`}>
+              {section.sectionLabel}
+            </h3>
+            {section.sectionDescription && (
+              <p className="text-xs text-muted-foreground italic leading-relaxed pb-1">
+                {section.sectionDescription}
+              </p>
+            )}
+            {section.items.map(item => {
+              const isPositionItem = item.id.endsWith('-5')
+              return (
+                <React.Fragment key={item.id}>
+                  <Checkbox
+                    id={item.id}
+                    label={item.label}
+                    checked={!!checks[item.id]}
+                    onChange={e => onCheck(item.id, e.target.checked)}
+                  />
+                  {isPositionItem && <CoordsReference coords={gpsCoords} />}
+                </React.Fragment>
+              )
+            })}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -415,6 +449,7 @@ export function IsmFormPage() {
             form={form}
             checks={checks}
             onCheck={toggleCheck}
+            gpsCoords={geo.formatted}
           />
         )}
 
