@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
 import { Readable } from 'stream'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
-import { applyBranding, PDF_BRANDING_TOP_MARGIN, PDF_BRANDING_BOTTOM_MARGIN } from './lib/pdfBranding'
+import { applyBranding, PDF_BRANDING_TOP_MARGIN, PDF_BRANDING_BOTTOM_MARGIN } from './_lib/pdfBranding'
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } },
