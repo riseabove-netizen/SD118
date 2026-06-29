@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
 import { Readable } from 'stream'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { applyBranding, PDF_BRANDING_TOP_MARGIN, PDF_BRANDING_BOTTOM_MARGIN } from '../src/lib/pdfBranding'
 
 export const config = {
   api: { bodyParser: { sizeLimit: '50mb' } },
@@ -80,12 +81,12 @@ async function buildPdf(body: InspectionBody, inspectionId: string): Promise<Uin
   const contentWidth = pageWidth - margin * 2
 
   let page = pdf.addPage([pageWidth, pageHeight])
-  let y = pageHeight - margin
+  let y = pageHeight - PDF_BRANDING_TOP_MARGIN
 
   function ensureSpace(needed: number) {
-    if (y - needed < margin) {
+    if (y - needed < PDF_BRANDING_BOTTOM_MARGIN) {
       page = pdf.addPage([pageWidth, pageHeight])
-      y = pageHeight - margin
+      y = pageHeight - PDF_BRANDING_TOP_MARGIN
     }
   }
 
@@ -131,8 +132,8 @@ async function buildPdf(body: InspectionBody, inspectionId: string): Promise<Uin
     y -= 6
   }
 
-  // Header
-  drawText('M/Y Rise Above — Engine Room Inspection', { font: bold, size: 18, color: rgb(0.7, 0.1, 0.1), gap: 6 })
+  // Title (vessel name is now drawn by applyBranding in the header band)
+  drawText('Engine Room Inspection', { font: bold, size: 18, color: rgb(0.7, 0.1, 0.1), gap: 6 })
   drawText(`Date: ${new Date(body.timestamp).toLocaleString()}`, { size: 10, color: rgb(0.3, 0.3, 0.3), gap: 2 })
   drawText(`Inspector: ${body.user || '—'}`, { size: 10, color: rgb(0.3, 0.3, 0.3), gap: 2 })
   const coordLine =
@@ -203,6 +204,7 @@ async function buildPdf(body: InspectionBody, inspectionId: string): Promise<Uin
     }
   }
 
+  await applyBranding(pdf)
   return await pdf.save()
 }
 

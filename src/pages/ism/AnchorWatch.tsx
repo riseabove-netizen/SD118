@@ -21,6 +21,7 @@ import {
   type WindForecast,
 } from '@/lib/anchor-watch-utils'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { applyBranding, PDF_BRANDING_TOP_MARGIN } from '@/lib/pdfBranding'
 import { MapPicker, googleMapsUrl } from '@/components/MapPicker'
 
 // JSON-in-markdown storage (same pattern as Fire Equipment).
@@ -975,11 +976,11 @@ async function buildPdf(data: AnchorWatchData, wind: WindForecast | null, satell
 
   const margin = 36
   const width = page.getWidth() - margin * 2
-  let y = page.getHeight() - margin
+  // Reserve room at top for branded header (logo + vessel name) and bottom for footer.
+  let y = page.getHeight() - PDF_BRANDING_TOP_MARGIN
 
-  // Title
+  // Title (vessel label + logo come from the branding overlay)
   page.drawText('Anchor Watchkeeper Log', { x: margin, y: y - 14, size: 16, font: helvBold, color: ink })
-  page.drawText('M/Y Rise Above', { x: page.getWidth() - margin - helv.widthOfTextAtSize('M/Y Rise Above', 10), y: y - 12, size: 10, font: helv, color: muted })
   y -= 22
   page.drawText(data.locationName || '(unnamed anchorage)', { x: margin, y: y - 12, size: 13, font: helvBold, color: accent })
   y -= 22
@@ -1109,6 +1110,8 @@ async function buildPdf(data: AnchorWatchData, wind: WindForecast | null, satell
     } catch (e) { console.warn('Chart embed failed', e) }
   }
 
+  // Apply Rise Above branding (logo header, boat footer, page numbers).
+  await applyBranding(pdf)
   return await pdf.save()
 }
 

@@ -4,6 +4,7 @@ import { MenuLayout } from '@/components/MenuLayout'
 import { fetchGuide, saveGuide, uploadDrivePdf } from '@/lib/guides'
 import { getCrewName } from '@/lib/auth'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { applyBranding, PDF_BRANDING_TOP_MARGIN, PDF_BRANDING_BOTTOM_MARGIN } from '@/lib/pdfBranding'
 import {
   FIRE_EQUIPMENT_SEED,
   FIRE_EQUIPMENT_GUIDE_ID,
@@ -618,12 +619,10 @@ async function buildTestPdf(args: PdfArgs): Promise<Uint8Array> {
   const lineH = 14
 
   let page = pdf.addPage([PAGE_W, PAGE_H])
-  let y = PAGE_H - margin
+  let y = PAGE_H - PDF_BRANDING_TOP_MARGIN
 
-  // Header
+  // Header (vessel label + logo come from the branding overlay)
   page.drawText('Safety Equipment Test', { x: margin, y: y - 14, size: 16, font: helvBold, color: ink })
-  const sub = 'M/Y Rise Above'
-  page.drawText(sub, { x: PAGE_W - margin - helv.widthOfTextAtSize(sub, 10), y: y - 12, size: 10, font: helv, color: muted })
   y -= 28
   page.drawText(args.stamp.toLocaleString(), { x: margin, y, size: 10, font: helv, color: muted })
   y -= 18
@@ -664,7 +663,7 @@ async function buildTestPdf(args: PdfArgs): Promise<Uint8Array> {
   for (const r of args.records) {
     if (y < margin + 60) {
       page = pdf.addPage([PAGE_W, PAGE_H])
-      y = PAGE_H - margin
+      y = PAGE_H - PDF_BRANDING_TOP_MARGIN
       drawHead()
     }
     page.drawText(trim(r.table, 195, helvBold), { x: colX[0], y, size: 9, font: helvBold, color: ink })
@@ -679,7 +678,7 @@ async function buildTestPdf(args: PdfArgs): Promise<Uint8Array> {
   if (args.notes) {
     if (y < margin + 80) {
       page = pdf.addPage([PAGE_W, PAGE_H])
-      y = PAGE_H - margin
+      y = PAGE_H - PDF_BRANDING_TOP_MARGIN
     }
     y -= 10
     page.drawText('Notes', { x: margin, y, size: 11, font: helvBold, color: ink })
@@ -688,7 +687,7 @@ async function buildTestPdf(args: PdfArgs): Promise<Uint8Array> {
     for (const ln of wrap) {
       if (y < margin + 30) {
         page = pdf.addPage([PAGE_W, PAGE_H])
-        y = PAGE_H - margin
+        y = PAGE_H - PDF_BRANDING_TOP_MARGIN
       }
       page.drawText(ln, { x: margin, y, size: 10, font: helv, color: ink })
       y -= 13
@@ -698,13 +697,15 @@ async function buildTestPdf(args: PdfArgs): Promise<Uint8Array> {
   // Footer signature
   if (y < margin + 80) {
     page = pdf.addPage([PAGE_W, PAGE_H])
-    y = PAGE_H - margin
+    y = PAGE_H - PDF_BRANDING_TOP_MARGIN
   }
   y -= 20
   page.drawLine({ start: { x: margin, y }, end: { x: margin + 240, y }, color: accent, thickness: 0.6 })
   page.drawText(args.signature, { x: margin, y: y + 4, size: 14, font: helvBold, color: accent })
   page.drawText(`Signed by ${args.signer} · ${args.stamp.toLocaleString()}`, { x: margin, y: y - 12, size: 9, font: helv, color: muted })
 
+  // Apply Rise Above branding (logo header, boat footer, page numbers).
+  await applyBranding(pdf)
   const out = await pdf.save()
   return out
 }

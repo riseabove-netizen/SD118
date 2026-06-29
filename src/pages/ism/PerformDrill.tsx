@@ -5,6 +5,7 @@ import { getCrewName } from '@/lib/auth'
 import { saveGuide, uploadDrivePdf } from '@/lib/guides'
 import { DRILL_SCRIPTS, slugifyDrill, findDrillScript, type DrillScript } from '@/data/drills-scripts'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { applyBranding, PDF_BRANDING_TOP_MARGIN, PDF_BRANDING_BOTTOM_MARGIN } from '@/lib/pdfBranding'
 
 // Build a Perform Drill workflow with four sections:
 //   1. Select drill + personnel involved
@@ -591,18 +592,17 @@ async function buildDrillPdf(script: DrillScript, data: DrillResultData): Promis
   const line = rgb(0.85, 0.85, 0.85)
   const margin = 36
   const width = page.getWidth() - margin * 2
-  let y = page.getHeight() - margin
+  let y = page.getHeight() - PDF_BRANDING_TOP_MARGIN
 
   const ensureSpace = (lines: number) => {
-    if (y < margin + lines * 12 + 20) {
+    if (y < PDF_BRANDING_BOTTOM_MARGIN + lines * 12 + 20) {
       page = pdf.addPage([595.28, 841.89])
-      y = page.getHeight() - margin
+      y = page.getHeight() - PDF_BRANDING_TOP_MARGIN
     }
   }
 
-  // Title
+  // Title (vessel label + logo come from the branding overlay)
   page.drawText('Drill Report', { x: margin, y: y - 14, size: 16, font: helvBold, color: ink })
-  page.drawText('M/Y Rise Above', { x: page.getWidth() - margin - helv.widthOfTextAtSize('M/Y Rise Above', 10), y: y - 12, size: 10, font: helv, color: muted })
   y -= 22
   page.drawText(script.title, { x: margin, y: y - 12, size: 13, font: helvBold, color: accent })
   y -= 22
@@ -709,6 +709,8 @@ async function buildDrillPdf(script: DrillScript, data: DrillResultData): Promis
     }
   }
 
+  // Apply Rise Above branding (logo header, boat footer, page numbers).
+  await applyBranding(pdf)
   return await pdf.save()
 }
 

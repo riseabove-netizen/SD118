@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
 import { Readable } from 'stream'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { applyBranding, PDF_BRANDING_TOP_MARGIN, PDF_BRANDING_BOTTOM_MARGIN } from '../src/lib/pdfBranding'
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } },
@@ -406,12 +407,12 @@ async function buildWatchPdf(state: WatchState): Promise<Uint8Array> {
   const contentWidth = pageWidth - margin * 2
 
   let page = pdf.addPage([pageWidth, pageHeight])
-  let y = pageHeight - margin
+  let y = pageHeight - PDF_BRANDING_TOP_MARGIN
 
   function ensureSpace(needed: number) {
-    if (y - needed < margin) {
+    if (y - needed < PDF_BRANDING_BOTTOM_MARGIN) {
       page = pdf.addPage([pageWidth, pageHeight])
-      y = pageHeight - margin
+      y = pageHeight - PDF_BRANDING_TOP_MARGIN
     }
   }
 
@@ -477,24 +478,25 @@ async function buildWatchPdf(state: WatchState): Promise<Uint8Array> {
     }
   }
 
-  // Header band
+  // Title band (sits below the branded logo header)
+  const bandTop = pageHeight - PDF_BRANDING_TOP_MARGIN
   page.drawRectangle({
     x: margin,
-    y: pageHeight - margin - 36,
+    y: bandTop - 36,
     width: contentWidth,
     height: 36,
     color: rgb(0.07, 0.13, 0.28),
   })
-  page.drawText('M/Y RISE ABOVE', { x: margin + 12, y: pageHeight - margin - 16, size: 13, font: bold, color: rgb(1, 1, 1) })
-  page.drawText('WATCH DUTIES', { x: margin + 12, y: pageHeight - margin - 30, size: 9, font: bold, color: rgb(0.85, 0.27, 0.27) })
+  page.drawText('WATCH DUTIES', { x: margin + 12, y: bandTop - 16, size: 13, font: bold, color: rgb(1, 1, 1) })
+  page.drawText('M/Y RISE ABOVE III', { x: margin + 12, y: bandTop - 30, size: 9, font: bold, color: rgb(0.85, 0.27, 0.27) })
   page.drawText('07:45 – 08:00 for 24 hours', {
     x: pageWidth - margin - 140,
-    y: pageHeight - margin - 22,
+    y: bandTop - 22,
     size: 9,
     font,
     color: rgb(1, 1, 1),
   })
-  y = pageHeight - margin - 36 - 16
+  y = bandTop - 36 - 12
 
   // Date + crew strip
   const [yy, mm, dd] = state.date.split('-').map(Number)
@@ -607,8 +609,12 @@ async function buildWatchPdf(state: WatchState): Promise<Uint8Array> {
   page.drawText('DATE / TIME: ' + (state.receiptSignature?.time || '____________________'), { x: pageWidth / 2 + 12, y, size: 9, font, color: rgb(0.3, 0.3, 0.3) })
   y -= 18
 
-  page.drawText(`Generated: ${new Date().toLocaleString()}`, { x: margin, y: margin / 2, size: 7.5, font, color: rgb(0.55, 0.55, 0.55) })
+  // Generated timestamp (placed above the branded footer band)
+  ensureSpace(14)
+  y -= 10
+  page.drawText(`Generated: ${new Date().toLocaleString()}`, { x: margin, y, size: 7.5, font, color: rgb(0.55, 0.55, 0.55) })
 
+  await applyBranding(pdf)
   return await pdf.save()
 }
 

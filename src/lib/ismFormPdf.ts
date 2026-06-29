@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont } from 'pdf-lib'
 import type { ISMForm, FormItem } from '@/data/forms-catalog'
+import { applyBranding, PDF_BRANDING_TOP_MARGIN, PDF_BRANDING_BOTTOM_MARGIN } from './pdfBranding'
 
 export function uint8ToBase64(bytes: Uint8Array): string {
   let binary = ''
@@ -71,16 +72,19 @@ export async function buildIsmFormPdf(args: BuildArgs): Promise<Uint8Array> {
   const accent = form.formType === 'emergency' ? rgb(0.78, 0.18, 0.18) : rgb(0.13, 0.35, 0.7)
   const line = rgb(0.85, 0.85, 0.85)
   const margin = 36
+  // Top/bottom space reserved for the shared header (logo) and footer (boat + page number).
+  const topReserved = PDF_BRANDING_TOP_MARGIN
+  const bottomReserved = PDF_BRANDING_BOTTOM_MARGIN
 
   let page: PDFPage = pdf.addPage([595.28, 841.89])
   const width = page.getWidth() - margin * 2
-  let y = page.getHeight() - margin
+  let y = page.getHeight() - topReserved
 
   const newPage = () => {
     page = pdf.addPage([595.28, 841.89])
-    y = page.getHeight() - margin
+    y = page.getHeight() - topReserved
   }
-  const ensure = (h: number) => { if (y - h < margin) newPage() }
+  const ensure = (h: number) => { if (y - h < bottomReserved) newPage() }
 
   const drawText = (txt: string, x: number, size: number, font: PDFFont, color = ink) => {
     page.drawText(txt, { x, y: y - size, size, font, color })
@@ -99,10 +103,8 @@ export async function buildIsmFormPdf(args: BuildArgs): Promise<Uint8Array> {
     y -= 8
   }
 
-  // Header
+  // Header (vessel name + logo come from branding overlay; only form title here)
   drawText(form.formName, margin, 16, helvBold, ink)
-  const right = 'M/Y Rise Above'
-  drawText(right, page.getWidth() - margin - helv.widthOfTextAtSize(right, 10), 10, helv, muted)
   y -= 22
   drawText(form.category.toUpperCase(), margin, 9, helvBold, accent)
   y -= 14
@@ -228,6 +230,9 @@ export async function buildIsmFormPdf(args: BuildArgs): Promise<Uint8Array> {
   drawText('Signed by', margin, 9, helvBold, muted)
   drawText(signerName || '—', margin + 80, 11, helvBold, accent)
   drawText(submitted.toLocaleString(), margin + 280, 9, helv, muted)
+
+  // Apply Rise Above branding (logo header, boat footer, page numbers) to every page.
+  await applyBranding(pdf)
 
   return pdf.save()
 }
