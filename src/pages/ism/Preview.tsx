@@ -15,6 +15,8 @@ interface SubmissionData {
   emergencyHeader?: Record<string, string>
   specificCol?: string
   id: string
+  pdfUrl?: string
+  pdfError?: string
 }
 
 export function IsmPreviewPage() {
@@ -72,11 +74,32 @@ export function IsmPreviewPage() {
           </div>
         </div>
 
-        {/* Phase 2 note */}
-        <div className="p-4 rounded-xl border border-border bg-secondary/50 text-sm text-muted-foreground">
-          {/* TODO Phase 2: PDF generation + Google Drive upload */}
-          📄 PDF generation coming in Phase 2
-        </div>
+        {/* PDF link */}
+        {submission.pdfUrl ? (
+          <a
+            href={submission.pdfUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-3 p-4 rounded-xl border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+              <svg viewBox="0 0 24 24" className="w-5 h-5 text-primary" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-primary">Open PDF in Google Drive</p>
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">{submission.pdfUrl}</p>
+            </div>
+          </a>
+        ) : submission.pdfError ? (
+          <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/5 text-sm text-destructive">
+            <p className="font-semibold">PDF upload failed</p>
+            <p className="text-xs mt-1">{submission.pdfError}</p>
+            <p className="text-xs mt-1 text-muted-foreground">Form was still saved — you can retry by re-submitting.</p>
+          </div>
+        ) : null}
 
         {/* Summary */}
         <div className="space-y-4">

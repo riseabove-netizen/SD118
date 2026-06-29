@@ -13,6 +13,8 @@ import { formatDate, formatTime } from '@/lib/utils'
 import { useGeolocation } from '@/lib/useGeolocation'
 import { VESSEL } from '@/lib/vessel'
 import { useMutation } from '@tanstack/react-query'
+import { uploadDrivePdf } from '@/lib/guides'
+import { buildIsmFormPdf, ismPdfFilename, uint8ToBase64 } from '@/lib/ismFormPdf'
 
 function ChecklistItem({ item, checked, onChange }: {
   item: FormItem
@@ -272,6 +274,7 @@ export function IsmFormPage() {
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const submittedAt = new Date().toISOString()
       const fields: Record<string, unknown> = {
         ...checks,
         ...extraValues,
@@ -279,21 +282,49 @@ export function IsmFormPage() {
         ...(form?.formType === 'emergency' ? { ...emergencyHeader, selectedIncidentType: specificCol, specificIncidentChecks: specificChecks } : {}),
         signerName: crewName,
       }
-      return saveIsmForm({
+      const saved = await saveIsmForm({
         formId: formId,
         formName: form?.formName || formId,
         formType: form?.formType || 'operating',
-        submittedAt: new Date().toISOString(),
+        submittedAt,
         signerName: crewName,
         fields,
       })
+
+      // Generate PDF and upload to Drive (best-effort — saving the form already
+      // succeeded; surface PDF errors but don't roll the submission back).
+      let pdfUrl: string | undefined
+      let pdfError: string | undefined
+      if (form) {
+        try {
+          const bytes = await buildIsmFormPdf({
+            form,
+            checks,
+            extraValues,
+            emergencyHeader: form.formType === 'emergency' ? (emergencyHeader as unknown as Record<string, string>) : undefined,
+            specificCol,
+            specificChecks,
+            notes,
+            signerName: crewName,
+            submittedAt,
+            submissionId: saved.id,
+          })
+          const b64 = uint8ToBase64(bytes)
+          const filename = ismPdfFilename(form, submittedAt)
+          const up = await uploadDrivePdf(b64, filename, `IsmForm-${form.formId}`)
+          pdfUrl = up.viewUrl
+        } catch (e: any) {
+          pdfError = e?.message || 'PDF upload failed'
+        }
+      }
+      return { ...saved, pdfUrl, pdfError, submittedAt }
     },
     onSuccess: data => {
       sessionStorage.setItem(`ism-submission-${data.id}`, JSON.stringify({
         formId,
         formName: form?.formName,
         formType: form?.formType,
-        submittedAt: new Date().toISOString(),
+        submittedAt: data.submittedAt,
         signerName: crewName,
         checks,
         extraValues,
@@ -302,6 +333,8 @@ export function IsmFormPage() {
         specificCol,
         specificChecks,
         id: data.id,
+        pdfUrl: data.pdfUrl,
+        pdfError: data.pdfError,
       }))
       setLocation(`/ism/preview/${data.id}`)
     },
