@@ -39,19 +39,13 @@ function pickFolder(label: string | undefined, isPdf: boolean): { folderId: stri
 }
 
 function getAuth() {
-  // Prefer OAuth user delegation when configured. Files land in the user's
-  // own Drive, owned by them, on their quota. Service accounts cannot own
-  // files in personal Drive (no storage quota), so OAuth is required for
-  // personal Gmail / consumer Workspace accounts.
-  const oauthClientId = cleanEnv(process.env.GOOGLE_OAUTH_CLIENT_ID)
-  const oauthClientSecret = cleanEnv(process.env.GOOGLE_OAUTH_CLIENT_SECRET)
-  const oauthRefreshToken = cleanEnv(process.env.GOOGLE_OAUTH_REFRESH_TOKEN)
-  if (oauthClientId && oauthClientSecret && oauthRefreshToken) {
-    const client = new google.auth.OAuth2(oauthClientId, oauthClientSecret)
-    client.setCredentials({ refresh_token: oauthRefreshToken })
-    return client
-  }
-
+  // We now write into a Google Shared Drive that the service account is a member
+  // of, so the service account is sufficient (shared drives don't require
+  // personal storage quota the way My Drive does).
+  //
+  // Legacy OAuth user delegation (GOOGLE_OAUTH_*) is intentionally NOT used here
+  // anymore — the refresh token had been revoked and re-minting required manual
+  // browser auth. Shared drive + service account is more robust.
   const keyJson = cleanEnv(process.env.GOOGLE_SERVICE_ACCOUNT_KEY)
   if (!keyJson) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY not set')
   const key = JSON.parse(keyJson)
