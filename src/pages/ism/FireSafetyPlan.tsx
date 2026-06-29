@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { MenuLayout } from '@/components/MenuLayout'
+import { ZoomableImage } from '@/components/ZoomableImage'
 
 const PAGES = [
   { src: '/manual/fls-page-111.jpg', label: 'B-77 · Safety Equipment — Main Deck / Lower Deck' },
@@ -64,27 +65,7 @@ export function FireSafetyPlanPage() {
       </div>
 
       {zoomed && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setZoomed(null)}
-        >
-          <button
-            onClick={() => setZoomed(null)}
-            className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
-            aria-label="Close"
-          >
-            <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/>
-              <line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-          <img
-            src={zoomed}
-            alt="Plan page"
-            className="max-w-full max-h-full object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
+        <ZoomableImage src={zoomed} onClose={() => setZoomed(null)} />
       )}
     </MenuLayout>
   )
