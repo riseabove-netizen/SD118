@@ -83,7 +83,7 @@ export async function fetchWindForecast(lat: number, lon: number): Promise<WindF
 // Esri World Imagery static map export. Free, no auth, supports JPEG.
 // Bbox is computed from a center + a half-side in degrees.
 export function esriSatelliteUrl(lat: number, lon: number, opts?: { halfDeg?: number; w?: number; h?: number }): string {
-  const half = opts?.halfDeg ?? 0.006  // ~600 m at mid-latitudes
+  const half = opts?.halfDeg ?? 0.025  // ~2.5 km across at mid-latitudes — wider view shows the anchorage in context
   const w = opts?.w ?? 720
   const h = opts?.h ?? 480
   const minLon = lon - half

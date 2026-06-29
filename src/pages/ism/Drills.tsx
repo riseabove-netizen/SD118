@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
+import { useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { fetchGuide, saveGuide } from '@/lib/guides'
 import { getCrewName } from '@/lib/auth'
 import { DRILLS_GUIDE_ID, DRILLS_SEED, type DrillsData, type TestRow } from '@/data/drills-seed'
+import { slugifyDrill } from '@/data/drills-scripts'
 
 const DATA_PREFIX = '<!-- DRILLS-TESTING-DATA:'
 const DATA_SUFFIX = '-->'
@@ -17,9 +19,16 @@ function decode(markdown: string): DrillsData {
   try {
     const data = JSON.parse(json) as Partial<DrillsData>
     if (data && typeof data.intro === 'string' && Array.isArray(data.events) && Array.isArray(data.tests)) {
+      // Merge in any new seed events that were added after the user last saved.
+      const savedEvents = data.events.filter(e => typeof e === 'string') as string[]
+      const lower = new Set(savedEvents.map(e => e.toLowerCase().trim()))
+      const mergedEvents = [...savedEvents]
+      for (const seedEvent of DRILLS_SEED.events) {
+        if (!lower.has(seedEvent.toLowerCase().trim())) mergedEvents.push(seedEvent)
+      }
       return {
         intro: data.intro,
-        events: data.events.filter(e => typeof e === 'string'),
+        events: mergedEvents,
         tests: (data.tests as TestRow[]).filter(t => t && typeof t.description === 'string'),
         outro: typeof data.outro === 'string' ? data.outro : '',
       }
@@ -47,6 +56,7 @@ function encode(data: DrillsData): string {
 }
 
 export function DrillsPage() {
+  const [, setLocation] = useLocation()
   const [data, setData] = useState<DrillsData>(DRILLS_SEED)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -174,6 +184,19 @@ export function DrillsPage() {
           </div>
         </section>
 
+        {/* Perform Drill CTA */}
+        {!editing && (
+          <button
+            onClick={() => setLocation('/ism/drills/perform')}
+            className="w-full px-4 py-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 font-semibold text-sm flex items-center justify-center gap-2"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            Perform drill
+          </button>
+        )}
+
         {/* Events list */}
         <section className="rounded-xl border border-border bg-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-secondary/30">
@@ -203,7 +226,15 @@ export function DrillsPage() {
                     </button>
                   </>
                 ) : (
-                  <span className="text-sm">{e}</span>
+                  <>
+                    <span className="text-sm flex-1">{e}</span>
+                    <button
+                      onClick={() => setLocation(`/ism/drills/perform?drill=${encodeURIComponent(slugifyDrill(e))}`)}
+                      className="text-xs text-amber-300 hover:text-amber-200 font-medium px-2 py-1 rounded border border-amber-500/30 hover:border-amber-500/60"
+                    >
+                      Perform →
+                    </button>
+                  </>
                 )}
               </div>
             ))}

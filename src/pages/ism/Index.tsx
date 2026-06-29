@@ -82,8 +82,8 @@ export function IsmIndexPage() {
 
           <Tile
             onClick={() => setLocation('/ism/fire-safety')}
-            title="Fire Safety"
-            description="Plan, life-saving appliances, fire equipment list"
+            title="Life Saving Equipment"
+            description="Plan, life-saving appliances, equipment list"
             tone="orange"
             icon={
               <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

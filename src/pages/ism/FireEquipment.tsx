@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { fetchGuide, saveGuide } from '@/lib/guides'
 import { getCrewName } from '@/lib/auth'
@@ -19,6 +20,30 @@ import {
 const DATA_PREFIX = '<!-- FIRE-EQUIPMENT-DATA:'
 const DATA_SUFFIX = '-->'
 
+// Migrate any saved table to the new shape: preserve seed's category/deck
+// metadata and ensure every table has "Pressure" + "Last Checked By".
+function migrate(tables: FireEqTable[]): FireEqTable[] {
+  const seedById = new Map(FIRE_EQUIPMENT_SEED.map(t => [t.id, t]))
+  return tables.map(t => {
+    const seed = seedById.get(t.id)
+    const cols = t.columns.slice()
+    if (!cols.some(c => c.toLowerCase() === 'pressure')) cols.push('Pressure')
+    if (!cols.some(c => c.toLowerCase().startsWith('last checked'))) cols.push('Last Checked By')
+    const rows = t.rows.map(r => {
+      const v = r.values.slice()
+      while (v.length < cols.length) v.push('')
+      return { values: v }
+    })
+    return {
+      ...t,
+      category: (t as any).category || seed?.category || 'fire',
+      deck:     (t as any).deck     || seed?.deck     || 'all',
+      columns: cols,
+      rows,
+    } as FireEqTable
+  })
+}
+
 function decode(markdown: string): FireEqTable[] {
   if (!markdown) return FIRE_EQUIPMENT_SEED
   const start = markdown.indexOf(DATA_PREFIX)
@@ -29,7 +54,7 @@ function decode(markdown: string): FireEqTable[] {
   try {
     const data = JSON.parse(json)
     if (Array.isArray(data) && data.every(t => t && typeof t === 'object' && Array.isArray(t.columns) && Array.isArray(t.rows))) {
-      return data as FireEqTable[]
+      return migrate(data as FireEqTable[])
     }
   } catch {}
   return FIRE_EQUIPMENT_SEED
@@ -51,6 +76,7 @@ function newEmptyRow(cols: number): { values: string[] } {
 }
 
 export function FireEquipmentPage() {
+  const [, setLocation] = useLocation()
   const [tables, setTables] = useState<FireEqTable[]>(FIRE_EQUIPMENT_SEED)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -111,7 +137,7 @@ export function FireEquipmentPage() {
       const user = getCrewName() || 'crew'
       await saveGuide({
         id: FIRE_EQUIPMENT_GUIDE_ID,
-        title: 'Fire & Safety Equipment List',
+        title: 'Life Saving Equipment List',
         category: 'Safety',
         markdown,
         user,
@@ -135,18 +161,18 @@ export function FireEquipmentPage() {
 
   return (
     <MenuLayout
-      title="Fire Equipment"
+      title="Life Saving Equipment"
       showBack
       backHref="/ism/fire-safety"
       rightAction={editing ? undefined : {
         label: 'Edit',
-        ariaLabel: 'Edit fire equipment list',
+        ariaLabel: 'Edit equipment list',
         onClick: () => setEditing(true),
       }}
     >
       <div className="space-y-4">
         <div>
-          <h2 className="text-xl font-bold">Fire & Safety Equipment List</h2>
+          <h2 className="text-xl font-bold">Life Saving Equipment List</h2>
           <p className="text-sm text-muted-foreground mt-1">
             M/Y Rise Above · {editing ? 'Editing — tap any cell to change it' : 'Read-only — tap Edit to make changes'}
           </p>
@@ -165,6 +191,19 @@ export function FireEquipmentPage() {
           <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
             {error}
           </div>
+        )}
+
+        {!editing && (
+          <button
+            onClick={() => setLocation('/ism/safety-equipment-test')}
+            className="w-full px-4 py-3 rounded-xl bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/40 text-orange-300 font-semibold text-sm flex items-center justify-center gap-2"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 11l3 3 8-8"/>
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+            </svg>
+            Equipment testing schedule
+          </button>
         )}
 
         {tables.map((t, ti) => (

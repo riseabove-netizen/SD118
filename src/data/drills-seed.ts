@@ -11,6 +11,8 @@ export const DRILLS_SEED_EVENTS: string[] = [
   'Collision',
   'Grounding',
   'Fire',
+  'Fire in enclosed spaces',
+  'Abandon ship',
   'Man overboard',
   'Heavy weather',
   'Steering failure',

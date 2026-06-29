@@ -33,10 +33,10 @@ export function FireSafetyIndexPage() {
   const [, setLocation] = useLocation()
 
   return (
-    <MenuLayout title="Fire Safety" showBack backHref="/ism">
+    <MenuLayout title="Life Saving Equipment" showBack backHref="/ism">
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-bold">Fire Safety</h2>
+          <h2 className="text-xl font-bold">Life Saving Equipment</h2>
           <p className="text-sm text-muted-foreground mt-1">
             M/Y Rise Above
           </p>
@@ -58,7 +58,7 @@ export function FireSafetyIndexPage() {
 
           <Tile
             onClick={() => setLocation('/ism/fire-safety/equipment')}
-            title="Fire & Safety Equipment List"
+            title="Equipment List"
             description="Extinguishers, life rafts, flares, jackets, EPIRB, med kit (editable)"
             icon={
               <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
