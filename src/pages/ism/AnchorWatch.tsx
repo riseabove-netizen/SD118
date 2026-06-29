@@ -21,6 +21,7 @@ import {
   type WindForecast,
 } from '@/lib/anchor-watch-utils'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { MapPicker, googleMapsUrl } from '@/components/MapPicker'
 
 // JSON-in-markdown storage (same pattern as Fire Equipment).
 const DATA_PREFIX = '<!-- ANCHOR-WATCH-DATA:'
@@ -116,6 +117,14 @@ export function AnchorWatchPage() {
   // Captain close-out sub-form
   const [captainName, setCaptainName] = useState<string>('')
 
+  // Setup-phase: user must confirm coords are correct before Start enables.
+  const [coordsConfirmed, setCoordsConfirmed] = useState<boolean>(false)
+
+  // Active-phase: edit-position modal toggle + draft values
+  const [editingPos, setEditingPos] = useState<boolean>(false)
+  const [draftLat, setDraftLat] = useState<number | null>(null)
+  const [draftLon, setDraftLon] = useState<number | null>(null)
+
   // Initial load: try to fetch the active watch from the Guide store.
   useEffect(() => {
     let cancelled = false
@@ -182,6 +191,10 @@ export function AnchorWatchPage() {
     if (!data.locationName.trim()) { setError('Location name is required'); return }
     if (data.lat == null || data.lon == null) {
       setError(geo.error || 'Waiting for GPS — please allow location access.')
+      return
+    }
+    if (!coordsConfirmed) {
+      setError('Please confirm the coordinates on the map are correct.')
       return
     }
     setBusy('Starting watch…')
@@ -324,7 +337,42 @@ export function AnchorWatchPage() {
     setWind(null)
     setSatelliteUrl('')
     setChartTrackPreview(null)
+    setCoordsConfirmed(false)
     setPhase('setup')
+  }
+
+  // Active-phase: open / save position edit
+  const openEditPosition = () => {
+    setDraftLat(data.lat ?? null)
+    setDraftLon(data.lon ?? null)
+    setEditingPos(true)
+  }
+  const saveEditedPosition = async () => {
+    if (draftLat == null || draftLon == null) { setEditingPos(false); return }
+    setBusy('Updating position…')
+    try {
+      const sat = esriSatelliteUrl(draftLat, draftLon)
+      const next: AnchorWatchData = {
+        ...data,
+        lat: draftLat,
+        lon: draftLon,
+        coordsFormatted: formatCoords(draftLat, draftLon),
+        satelliteUrl: sat,
+      }
+      setData(next)
+      setSatelliteUrl(sat)
+      await persist(next, 'Position updated')
+      try {
+        const fc = await fetchWindForecast(draftLat, draftLon)
+        setWind(fc)
+        const withWind = { ...next, windForecastJson: JSON.stringify(fc) }
+        setData(withWind)
+        await persist(withWind, 'Wind forecast refreshed')
+      } catch (e) { console.warn('wind refresh failed', e) }
+      setEditingPos(false)
+    } catch (e: any) {
+      setError(e?.message || 'Failed to update position')
+    } finally { setBusy(null) }
   }
 
   // ── Render ────────────────────────────────────────────────────────
@@ -366,6 +414,8 @@ export function AnchorWatchPage() {
             geo={geo}
             onStart={handleStart}
             disabled={!!busy}
+            coordsConfirmed={coordsConfirmed}
+            setCoordsConfirmed={setCoordsConfirmed}
           />
         )}
 
@@ -386,6 +436,27 @@ export function AnchorWatchPage() {
             captainName={captainName} setCaptainName={setCaptainName}
             onClose={handleCloseAndSign}
             disabled={!!busy}
+            onEditPosition={openEditPosition}
+          />
+        )}
+
+        {phase === 'active' && editingPos && draftLat != null && draftLon != null && (
+          <EditPositionModal
+            lat={draftLat}
+            lon={draftLon}
+            gpsLat={geo.position?.lat ?? null}
+            gpsLon={geo.position?.lon ?? null}
+            onChange={(la, lo) => { setDraftLat(la); setDraftLon(lo) }}
+            onCancel={() => setEditingPos(false)}
+            onSave={saveEditedPosition}
+            busy={!!busy}
+            onUseGps={() => {
+              if (geo.position) {
+                setDraftLat(geo.position.lat)
+                setDraftLon(geo.position.lon)
+              }
+            }}
+            hasGps={!!geo.position}
           />
         )}
 
@@ -406,8 +477,12 @@ function SetupPanel(props: {
   geo: ReturnType<typeof useGeolocation>
   onStart: () => void
   disabled: boolean
+  coordsConfirmed: boolean
+  setCoordsConfirmed: (v: boolean) => void
 }) {
-  const { data, setData, geo, onStart, disabled } = props
+  const { data, setData, geo, onStart, disabled, coordsConfirmed, setCoordsConfirmed } = props
+
+  const hasCoords = data.lat != null && data.lon != null
   return (
     <div className="space-y-3">
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -418,9 +493,66 @@ function SetupPanel(props: {
         <Field label="Location notes">
           <TextArea value={data.locationNotes} onChange={(v) => setData(d => ({ ...d, locationNotes: v }))} placeholder="Anchorage notes, approach, neighbours, holding ground…" />
         </Field>
-        <Field label="Coordinates (GPS)" hint={geo.loading ? 'Reading GPS…' : geo.error || 'Auto-filled from device — must come from GPS, not typed.'}>
-          <TextInput value={data.coordsFormatted} onChange={() => { /* coords from GPS only */ }} disabled placeholder="Waiting for GPS…" />
-        </Field>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="block text-xs font-medium text-muted-foreground">Coordinates (drag map to adjust)</span>
+            {geo.position && hasCoords && (data.lat !== geo.position.lat || data.lon !== geo.position.lon) && (
+              <button
+                type="button"
+                onClick={() => setData(d => ({
+                  ...d,
+                  lat: geo.position!.lat,
+                  lon: geo.position!.lon,
+                  coordsFormatted: geo.formatted,
+                }))}
+                className="text-[11px] text-orange-300 hover:text-orange-200 underline"
+              >
+                Reset to GPS
+              </button>
+            )}
+          </div>
+          {hasCoords ? (
+            <MapPicker
+              lat={data.lat!}
+              lon={data.lon!}
+              onChange={(la, lo) => setData(d => ({
+                ...d,
+                lat: la,
+                lon: lo,
+                coordsFormatted: formatCoords(la, lo),
+              }))}
+              gpsLat={geo.position?.lat ?? null}
+              gpsLon={geo.position?.lon ?? null}
+              height={300}
+            />
+          ) : (
+            <div className="rounded-lg border border-dashed border-border bg-secondary/20 p-6 text-center text-sm text-muted-foreground">
+              {geo.loading ? 'Waiting for GPS…' : (geo.error || 'GPS unavailable. Enable location to continue.')}
+            </div>
+          )}
+          {hasCoords && (
+            <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
+              <CoordsLink lat={data.lat!} lon={data.lon!} text={data.coordsFormatted} />
+              {geo.position && (
+                <span className="text-[11px] text-muted-foreground">
+                  GPS: {formatCoords(geo.position.lat, geo.position.lon)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <label className={`flex items-start gap-2 rounded-lg border p-3 cursor-pointer ${coordsConfirmed ? 'border-green-500/50 bg-green-500/10' : 'border-amber-500/40 bg-amber-500/5'}`}>
+          <input
+            type="checkbox"
+            checked={coordsConfirmed}
+            onChange={(e) => setCoordsConfirmed(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-green-500"
+          />
+          <span className="text-xs">
+            <span className="font-semibold">I confirm the coordinates on the map are correct</span>
+            <span className="block text-muted-foreground mt-0.5">Drag the map until the pin sits over the actual anchor position before checking this box.</span>
+          </span>
+        </label>
         <Field label="Physical danger">
           <TextInput value={data.physicalDanger} onChange={(v) => setData(d => ({ ...d, physicalDanger: v }))} placeholder="Rocks, shallows, traffic…" />
         </Field>
@@ -446,10 +578,10 @@ function SetupPanel(props: {
 
       <button
         onClick={onStart}
-        disabled={disabled}
-        className="w-full px-4 py-3 rounded-lg bg-destructive hover:bg-destructive/90 disabled:opacity-50 text-white font-semibold"
+        disabled={disabled || !hasCoords || !coordsConfirmed || !data.locationName.trim()}
+        className="w-full px-4 py-3 rounded-lg bg-destructive hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold"
       >
-        Start anchor watch
+        {!coordsConfirmed && hasCoords ? 'Confirm coordinates to start' : 'Start anchor watch'}
       </button>
     </div>
   )
@@ -474,8 +606,9 @@ function ActivePanel(props: {
   captainName: string; setCaptainName: (v: string) => void
   onClose: () => void
   disabled: boolean
+  onEditPosition: () => void
 }) {
-  const { data, wind, satelliteUrl, checklistDone, onToggle, signName, setSignName, signWind, setSignWind, signNotes, setSignNotes, onSign, chartInputRef, chartTrackPreview, onPickChart, captainName, setCaptainName, onClose, disabled } = props
+  const { data, wind, satelliteUrl, checklistDone, onToggle, signName, setSignName, signWind, setSignWind, signNotes, setSignNotes, onSign, chartInputRef, chartTrackPreview, onPickChart, captainName, setCaptainName, onClose, disabled, onEditPosition } = props
   const windSvg = useMemo(() => (wind ? buildWindSvg(wind) : null), [wind])
   const alarmKt = parseFloat(data.windAlarmKt || '16')
 
@@ -487,7 +620,11 @@ function ActivePanel(props: {
           <div>
             <div className="text-xs text-muted-foreground">Anchorage</div>
             <div className="text-lg font-bold">{data.locationName || '—'}</div>
-            <div className="text-sm text-muted-foreground mt-1">{data.coordsFormatted}</div>
+            <div className="text-sm text-muted-foreground mt-1">
+              {data.lat != null && data.lon != null
+                ? <CoordsLink lat={data.lat} lon={data.lon} text={data.coordsFormatted} />
+                : (data.coordsFormatted || '—')}
+            </div>
           </div>
           <div className="text-right">
             <div className="text-xs text-muted-foreground">Started</div>
@@ -512,7 +649,25 @@ function ActivePanel(props: {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {satelliteUrl && (
           <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border">Satellite — {data.coordsFormatted}</div>
+            <div className="px-3 py-2 text-xs font-medium border-b border-border flex items-center justify-between gap-2">
+              <span className="text-muted-foreground">
+                Satellite —{' '}
+                {data.lat != null && data.lon != null
+                  ? <CoordsLink lat={data.lat} lon={data.lon} text={data.coordsFormatted} />
+                  : data.coordsFormatted}
+              </span>
+              <button
+                onClick={onEditPosition}
+                disabled={disabled}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/40 text-orange-300 disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 20h9"/>
+                  <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                </svg>
+                Edit position
+              </button>
+            </div>
             <img src={satelliteUrl} alt="Satellite view" className="w-full h-56 object-cover" />
           </div>
         )}
@@ -690,6 +845,97 @@ function ClosedPanel(props: { data: AnchorWatchData; onStartNew: () => void }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Coords link
+
+function CoordsLink(props: { lat: number; lon: number; text?: string }) {
+  const { lat, lon, text } = props
+  const label = text || formatCoords(lat, lon)
+  return (
+    <a
+      href={googleMapsUrl(lat, lon)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-orange-300 hover:text-orange-200 underline decoration-dotted underline-offset-2"
+      title="Open in Google Maps"
+    >
+      <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+      <span>{label}</span>
+    </a>
+  )
+}
+
+// Edit-position modal (active watch)
+
+function EditPositionModal(props: {
+  lat: number
+  lon: number
+  gpsLat: number | null
+  gpsLon: number | null
+  onChange: (lat: number, lon: number) => void
+  onCancel: () => void
+  onSave: () => void
+  onUseGps: () => void
+  hasGps: boolean
+  busy: boolean
+}) {
+  const { lat, lon, gpsLat, gpsLon, onChange, onCancel, onSave, onUseGps, hasGps, busy } = props
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-xl rounded-xl border border-border bg-card shadow-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <h3 className="font-semibold">Edit anchor position</h3>
+          <button onClick={onCancel} disabled={busy} className="text-muted-foreground hover:text-foreground disabled:opacity-50">✕</button>
+        </div>
+        <div className="p-4 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Drag the map until the crosshair sits over the actual anchor position. The satellite
+            snapshot, position field and wind forecast will all be refreshed when you save.
+          </p>
+          <MapPicker
+            lat={lat}
+            lon={lon}
+            onChange={onChange}
+            gpsLat={gpsLat}
+            gpsLon={gpsLon}
+            height={320}
+          />
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CoordsLink lat={lat} lon={lon} />
+            {hasGps && (
+              <button
+                type="button"
+                onClick={onUseGps}
+                className="text-[11px] text-orange-300 hover:text-orange-200 underline"
+              >
+                Use current GPS
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="px-4 py-3 border-t border-border flex items-center gap-2 bg-background/50">
+          <button
+            onClick={onSave}
+            disabled={busy}
+            className="flex-1 px-4 py-2.5 rounded-lg bg-destructive hover:bg-destructive/90 disabled:opacity-50 text-white font-semibold text-sm"
+          >
+            {busy ? 'Saving…' : 'Save position'}
+          </button>
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="px-4 py-2.5 rounded-lg border border-border hover:bg-secondary disabled:opacity-50 text-sm"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // File / base64 helpers
 
 function fileToBase64(file: File): Promise<string> {
