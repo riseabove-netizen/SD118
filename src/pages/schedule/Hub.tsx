@@ -76,7 +76,7 @@ export function ScheduleHubPage() {
             No trips on the schedule yet.
           </div>
         )}
-        {TRIPS.map(trip => {
+        {TRIPS.filter(t => t.id === 'june-honeymoon-2026').map(trip => {
           const startDays = daysUntil(trip.startDate)
           const endDays = daysUntil(trip.endDate)
           const isPast = endDays < 0
