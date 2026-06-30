@@ -34,13 +34,21 @@ function EventRow({ event }: { event: TripEvent }) {
       <span
         className={`absolute left-0 top-2 w-2.5 h-2.5 rounded-full ${event.highlight ? 'bg-primary ring-4 ring-primary/20' : 'bg-muted-foreground/60'}`}
       />
-      <div className="flex items-baseline gap-2 flex-wrap">
+      <div className="flex items-start gap-2 flex-wrap">
         {event.time && (
-          <span className="text-xs font-mono text-primary px-1.5 py-0.5 rounded bg-primary/10">
+          <span className="text-xs font-mono text-primary px-1.5 py-0.5 rounded bg-primary/10 mt-0.5">
             {event.time}
           </span>
         )}
-        {titleNode}
+        {event.locationImage && (
+          <img
+            src={event.locationImage}
+            alt=""
+            loading="lazy"
+            className="w-10 h-10 rounded object-cover border border-border shrink-0"
+          />
+        )}
+        <span className="flex-1 min-w-0">{titleNode}</span>
       </div>
       {event.details && event.details.length > 0 && (
         <ul className="mt-1 space-y-0.5">
@@ -82,6 +90,59 @@ const DayCard = React.forwardRef<HTMLDivElement, { day: TripDay; index: number; 
         {day.subtitle && <div className="text-xs text-muted-foreground mt-0.5">{day.subtitle}</div>}
       </div>
 
+      {day.imageUrl && (
+        <div className="relative">
+          <img
+            src={day.imageUrl}
+            alt={day.imageCaption || day.title}
+            loading="lazy"
+            className="w-full h-40 object-cover"
+          />
+          {day.imageCaption && (
+            <div className="absolute bottom-0 inset-x-0 px-3 py-1.5 text-[11px] text-white bg-gradient-to-t from-black/70 to-transparent">
+              {day.imageCaption}
+            </div>
+          )}
+        </div>
+      )}
+
+      {day.dock && (
+        <div className="px-4 py-2.5 bg-secondary/30 border-b border-border space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v10M5 12h14M3 22c4-2 6-4 9-4s5 2 9 4" />
+            </svg>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Dock</span>
+            {day.dock.marinaLink ? (
+              <a
+                href={day.dock.marinaLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-semibold text-primary underline decoration-primary/40 underline-offset-2"
+              >
+                {day.dock.marina}
+              </a>
+            ) : (
+              <span className="text-xs font-semibold text-foreground">{day.dock.marina}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 flex-wrap text-[11px]">
+            {day.dock.radioChannel && (
+              <span className="font-mono text-primary">VHF {day.dock.radioChannel}</span>
+            )}
+            {day.dock.eta && (
+              <span className="text-muted-foreground">ETA <span className="font-mono text-foreground">{day.dock.eta}</span></span>
+            )}
+            {day.dock.etd && (
+              <span className="text-muted-foreground">ETD <span className="font-mono text-foreground">{day.dock.etd}</span></span>
+            )}
+          </div>
+          {day.dock.notes && (
+            <div className="text-[11px] text-muted-foreground leading-relaxed">{day.dock.notes}</div>
+          )}
+        </div>
+      )}
+
       <div className="relative px-4 py-4">
         <div className="absolute left-[1.4rem] top-4 bottom-4 w-px bg-border" />
         <div className="space-y-3 relative">
@@ -98,6 +159,25 @@ const DayCard = React.forwardRef<HTMLDivElement, { day: TripDay; index: number; 
           </svg>
           <span className="text-xs text-muted-foreground">Overnight</span>
           <span className="text-xs font-medium text-foreground">{day.overnight}</span>
+        </div>
+      )}
+
+      {day.leg && (
+        <div className="px-4 py-2.5 bg-black/30 border-t border-primary/20">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-primary">{day.leg.label || 'Leg'}</span>
+            {day.leg.route && (
+              <span className="text-xs font-semibold text-foreground">{day.leg.route}</span>
+            )}
+          </div>
+          {day.leg.sub && (
+            <div className="text-[11px] text-muted-foreground mt-0.5">{day.leg.sub}</div>
+          )}
+          <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground mt-1">
+            {day.leg.miles && <span><span className="font-mono text-foreground">{day.leg.miles}</span> mi</span>}
+            {day.leg.duration && <span><span className="font-mono text-foreground">{day.leg.duration}</span></span>}
+            {day.leg.knots && <span><span className="font-mono text-foreground">{day.leg.knots}</span> kn</span>}
+          </div>
         </div>
       )}
     </div>
@@ -209,6 +289,12 @@ function EditableDayCard({
               rows={2}
               className="w-full bg-card border border-border rounded px-2 py-1 text-xs"
             />
+            <input
+              value={ev.locationImage || ''}
+              onChange={e => patchEvent(i, { locationImage: e.target.value })}
+              placeholder="Location image URL (optional)"
+              className="w-full bg-card border border-border rounded px-2 py-1 text-xs"
+            />
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <input
                 type="checkbox"
@@ -227,13 +313,128 @@ function EditableDayCard({
         </button>
       </div>
 
-      <div className="px-3 pb-3">
+      <div className="px-3 pb-3 space-y-2">
         <input
           value={day.overnight || ''}
           onChange={e => onChange({ ...day, overnight: e.target.value })}
           placeholder="Overnight (optional)"
           className="w-full bg-secondary/40 border border-border rounded px-2 py-1 text-xs"
         />
+        <details className="rounded border border-border bg-secondary/20 px-2">
+          <summary className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground cursor-pointer py-1.5">Dock / Marina</summary>
+          <div className="py-2 space-y-1.5">
+            <input
+              value={day.dock?.marina || ''}
+              onChange={e => onChange({ ...day, dock: { ...(day.dock || {}), marina: e.target.value } })}
+              placeholder="Marina name"
+              className="w-full bg-card border border-border rounded px-2 py-1 text-xs"
+            />
+            <div className="flex items-center gap-1">
+              <input
+                value={day.dock?.marinaLink || ''}
+                onChange={e => onChange({ ...day, dock: { ...(day.dock || {}), marinaLink: e.target.value } })}
+                placeholder="Marina link (Google Maps URL)"
+                className="flex-1 bg-card border border-border rounded px-2 py-1 text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => onChange({ ...day, dock: { ...(day.dock || {}), marinaLink: mapsLink(day.dock?.marina || '') } })}
+                className="text-[10px] uppercase tracking-wide text-primary px-2 py-1 rounded border border-primary/40"
+              >
+                Maps
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <input
+                value={day.dock?.radioChannel || ''}
+                onChange={e => onChange({ ...day, dock: { ...(day.dock || {}), radioChannel: e.target.value } })}
+                placeholder="VHF Ch"
+                className="bg-card border border-border rounded px-2 py-1 text-xs font-mono"
+              />
+              <input
+                value={day.dock?.eta || ''}
+                onChange={e => onChange({ ...day, dock: { ...(day.dock || {}), eta: e.target.value } })}
+                placeholder="ETA"
+                className="bg-card border border-border rounded px-2 py-1 text-xs font-mono"
+              />
+              <input
+                value={day.dock?.etd || ''}
+                onChange={e => onChange({ ...day, dock: { ...(day.dock || {}), etd: e.target.value } })}
+                placeholder="ETD"
+                className="bg-card border border-border rounded px-2 py-1 text-xs font-mono"
+              />
+            </div>
+            <textarea
+              value={day.dock?.notes || ''}
+              onChange={e => onChange({ ...day, dock: { ...(day.dock || {}), notes: e.target.value } })}
+              placeholder="Dock notes (optional)"
+              rows={2}
+              className="w-full bg-card border border-border rounded px-2 py-1 text-xs"
+            />
+          </div>
+        </details>
+        <details className="rounded border border-border bg-secondary/20 px-2">
+          <summary className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground cursor-pointer py-1.5">Day image</summary>
+          <div className="py-2 space-y-1.5">
+            <input
+              value={day.imageUrl || ''}
+              onChange={e => onChange({ ...day, imageUrl: e.target.value })}
+              placeholder="Image URL"
+              className="w-full bg-card border border-border rounded px-2 py-1 text-xs"
+            />
+            <input
+              value={day.imageCaption || ''}
+              onChange={e => onChange({ ...day, imageCaption: e.target.value })}
+              placeholder="Caption (optional)"
+              className="w-full bg-card border border-border rounded px-2 py-1 text-xs"
+            />
+          </div>
+        </details>
+        <details className="rounded border border-border bg-secondary/20 px-2">
+          <summary className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground cursor-pointer py-1.5">Passage leg</summary>
+          <div className="py-2 space-y-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
+              <input
+                value={day.leg?.label || ''}
+                onChange={e => onChange({ ...day, leg: { ...(day.leg || {}), label: e.target.value } })}
+                placeholder="Label (LEG 11)"
+                className="bg-card border border-border rounded px-2 py-1 text-xs"
+              />
+              <input
+                value={day.leg?.route || ''}
+                onChange={e => onChange({ ...day, leg: { ...(day.leg || {}), route: e.target.value } })}
+                placeholder="Route"
+                className="bg-card border border-border rounded px-2 py-1 text-xs"
+              />
+            </div>
+            <input
+              value={day.leg?.sub || ''}
+              onChange={e => onChange({ ...day, leg: { ...(day.leg || {}), sub: e.target.value } })}
+              placeholder="Subtitle (NIGHT PASSAGE)"
+              className="w-full bg-card border border-border rounded px-2 py-1 text-xs"
+            />
+            <div className="grid grid-cols-3 gap-1.5">
+              <input
+                value={day.leg?.miles || ''}
+                onChange={e => onChange({ ...day, leg: { ...(day.leg || {}), miles: e.target.value } })}
+                placeholder="Miles"
+                className="bg-card border border-border rounded px-2 py-1 text-xs font-mono"
+              />
+              <input
+                value={day.leg?.duration || ''}
+                onChange={e => onChange({ ...day, leg: { ...(day.leg || {}), duration: e.target.value } })}
+                placeholder="Duration"
+                className="bg-card border border-border rounded px-2 py-1 text-xs font-mono"
+              />
+              <input
+                value={day.leg?.knots || ''}
+                onChange={e => onChange({ ...day, leg: { ...(day.leg || {}), knots: e.target.value } })}
+                placeholder="Knots"
+                className="bg-card border border-border rounded px-2 py-1 text-xs font-mono"
+              />
+            </div>
+          </div>
+        </details>
       </div>
     </div>
   )
