@@ -4,7 +4,7 @@ import { MenuLayout } from '@/components/MenuLayout'
 import { findTripById, loadTrip, saveTrip, mapsLink, type Trip, type TripDay, type TripEvent } from '@/data/trips'
 import { shareLink } from '@/lib/share-link'
 import { printTripAsPdf } from '@/lib/trip-share'
-import { isLoggedIn, getCrewName } from '@/lib/auth'
+import { isLoggedIn, isAdmin, getCrewName } from '@/lib/auth'
 
 function formatRange(startIso: string, endIso: string): string {
   const fmt = (iso: string) => {
@@ -253,7 +253,7 @@ export function TripDetailPage() {
   const [saving, setSaving] = useState(false)
   const todayRef = useRef<HTMLDivElement | null>(null)
   const didScrollToToday = useRef(false)
-  const canEdit = isLoggedIn()
+  const canEdit = isAdmin()
   // Public guests (unauthenticated) reach this page only via a shared link.
   // They must not be able to back-navigate to the schedule list and browse other trips.
   const isGuest = !isLoggedIn()
@@ -376,11 +376,17 @@ export function TripDetailPage() {
       rightAction={
         editMode
           ? undefined
-          : {
-              icon: <ShareIcon />,
-              ariaLabel: 'Share trip',
-              onClick: () => setShareOpen(true),
-            }
+          : canEdit
+            ? {
+                icon: <PencilIcon />,
+                ariaLabel: 'Edit itinerary',
+                onClick: startEdit,
+              }
+            : {
+                icon: <ShareIcon />,
+                ariaLabel: 'Share trip',
+                onClick: () => setShareOpen(true),
+              }
       }
     >
       <div className="space-y-4">
@@ -457,13 +463,6 @@ export function TripDetailPage() {
           </div>
         ) : (
           <div className="pt-2 space-y-2">
-            <button
-              onClick={() => setShareOpen(true)}
-              className="w-full h-11 rounded-lg border border-border bg-card text-foreground font-medium flex items-center justify-center gap-2"
-            >
-              <ShareIcon />
-              Share trip
-            </button>
             {canEdit && (
               <button
                 onClick={startEdit}
@@ -473,6 +472,13 @@ export function TripDetailPage() {
                 Edit itinerary
               </button>
             )}
+            <button
+              onClick={() => setShareOpen(true)}
+              className="w-full h-11 rounded-lg border border-border bg-card text-foreground font-medium flex items-center justify-center gap-2"
+            >
+              <ShareIcon />
+              Share trip
+            </button>
           </div>
         )}
 
