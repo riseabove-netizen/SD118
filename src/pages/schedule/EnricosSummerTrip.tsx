@@ -4,6 +4,8 @@ import { MenuLayout } from '@/components/MenuLayout'
 import { TRIPS, loadTrip, saveTrip, type Trip, type GuestEntry } from '@/data/trips'
 import { isLoggedIn, canWrite, getCrewName } from '@/lib/auth'
 import { GuestListEditor } from './GuestListEditor'
+import { buildLegs } from './enricos-legs'
+import { LegCard } from './LegCard'
 
 // Trip ids that make up Enrico's Summer Trip (Aug 4 – Sep 30 2026).
 // Order matches chronological flow.
@@ -310,7 +312,19 @@ export function EnricosSummerTripPage() {
     // Unique guest names across all chapters (confirmed + maybe).
     const seen = new Set<string>()
     chapters.forEach(t => (t.guestList || []).forEach(g => seen.add(g.name.toLowerCase())))
-    return { start, end, totalDays, uniqueGuests: seen.size, chapters: chapters.length }
+    // Total passage distance and steaming time across all consecutive legs.
+    const legs = buildLegs()
+    const totalNm = legs.reduce((acc, l) => acc + l.distanceNm, 0)
+    const totalSteamHours = legs.reduce((acc, l) => acc + l.travelHours, 0)
+    return {
+      start,
+      end,
+      totalDays,
+      uniqueGuests: seen.size,
+      chapters: chapters.length,
+      totalNm: Math.round(totalNm),
+      totalSteamHours,
+    }
   }, [chapters])
 
   const canEditInline = canWrite()
@@ -344,6 +358,8 @@ export function EnricosSummerTripPage() {
               <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">{formatRange(summary.start, summary.end)}</span>
               <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">{summary.chapters} chapters</span>
               <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">{summary.totalDays} days at sea / in port</span>
+              <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">~{summary.totalNm} nm total passage</span>
+              <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">~{Math.round(summary.totalSteamHours)}h steaming @ 12 kn</span>
               {summary.uniqueGuests > 0 && (
                 <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">{summary.uniqueGuests} unique guests</span>
               )}
@@ -358,17 +374,24 @@ export function EnricosSummerTripPage() {
       </div>
 
       <div className="space-y-3">
-        {chapters.map((trip, i) => (
-          <ChapterCard
-            key={trip.id}
-            index={i}
-            trip={trip}
-            canEditInline={canEditInline}
-            onChange={next => {
-              setChapters(prev => prev.map(t => (t.id === next.id ? next : t)))
-            }}
-          />
-        ))}
+        {chapters.map((trip, i) => {
+          // Build the leg that connects this chapter to the next (if any).
+          const legs = buildLegs()
+          const nextLeg = legs.find(l => l.fromId === trip.id)
+          return (
+            <React.Fragment key={trip.id}>
+              <ChapterCard
+                index={i}
+                trip={trip}
+                canEditInline={canEditInline}
+                onChange={next => {
+                  setChapters(prev => prev.map(t => (t.id === next.id ? next : t)))
+                }}
+              />
+              {nextLeg && <LegCard leg={nextLeg} />}
+            </React.Fragment>
+          )
+        })}
       </div>
     </MenuLayout>
   )
