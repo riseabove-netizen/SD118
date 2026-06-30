@@ -60,7 +60,7 @@ export function ScheduleHubPage() {
               <div className="text-3xl">🛥️</div>
               <div className="px-2.5 py-1 rounded-full text-xs font-medium bg-primary text-primary-foreground">Summer 2026</div>
             </div>
-            <div className="mt-3 text-xl font-bold text-white">Enrico's Summer Trip</div>
+            <div className="mt-3 text-xl font-bold text-white">Enrico's Attempt at Retirement</div>
             <div className="text-sm text-white/85">All 15 chapters · Balearics → Croatia</div>
             <div className="mt-3 flex items-center gap-2 text-xs text-white/80">
               <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>

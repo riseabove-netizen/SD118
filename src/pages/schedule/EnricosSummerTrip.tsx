@@ -6,9 +6,12 @@ import { isLoggedIn, canWrite, getCrewName } from '@/lib/auth'
 import { GuestListEditor } from './GuestListEditor'
 import { buildLegs } from './enricos-legs'
 import { LegCard } from './LegCard'
+import { shareLink } from '@/lib/share-link'
+import { printConsolidatedTripAsPdf } from '@/lib/enricos-trip-share'
 
-// Trip ids that make up Enrico's Summer Trip (Aug 4 – Sep 30 2026).
+// Trip ids that make up Enrico's Attempt at Retirement (Aug 4 – Sep 30 2026).
 // Order matches chronological flow.
+// Slug stays /schedule/enricos-summer-trip so existing shared links keep working.
 const CHAPTER_IDS = [
   'balearics-2026',
   'menorca-corsica-2026',
@@ -328,6 +331,27 @@ export function EnricosSummerTripPage() {
   }, [chapters])
 
   const canEditInline = canWrite()
+  const [shareStatus, setShareStatus] = useState<'idle' | 'sharing' | 'shared' | 'copied' | 'failed'>('idle')
+
+  async function handleShare() {
+    setShareStatus('sharing')
+    try {
+      const result = await shareLink({
+        title: "Enrico's Attempt at Retirement",
+        url: window.location.href,
+        text: "M/Y Rise Above · Summer 2026 — Balearics to Croatia, 15 chapters, ~1,538 nm of passage.",
+      })
+      setShareStatus(result === 'shared' ? 'shared' : result === 'copied' ? 'copied' : 'failed')
+    } catch {
+      setShareStatus('failed')
+    }
+    setTimeout(() => setShareStatus('idle'), 2200)
+  }
+
+  function handlePrintPdf() {
+    if (chapters.length === 0) return
+    printConsolidatedTripAsPdf(chapters)
+  }
 
   if (!isLoggedIn()) {
     return (
@@ -335,7 +359,7 @@ export function EnricosSummerTripPage() {
         <div className="max-w-sm text-center space-y-3">
           <div className="text-base font-semibold">Sign in required</div>
           <p className="text-sm text-muted-foreground">
-            Sign in to view Enrico's Summer Trip.
+            Sign in to view Enrico's Attempt at Retirement.
           </p>
         </div>
       </div>
@@ -343,13 +367,30 @@ export function EnricosSummerTripPage() {
   }
 
   return (
-    <MenuLayout title="Enrico's Summer Trip" showBack backHref="/schedule">
+    <MenuLayout
+      title="Enrico's Attempt at Retirement"
+      showBack
+      backHref="/schedule"
+      rightAction={{
+        icon: (
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
+        ),
+        ariaLabel: 'Share consolidated trip',
+        onClick: handleShare,
+      }}
+    >
       {/* Hero summary */}
       <div className="relative rounded-2xl overflow-hidden border border-border bg-gradient-to-br from-indigo-900 via-purple-800 to-rose-700 mb-4">
         <div className="absolute inset-0 bg-black/45" />
         <div className="relative p-5">
           <div className="text-4xl">🛥️</div>
-          <div className="mt-2 text-2xl font-bold text-white">Enrico's Summer Trip</div>
+          <div className="mt-2 text-2xl font-bold text-white">Enrico's Attempt at Retirement</div>
           <div className="text-sm text-white/85">
             Mediterranean season aboard M/Y Rise Above — Balearics to Croatia
           </div>
@@ -370,6 +411,45 @@ export function EnricosSummerTripPage() {
               Tap the pencil on any chapter to rename or update its subtitle. Changes sync to the schedule list and the trip's own page.
             </p>
           )}
+
+          {/* Share + PDF actions */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={handleShare}
+              disabled={shareStatus === 'sharing'}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white text-black text-xs font-semibold hover:bg-white/90 disabled:opacity-60"
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18" cy="5" r="3" />
+                <circle cx="6" cy="12" r="3" />
+                <circle cx="18" cy="19" r="3" />
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+              </svg>
+              {shareStatus === 'sharing'
+                ? 'Sharing…'
+                : shareStatus === 'shared'
+                  ? 'Shared'
+                  : shareStatus === 'copied'
+                    ? 'Link copied'
+                    : shareStatus === 'failed'
+                      ? 'Share failed'
+                      : 'Share link'}
+            </button>
+            <button
+              onClick={handlePrintPdf}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white/15 border border-white/30 text-white text-xs font-semibold hover:bg-white/25"
+            >
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+              Save as PDF
+            </button>
+          </div>
         </div>
       </div>
 
