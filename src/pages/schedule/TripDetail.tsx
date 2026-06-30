@@ -5,6 +5,8 @@ import { findTripById, loadTrip, saveTrip, mapsLink, type Trip, type TripDay, ty
 import { shareLink } from '@/lib/share-link'
 import { printTripAsPdf } from '@/lib/trip-share'
 import { isLoggedIn, isAdmin, getCrewName } from '@/lib/auth'
+import { NotesPanel, useTripNotes } from './NotesPanel'
+import type { TripNote } from '@/lib/trip-notes'
 
 function formatRange(startIso: string, endIso: string): string {
   const fmt = (iso: string) => {
@@ -69,8 +71,15 @@ function todayIsoLocal(): string {
   return `${y}-${m}-${day}`
 }
 
-const DayCard = React.forwardRef<HTMLDivElement, { day: TripDay; index: number; isToday?: boolean }>(
-  function DayCard({ day, index, isToday }, ref) {
+const DayCard = React.forwardRef<HTMLDivElement, {
+  day: TripDay
+  index: number
+  isToday?: boolean
+  tripId?: string
+  notes?: TripNote[]
+  onNoteAdded?: (note: TripNote) => void
+}>(
+  function DayCard({ day, index, isToday, tripId, notes, onNoteAdded }, ref) {
   return (
     <div
       ref={ref}
@@ -179,6 +188,16 @@ const DayCard = React.forwardRef<HTMLDivElement, { day: TripDay; index: number; 
             {day.leg.knots && <span><span className="font-mono text-foreground">{day.leg.knots}</span> kn</span>}
           </div>
         </div>
+      )}
+
+      {tripId && notes && onNoteAdded && (
+        <NotesPanel
+          tripId={tripId}
+          dayIso={day.isoDate}
+          notes={notes}
+          onAdded={onNoteAdded}
+          compact
+        />
       )}
     </div>
   )
@@ -459,6 +478,9 @@ export function TripDetailPage() {
   // They must not be able to back-navigate to the schedule list and browse other trips.
   const isGuest = !isLoggedIn()
 
+  // Notes (trip-level and per-day) — fetched once per trip.
+  const { notes, add: addNoteLocal } = useTripNotes(trip?.id || id)
+
   useEffect(() => {
     let cancelled = false
     async function run() {
@@ -639,6 +661,15 @@ export function TripDetailPage() {
           </div>
         </div>
 
+        {!editMode && (
+          <NotesPanel
+            tripId={showing.id}
+            dayIso=""
+            notes={notes}
+            onAdded={addNoteLocal}
+          />
+        )}
+
         <div className="space-y-3">
           {editMode && draft
             ? draft.days.map((day, i) => (
@@ -655,6 +686,9 @@ export function TripDetailPage() {
                       index={i}
                       isToday={isToday}
                       ref={isToday ? todayRef : undefined}
+                      tripId={showing.id}
+                      notes={notes}
+                      onNoteAdded={addNoteLocal}
                     />
                   )
                 })

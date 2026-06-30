@@ -165,6 +165,8 @@ function cleanEnv(v: string | undefined): string | undefined {
 const INVENTORY_ID = cleanEnv(process.env.INVENTORY_SPREADSHEET_ID)
 const TRIPS_SHEET = 'Trips'
 const WATCH_SHEET = 'WatchDuties'
+const NOTES_SHEET = 'TripNotes'
+const NOTES_HEADERS = ['ID', 'TripID', 'DayIso', 'Author', 'Text', 'CreatedAt']
 
 // Watch-Duties PDF lands in WATCH_DUTIES_FOLDER_ID if set, else falls back to
 // the existing INSPECTIONS_FOLDER_ID so it works out-of-the-box without new
@@ -805,6 +807,96 @@ async function handleWatchFinalize(req: VercelRequest, res: VercelResponse) {
 }
 
 // ============================================================================
+// TRIP NOTES — everyone (any logged-in role) can add; anyone can read.
+// ============================================================================
+
+type TripNote = {
+  id: string
+  tripId: string
+  dayIso: string // empty string = trip-level note; YYYY-MM-DD = day note
+  author: string
+  text: string
+  createdAt: string // ISO
+}
+
+function makeNoteId(): string {
+  // Compact unique id: time + random. No external deps.
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
+}
+
+async function handleNotesList(req: VercelRequest, res: VercelResponse) {
+  if (!INVENTORY_ID) {
+    return res.status(500).json({ error: 'Server not configured', detail: 'INVENTORY_SPREADSHEET_ID not set' })
+  }
+  const tripId = String(req.query.tripId || '').trim()
+  if (!tripId) return res.status(400).json({ error: 'tripId required' })
+
+  const auth = getSheetsAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  await ensureSheetExists(sheets, NOTES_SHEET, NOTES_HEADERS)
+
+  const resp = await sheets.spreadsheets.values.get({
+    spreadsheetId: INVENTORY_ID,
+    range: `${NOTES_SHEET}!A:F`,
+  })
+  const rows = resp.data.values || []
+  const notes: TripNote[] = rows
+    .slice(1)
+    .filter(r => r[1] === tripId)
+    .map(r => ({
+      id: String(r[0] || ''),
+      tripId: String(r[1] || ''),
+      dayIso: String(r[2] || ''),
+      author: String(r[3] || ''),
+      text: String(r[4] || ''),
+      createdAt: String(r[5] || ''),
+    }))
+    // Newest first
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+
+  return res.status(200).json({ notes })
+}
+
+async function handleNotesAdd(req: VercelRequest, res: VercelResponse) {
+  if (!INVENTORY_ID) {
+    return res.status(500).json({ error: 'Server not configured', detail: 'INVENTORY_SPREADSHEET_ID not set' })
+  }
+  const body = req.body as { tripId?: string; dayIso?: string; author?: string; text?: string }
+  const tripId = String(body?.tripId || '').trim()
+  const text = String(body?.text || '').trim()
+  if (!tripId) return res.status(400).json({ error: 'tripId required' })
+  if (!text) return res.status(400).json({ error: 'text required' })
+  if (text.length > 4000) return res.status(400).json({ error: 'text too long (max 4000 chars)' })
+
+  const dayIso = String(body?.dayIso || '').trim() // optional
+  const author = String(body?.author || 'guest').trim().slice(0, 80) || 'guest'
+
+  const note: TripNote = {
+    id: makeNoteId(),
+    tripId,
+    dayIso,
+    author,
+    text,
+    createdAt: new Date().toISOString(),
+  }
+
+  const auth = getSheetsAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  await ensureSheetExists(sheets, NOTES_SHEET, NOTES_HEADERS)
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: INVENTORY_ID,
+    range: `${NOTES_SHEET}!A:F`,
+    valueInputOption: 'RAW',
+    requestBody: {
+      values: [[note.id, note.tripId, note.dayIso, note.author, note.text, note.createdAt]],
+    },
+  })
+
+  return res.status(200).json({ ok: true, note })
+}
+
+// ============================================================================
 // ROUTER
 // ============================================================================
 
@@ -814,12 +906,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET') {
       if (action === 'watch-get') return await handleWatchGet(req, res)
       if (action === 'watch-calendar') return await handleWatchCalendar(req, res)
+      if (action === 'notes-list') return await handleNotesList(req, res)
       // default: trips get
       return await handleTripsGet(req, res)
     }
     if (req.method === 'POST') {
       if (action === 'watch-save') return await handleWatchSave(req, res)
       if (action === 'watch-finalize') return await handleWatchFinalize(req, res)
+      if (action === 'notes-add') return await handleNotesAdd(req, res)
       // default: trips post
       return await handleTripsPost(req, res)
     }
