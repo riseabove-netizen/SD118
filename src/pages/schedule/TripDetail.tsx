@@ -511,23 +511,38 @@ export function TripDetailPage() {
   }, [id])
 
   // Reset the once-per-trip scroll guard whenever the route id changes,
-  // so navigating between trips re-evaluates whether to auto-scroll.
+  // and immediately jump the window to the top so any inherited scroll
+  // position from the previous trip view is cleared before the new trip's
+  // hero / nautical chart render.
   useEffect(() => {
     didScrollToToday.current = false
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'auto' })
+    }
   }, [id])
 
   // Auto-scroll today's day card to the top of the viewport once the trip
-  // loads — but ONLY for trips that are currently active (today falls within
-  // the trip's date range). Future and past trips should open at the top so
-  // the user sees the hero card and the nautical chart first.
+  // loads — but ONLY when the trip is actively in progress AND it actually
+  // contains a day whose ISO date matches today. Future and past trips, and
+  // active trips with no matching day card, all open at the top so the user
+  // sees the hero card and the nautical chart first.
+  //
+  // We also force the page to scroll position 0 on every fresh trip view so
+  // any inherited scroll state from a previous navigation is cleared before
+  // we decide whether to scroll-to-today.
   useEffect(() => {
     if (editMode) return
     if (didScrollToToday.current) return
     if (!trip) return
+
     const todayIso = todayIsoLocal()
     const isActive = todayIso >= trip.startDate && todayIso <= trip.endDate
-    if (!isActive) {
-      // Future or past trip — mark as handled so we never auto-scroll later.
+    const hasTodayDay = trip.days.some(d => d.isoDate === todayIso)
+
+    if (!isActive || !hasTodayDay) {
+      // Future or past trip (or active trip with no matching day) — ensure we
+      // land at the top of the page and never auto-scroll for this view.
+      window.scrollTo({ top: 0, behavior: 'auto' })
       didScrollToToday.current = true
       return
     }
