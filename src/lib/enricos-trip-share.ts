@@ -28,7 +28,7 @@ export function printConsolidatedTripAsPdf(chapters: Trip[]) {
 
 function buildConsolidatedHtml(chapters: Trip[]): string {
   if (chapters.length === 0) {
-    return `<!doctype html><meta charset="utf-8"><body>No chapters to render.</body>`
+    return `<!doctype html><meta charset="utf-8"><body>Nothing to render.</body>`
   }
 
   const legs = buildLegs()
@@ -70,7 +70,7 @@ function buildConsolidatedHtml(chapters: Trip[]): string {
       return `
         <section class="chapter">
           <div class="ch-head">
-            <div class="ch-num">CH ${chapterNum}</div>
+            <div class="ch-num">LEG ${chapterNum}</div>
             <div class="ch-titles">
               <div class="ch-name">${safeName}</div>
               <div class="ch-subtitle">${safeSubtitle}</div>
@@ -217,7 +217,7 @@ function buildConsolidatedHtml(chapters: Trip[]): string {
     <div class="vessel">Mediterranean season — Balearics to Croatia</div>
     <div class="stats">
       <div class="stat">${escapeHtml(range)}</div>
-      <div class="stat">${chapters.length} chapters</div>
+      <div class="stat">${chapters.length} stops</div>
       <div class="stat">${totalDays} days at sea / in port</div>
       <div class="stat">~${totalNm} nm total passage</div>
       <div class="stat">~${totalSteamHours}h steaming @ 12 kn</div>

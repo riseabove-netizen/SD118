@@ -164,7 +164,7 @@ function ChapterCard({ index, trip, onChange, canEditInline }: ChapterProps) {
       <div className="relative p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
-            <div className="text-[10px] font-bold tracking-widest text-white/70">CH {String(index + 1).padStart(2, '0')}</div>
+            <div className="text-[10px] font-bold tracking-widest text-white/70">LEG {String(index + 1).padStart(2, '0')}</div>
             <div className="text-3xl">{trip.hero.icon}</div>
           </div>
           <div className={`px-2.5 py-1 rounded-full text-xs font-medium ${badgeClass}`}>{badge}</div>
@@ -339,7 +339,7 @@ export function EnricosSummerTripPage() {
       const result = await shareLink({
         title: "Enrico's Attempt at Retirement",
         url: window.location.href,
-        text: "M/Y Rise Above · Summer 2026 — Balearics to Croatia, 15 chapters, ~1,538 nm of passage.",
+        text: "M/Y Rise Above · Summer 2026 — Balearics to Croatia, 15 stops, ~1,538 nm of passage.",
       })
       setShareStatus(result === 'shared' ? 'shared' : result === 'copied' ? 'copied' : 'failed')
     } catch {
@@ -397,7 +397,7 @@ export function EnricosSummerTripPage() {
           {summary && (
             <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
               <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">{formatRange(summary.start, summary.end)}</span>
-              <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">{summary.chapters} chapters</span>
+              <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">{summary.chapters} stops</span>
               <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">{summary.totalDays} days at sea / in port</span>
               <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">~{summary.totalNm} nm total passage</span>
               <span className="px-2 py-1 rounded-full bg-white/15 border border-white/20 text-white">~{Math.round(summary.totalSteamHours)}h steaming @ 12 kn</span>
@@ -408,7 +408,7 @@ export function EnricosSummerTripPage() {
           )}
           {canEditInline && (
             <p className="mt-3 text-[11px] text-white/70">
-              Tap the pencil on any chapter to rename or update its subtitle. Changes sync to the schedule list and the trip's own page.
+              Tap the pencil on any leg to rename or update its subtitle. Changes sync to the schedule list and the trip's own page.
             </p>
           )}
 

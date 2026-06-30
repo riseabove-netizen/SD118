@@ -326,7 +326,7 @@ export const TRIPS: Trip[] = [
   // =================================================================
   {
     id: 'balearics-2026',
-    name: 'Balearic Islands · Chapter 1',
+    name: 'Balearic Islands · Leg 1',
     subtitle: 'Palma · Formentera · Ibiza · Aug 4–9',
     startDate: '2026-08-04',
     endDate: '2026-08-09',
@@ -454,7 +454,7 @@ export const TRIPS: Trip[] = [
   },
   {
     id: 'menorca-corsica-2026',
-    name: 'Menorca & Corsica · Chapter 1B–2',
+    name: 'Menorca & Corsica · Leg 1B–2',
     subtitle: 'Ciutadella · Port Mahon · Bonifacio · Lavezzi · Aug 10–12',
     startDate: '2026-08-10',
     endDate: '2026-08-12',
@@ -543,7 +543,7 @@ export const TRIPS: Trip[] = [
   },
   {
     id: 'sardinia-2026',
-    name: 'Sardinia · Chapter 3',
+    name: 'Sardinia · Leg 3',
     subtitle: 'Porto Cervo · Maddalena · Ferragosto · Alghero · Cala Luna · Aug 13–17',
     startDate: '2026-08-13',
     endDate: '2026-08-17',
@@ -667,7 +667,7 @@ export const TRIPS: Trip[] = [
   },
   {
     id: 'ponza-2026',
-    name: 'Ponza · Chapter 4',
+    name: 'Ponza · Leg 4',
     subtitle: 'Italy’s Secret Island · Chiaia di Luna · Grotte di Pilato · Aug 18–19',
     startDate: '2026-08-18',
     endDate: '2026-08-19',
@@ -715,7 +715,7 @@ export const TRIPS: Trip[] = [
   },
   {
     id: 'naples-capri-amalfi-2026',
-    name: 'Naples · Capri · Amalfi · Chapter 5',
+    name: 'Naples · Capri · Amalfi · Leg 5',
     subtitle: 'Naples · Pompeii · Capri · Positano · Aug 22–25',
     startDate: '2026-08-22',
     endDate: '2026-08-25',
@@ -811,7 +811,7 @@ export const TRIPS: Trip[] = [
   },
   {
     id: 'aeolian-catania-2026',
-    name: 'Aeolian Islands · Catania · Chapter 6–7',
+    name: 'Aeolian Islands · Catania · Leg 6–7',
     subtitle: 'Stromboli · Panarea · Lipari · Salina · Vulcano · Catania · Aug 26–28',
     startDate: '2026-08-26',
     endDate: '2026-08-28',
@@ -893,7 +893,7 @@ export const TRIPS: Trip[] = [
   },
   {
     id: 'malta-2026',
-    name: 'Malta · Chapter 8',
+    name: 'Malta · Leg 8',
     subtitle: 'Valletta · Three Cities · Mdina · Comino · 10 nights · Aug 29–Sep 6',
     startDate: '2026-08-29',
     endDate: '2026-09-06',
@@ -1544,7 +1544,7 @@ export const TRIPS: Trip[] = [
   {
     id: 'hvar-split-2026',
     name: 'Hvar & Split — The Dalmatian Crown',
-    subtitle: 'Pakleni · Palmižana · Stari Grad · Diocletian\u2019s Palace · Final Chapter',
+    subtitle: 'Pakleni · Palmižana · Stari Grad · Diocletian\u2019s Palace · Final Leg',
     startDate: '2026-09-25',
     endDate: '2026-09-30',
     hero: { icon: '\ud83c\udf47', gradient: 'from-blue-950 via-indigo-900 to-rose-800' },
@@ -1656,7 +1656,7 @@ export const TRIPS: Trip[] = [
         date: 'Wednesday · September 30',
         isoDate: '2026-09-30',
         title: 'Bacvice, Brač & Farewell — Journey\u2019s End',
-        subtitle: 'Day 56 · 56 days · ~2,270 nm · 17 chapters complete',
+        subtitle: 'Day 56 · 56 days · ~2,270 nm · 17 legs complete',
         events: [
           { time: '08:00', title: 'Final morning swim at Bacvice (Picigin game beach)', link: mapsLink('Bacvice Beach Split') },
           { title: 'Half-day cruise to Brač island \u2014 anchor off Zlatni Rat', link: mapsLink('Zlatni Rat Brac'), highlight: true, details: ['The Golden Cape \u2014 one of Croatia\u2019s most spectacular beaches'] },
