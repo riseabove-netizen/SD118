@@ -1,36 +1,217 @@
 import { useEffect, useState } from 'react'
-import { addNote, formatNoteTime, listNotes, type TripNote } from '@/lib/trip-notes'
-import { getCrewName } from '@/lib/auth'
+import { addNote, deleteNote, formatNoteTime, listNotes, updateNote, type TripNote } from '@/lib/trip-notes'
+import { getCrewName, isAdmin } from '@/lib/auth'
 
 /**
  * Notes panel that can render either trip-level notes (dayIso='') or
  * day-level notes (dayIso='YYYY-MM-DD'). Anyone signed in can add.
  *
+ * Edit rules:
+ *   • Anyone can post a new note (server has no auth gate).
+ *   • The author of a note can edit their own (matched by author-name).
+ *   • Admins can edit and delete any note (server validates HMAC token).
+ *
  * Notes are fetched once at the top level (Trip page) and passed down to
  * each DayCard via the `notes` prop, so we don't hit /api/trips per day.
- * The "add" form lives inside this component and posts to the backend.
  */
+
+function NoteRow({
+  note,
+  currentAuthor,
+  isAdminViewer,
+  onUpdated,
+  onDeleted,
+}: {
+  note: TripNote
+  currentAuthor: string
+  isAdminViewer: boolean
+  onUpdated: (n: TripNote) => void
+  onDeleted: (id: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(note.text)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  const noteAuthor = (note.author || '').trim().toLowerCase()
+  const me = (currentAuthor || '').trim().toLowerCase()
+  const isOwnNote = !!me && me === noteAuthor
+  const canEdit = isOwnNote || isAdminViewer
+  const canDelete = isAdminViewer
+
+  async function save() {
+    const t = draft.trim()
+    if (!t) {
+      setErr('Note cannot be empty')
+      return
+    }
+    setBusy(true)
+    setErr(null)
+    const result = await updateNote({
+      id: note.id,
+      author: currentAuthor || '',
+      text: t,
+    })
+    setBusy(false)
+    if (!result.ok || !result.note) {
+      setErr(result.detail || 'Could not save')
+      return
+    }
+    onUpdated(result.note)
+    setEditing(false)
+  }
+
+  async function remove() {
+    setBusy(true)
+    setErr(null)
+    const result = await deleteNote(note.id)
+    setBusy(false)
+    if (!result.ok) {
+      setErr(result.detail || 'Could not delete')
+      setConfirmDelete(false)
+      return
+    }
+    onDeleted(note.id)
+  }
+
+  return (
+    <li className="rounded-lg border border-border bg-secondary/40 px-3 py-2">
+      <div className="flex items-baseline gap-2 flex-wrap">
+        <span className="text-xs font-semibold text-foreground">{note.author || 'guest'}</span>
+        <span className="text-[10px] text-muted-foreground">{formatNoteTime(note.createdAt)}</span>
+
+        {(canEdit || canDelete) && !editing && (
+          <div className="ml-auto flex items-center gap-1">
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(note.text)
+                  setEditing(true)
+                  setErr(null)
+                }}
+                className="p-1 rounded hover:bg-background text-muted-foreground hover:text-foreground"
+                title="Edit note"
+                aria-label="Edit note"
+              >
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                </svg>
+              </button>
+            )}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="p-1 rounded hover:bg-background text-muted-foreground hover:text-primary"
+                title="Delete note (admin)"
+                aria-label="Delete note"
+              >
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="mt-1 space-y-2">
+          <textarea
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            rows={Math.max(2, Math.min(8, draft.split('\n').length + 1))}
+            maxLength={4000}
+            className="w-full text-sm bg-background border border-border rounded px-2 py-1.5 text-foreground resize-y min-h-[40px]"
+            autoFocus
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={save}
+              disabled={busy || !draft.trim() || draft.trim() === note.text}
+              className="text-xs font-semibold px-3 py-1 rounded bg-primary text-primary-foreground disabled:opacity-50"
+            >
+              {busy ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(false)
+                setDraft(note.text)
+                setErr(null)
+              }}
+              disabled={busy}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+            {err && <span className="text-xs text-primary">{err}</span>}
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="text-sm text-foreground/90 whitespace-pre-wrap leading-snug mt-0.5">{note.text}</div>
+          {confirmDelete && (
+            <div className="mt-2 flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Delete this note?</span>
+              <button
+                type="button"
+                onClick={remove}
+                disabled={busy}
+                className="font-semibold px-2 py-0.5 rounded bg-primary text-primary-foreground disabled:opacity-50"
+              >
+                {busy ? 'Deleting…' : 'Delete'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                disabled={busy}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Cancel
+              </button>
+              {err && <span className="text-primary">{err}</span>}
+            </div>
+          )}
+        </>
+      )}
+    </li>
+  )
+}
 
 export function NotesPanel({
   tripId,
   dayIso,
   notes,
   onAdded,
+  onUpdated,
+  onDeleted,
   compact,
 }: {
   tripId: string
   dayIso?: string // '' or undefined = trip-level
   notes: TripNote[] // pre-filtered for this scope
   onAdded: (note: TripNote) => void
+  onUpdated: (note: TripNote) => void
+  onDeleted: (id: string) => void
   compact?: boolean
 }) {
   // Notes are open to everyone — logged-in crew/viewer/admin, AND guests
-  // reaching the trip via a shared link. The backend has no auth requirement.
+  // reaching the trip via a shared link. The backend has no auth requirement
+  // for add. Edit requires author-match; delete requires admin token.
   const [text, setText] = useState('')
   const [author, setAuthor] = useState<string>(() => getCrewName() || '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(!compact)
+  const isAdminViewer = isAdmin()
 
   const scopeKey = dayIso || ''
   const scoped = notes.filter(n => (n.dayIso || '') === scopeKey)
@@ -105,58 +286,62 @@ export function NotesPanel({
           {scoped.length > 0 && (
             <ul className="space-y-2">
               {scoped.map(n => (
-                <li key={n.id} className="rounded-lg border border-border bg-secondary/40 px-3 py-2">
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-xs font-semibold text-foreground">{n.author || 'guest'}</span>
-                    <span className="text-[10px] text-muted-foreground">{formatNoteTime(n.createdAt)}</span>
-                  </div>
-                  <div className="text-sm text-foreground/90 whitespace-pre-wrap leading-snug mt-0.5">{n.text}</div>
-                </li>
+                <NoteRow
+                  key={n.id}
+                  note={n}
+                  currentAuthor={author}
+                  isAdminViewer={isAdminViewer}
+                  onUpdated={onUpdated}
+                  onDeleted={onDeleted}
+                />
               ))}
             </ul>
           )}
 
-          {(
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <input
-                  value={author}
-                  onChange={e => setAuthor(e.target.value)}
-                  placeholder="Your name"
-                  maxLength={80}
-                  className="w-32 text-xs bg-background border border-border rounded px-2 py-1.5 text-foreground placeholder:text-muted-foreground"
-                />
-                <textarea
-                  value={text}
-                  onChange={e => setText(e.target.value)}
-                  placeholder={placeholder}
-                  rows={compact ? 2 : 2}
-                  maxLength={4000}
-                  className="flex-1 text-sm bg-background border border-border rounded px-2 py-1.5 text-foreground placeholder:text-muted-foreground resize-y min-h-[34px]"
-                />
-              </div>
-              <div className="flex items-center gap-2">
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                value={author}
+                onChange={e => setAuthor(e.target.value)}
+                placeholder="Your name"
+                maxLength={80}
+                className="w-32 text-xs bg-background border border-border rounded px-2 py-1.5 text-foreground placeholder:text-muted-foreground"
+              />
+              <textarea
+                value={text}
+                onChange={e => setText(e.target.value)}
+                placeholder={placeholder}
+                rows={compact ? 2 : 2}
+                maxLength={4000}
+                className="flex-1 text-sm bg-background border border-border rounded px-2 py-1.5 text-foreground placeholder:text-muted-foreground resize-y min-h-[34px]"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={submit}
+                disabled={busy || !text.trim()}
+                className="text-xs font-semibold px-3 py-1.5 rounded bg-primary text-primary-foreground disabled:opacity-50"
+              >
+                {busy ? 'Saving…' : 'Add note'}
+              </button>
+              {text && (
                 <button
                   type="button"
-                  onClick={submit}
-                  disabled={busy || !text.trim()}
-                  className="text-xs font-semibold px-3 py-1.5 rounded bg-primary text-primary-foreground disabled:opacity-50"
+                  onClick={() => setText('')}
+                  className="text-xs text-muted-foreground hover:text-foreground"
                 >
-                  {busy ? 'Saving…' : 'Add note'}
+                  Clear
                 </button>
-                {text && (
-                  <button
-                    type="button"
-                    onClick={() => setText('')}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Clear
-                  </button>
-                )}
-                {err && <span className="text-xs text-primary">{err}</span>}
-              </div>
+              )}
+              {err && <span className="text-xs text-primary">{err}</span>}
             </div>
-          )}
+            {author && (
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                Tip: keep this name consistent so you can edit your own notes later.
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -164,8 +349,8 @@ export function NotesPanel({
 }
 
 /**
- * Hook: load every note for a trip once. Returns the list plus an `add`
- * handler that mutates local state so newly-posted notes appear instantly.
+ * Hook: load every note for a trip once. Returns the list plus handlers
+ * that mutate local state so changes appear instantly.
  */
 export function useTripNotes(tripId: string) {
   const [notes, setNotes] = useState<TripNote[]>([])
@@ -187,6 +372,12 @@ export function useTripNotes(tripId: string) {
   function add(n: TripNote) {
     setNotes(prev => [n, ...prev.filter(p => p.id !== n.id)])
   }
+  function update(n: TripNote) {
+    setNotes(prev => prev.map(p => (p.id === n.id ? n : p)))
+  }
+  function remove(id: string) {
+    setNotes(prev => prev.filter(p => p.id !== id))
+  }
 
-  return { notes, loaded, add }
+  return { notes, loaded, add, update, remove }
 }

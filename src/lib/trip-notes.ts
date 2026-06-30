@@ -1,6 +1,9 @@
 // Client helpers for trip / day notes.
-// Backend lives inside api/trips.ts (actions `notes-list`, `notes-add`) to
-// stay under the Vercel Hobby 12-function cap.
+// Backend lives inside api/trips.ts (actions `notes-list`, `notes-add`,
+// `notes-update`, `notes-delete`) to stay under the Vercel Hobby 12-function
+// cap.
+
+import { getToken } from './auth'
 
 export type TripNote = {
   id: string
@@ -51,6 +54,68 @@ export async function addNote(params: {
     }
     const data = (await resp.json()) as { ok: boolean; note: TripNote }
     return { ok: true, note: data.note }
+  } catch (e: any) {
+    return { ok: false, detail: e?.message || 'Network error' }
+  }
+}
+
+/**
+ * Edit an existing note. Server-side rule: admin OR matching author.
+ */
+export async function updateNote(params: {
+  id: string
+  author: string // current viewer’s name (used for author-match)
+  text: string
+}): Promise<{ ok: boolean; note?: TripNote; detail?: string }> {
+  try {
+    const resp = await fetch('/api/trips?action=notes-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: params.id,
+        text: params.text,
+        author: params.author || '',
+        token: getToken() || '',
+      }),
+    })
+    if (!resp.ok) {
+      let detail = ''
+      try {
+        const d = await resp.json()
+        detail = d?.error || d?.detail || ''
+      } catch {
+        detail = await resp.text()
+      }
+      return { ok: false, detail: detail || `HTTP ${resp.status}` }
+    }
+    const data = (await resp.json()) as { ok: boolean; note: TripNote }
+    return { ok: true, note: data.note }
+  } catch (e: any) {
+    return { ok: false, detail: e?.message || 'Network error' }
+  }
+}
+
+/**
+ * Delete a note. Admin-only on the server.
+ */
+export async function deleteNote(id: string): Promise<{ ok: boolean; detail?: string }> {
+  try {
+    const resp = await fetch('/api/trips?action=notes-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, token: getToken() || '' }),
+    })
+    if (!resp.ok) {
+      let detail = ''
+      try {
+        const d = await resp.json()
+        detail = d?.error || d?.detail || ''
+      } catch {
+        detail = await resp.text()
+      }
+      return { ok: false, detail: detail || `HTTP ${resp.status}` }
+    }
+    return { ok: true }
   } catch (e: any) {
     return { ok: false, detail: e?.message || 'Network error' }
   }

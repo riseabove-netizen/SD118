@@ -2,6 +2,44 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
 import { Readable } from 'stream'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import crypto from 'crypto'
+
+// === Inlined auth verifier (mirrors api/auth.ts). Vercel @vercel/node bundler
+// does not always pick up cross-file helpers; safer to inline. Token format:
+//   base64('auth:<role>:<ts>').<hmac-of-payload>
+// ============================================================================
+const _HMAC_SECRET = process.env.HMAC_SECRET || process.env.APP_SECRET || 'fallback-secret'
+function _hmac(payload: string): string {
+  return crypto.createHmac('sha256', _HMAC_SECRET).update(payload).digest('hex')
+}
+function verifyToken(token: string | undefined | null): { ok: boolean; role?: 'admin' | 'viewer' | 'crew' } {
+  if (!token || typeof token !== 'string') return { ok: false }
+  const dot = token.indexOf('.')
+  if (dot < 0) return { ok: false }
+  const b64 = token.slice(0, dot)
+  const sig = token.slice(dot + 1)
+  let payload = ''
+  try {
+    payload = Buffer.from(b64, 'base64').toString('utf-8')
+  } catch {
+    return { ok: false }
+  }
+  // Constant-time HMAC comparison
+  const expected = _hmac(payload)
+  if (sig.length !== expected.length) return { ok: false }
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return { ok: false }
+  } catch {
+    return { ok: false }
+  }
+  // payload = auth:<role>:<ts>
+  const parts = payload.split(':')
+  if (parts.length < 3 || parts[0] !== 'auth') return { ok: false }
+  const role = parts[1]
+  if (role === 'admin' || role === 'viewer' || role === 'crew') return { ok: true, role }
+  return { ok: false }
+}
+// ============================================================================
 // === Inlined PDF branding helper (was api/_lib/pdfBranding.ts) ===
 // Vercel @vercel/node bundler did not include _lib files in the function
 // bundle even with includeFiles config. Inlining avoids cross-file imports.
@@ -896,6 +934,133 @@ async function handleNotesAdd(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({ ok: true, note })
 }
 
+/**
+ * Read the notes sheet, return the row index (0-based within the data rows)
+ * matching `id`, plus the full rows array.
+ */
+async function findNoteRow(sheets: any, id: string) {
+  await ensureSheetExists(sheets, NOTES_SHEET, NOTES_HEADERS)
+  const resp = await sheets.spreadsheets.values.get({
+    spreadsheetId: INVENTORY_ID,
+    range: `${NOTES_SHEET}!A:F`,
+  })
+  const rows = resp.data.values || []
+  const idx = rows.slice(1).findIndex((r: any) => r[0] === id)
+  return { rows, idx, sheetRow: idx >= 0 ? idx + 2 : -1 }
+}
+
+/**
+ * Edit an existing note. The author of the note may edit it (matched by
+ * the `author` string they supplied); admins may edit any note.
+ */
+async function handleNotesUpdate(req: VercelRequest, res: VercelResponse) {
+  if (!INVENTORY_ID) {
+    return res.status(500).json({ error: 'Server not configured', detail: 'INVENTORY_SPREADSHEET_ID not set' })
+  }
+  const body = req.body as { id?: string; text?: string; author?: string; token?: string }
+  const id = String(body?.id || '').trim()
+  const text = String(body?.text || '').trim()
+  if (!id) return res.status(400).json({ error: 'id required' })
+  if (!text) return res.status(400).json({ error: 'text required' })
+  if (text.length > 4000) return res.status(400).json({ error: 'text too long (max 4000 chars)' })
+
+  const tokenInfo = verifyToken(body?.token)
+  const callerAuthor = String(body?.author || '').trim()
+
+  const auth = getSheetsAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  const { rows, idx, sheetRow } = await findNoteRow(sheets, id)
+  if (idx < 0) return res.status(404).json({ error: 'Note not found' })
+
+  const row = rows[idx + 1]
+  const noteAuthor = String(row[3] || '')
+
+  // Permission: admin OR author-match
+  const isAdmin = tokenInfo.ok && tokenInfo.role === 'admin'
+  const isAuthor = callerAuthor && callerAuthor.toLowerCase() === noteAuthor.toLowerCase()
+  if (!isAdmin && !isAuthor) {
+    return res.status(403).json({
+      error: 'Forbidden',
+      detail: 'You can only edit your own notes. Sign in with the admin code to edit anyone’s note.',
+    })
+  }
+
+  // Preserve original columns except Text (col E, index 4)
+  const updatedRow = [row[0], row[1], row[2], row[3], text, row[5]]
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: INVENTORY_ID,
+    range: `${NOTES_SHEET}!A${sheetRow}:F${sheetRow}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [updatedRow] },
+  })
+
+  return res.status(200).json({
+    ok: true,
+    note: {
+      id: updatedRow[0],
+      tripId: updatedRow[1],
+      dayIso: updatedRow[2],
+      author: updatedRow[3],
+      text: updatedRow[4],
+      createdAt: updatedRow[5],
+    },
+  })
+}
+
+/**
+ * Delete a note. Admin-only.
+ */
+async function handleNotesDelete(req: VercelRequest, res: VercelResponse) {
+  if (!INVENTORY_ID) {
+    return res.status(500).json({ error: 'Server not configured', detail: 'INVENTORY_SPREADSHEET_ID not set' })
+  }
+  const body = req.body as { id?: string; token?: string }
+  const id = String(body?.id || '').trim()
+  if (!id) return res.status(400).json({ error: 'id required' })
+
+  const tokenInfo = verifyToken(body?.token)
+  if (!tokenInfo.ok || tokenInfo.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Forbidden',
+      detail: 'Only admins can delete notes. Sign in with the admin code to delete.',
+    })
+  }
+
+  const auth = getSheetsAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  const { idx, sheetRow } = await findNoteRow(sheets, id)
+  if (idx < 0) return res.status(404).json({ error: 'Note not found' })
+
+  // Resolve the sheetId for the TripNotes tab so we can issue a deleteDimension.
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: INVENTORY_ID })
+  const sheet = (meta.data.sheets || []).find((s: any) => s.properties?.title === NOTES_SHEET)
+  const sheetId = sheet?.properties?.sheetId
+  if (typeof sheetId !== 'number') {
+    return res.status(500).json({ error: 'Could not resolve sheetId for TripNotes' })
+  }
+
+  // Delete the row entirely (0-indexed; sheetRow is 1-indexed, so subtract 1).
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: INVENTORY_ID,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId,
+              dimension: 'ROWS',
+              startIndex: sheetRow - 1,
+              endIndex: sheetRow,
+            },
+          },
+        },
+      ],
+    },
+  })
+
+  return res.status(200).json({ ok: true, id })
+}
+
 // ============================================================================
 // ROUTER
 // ============================================================================
@@ -914,6 +1079,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (action === 'watch-save') return await handleWatchSave(req, res)
       if (action === 'watch-finalize') return await handleWatchFinalize(req, res)
       if (action === 'notes-add') return await handleNotesAdd(req, res)
+      if (action === 'notes-update') return await handleNotesUpdate(req, res)
+      if (action === 'notes-delete') return await handleNotesDelete(req, res)
       // default: trips post
       return await handleTripsPost(req, res)
     }

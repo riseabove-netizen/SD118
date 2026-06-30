@@ -78,8 +78,10 @@ const DayCard = React.forwardRef<HTMLDivElement, {
   tripId?: string
   notes?: TripNote[]
   onNoteAdded?: (note: TripNote) => void
+  onNoteUpdated?: (note: TripNote) => void
+  onNoteDeleted?: (id: string) => void
 }>(
-  function DayCard({ day, index, isToday, tripId, notes, onNoteAdded }, ref) {
+  function DayCard({ day, index, isToday, tripId, notes, onNoteAdded, onNoteUpdated, onNoteDeleted }, ref) {
   return (
     <div
       ref={ref}
@@ -190,12 +192,14 @@ const DayCard = React.forwardRef<HTMLDivElement, {
         </div>
       )}
 
-      {tripId && notes && onNoteAdded && (
+      {tripId && notes && onNoteAdded && onNoteUpdated && onNoteDeleted && (
         <NotesPanel
           tripId={tripId}
           dayIso={day.isoDate}
           notes={notes}
           onAdded={onNoteAdded}
+          onUpdated={onNoteUpdated}
+          onDeleted={onNoteDeleted}
           compact
         />
       )}
@@ -479,7 +483,7 @@ export function TripDetailPage() {
   const isGuest = !isLoggedIn()
 
   // Notes (trip-level and per-day) — fetched once per trip.
-  const { notes, add: addNoteLocal } = useTripNotes(trip?.id || id)
+  const { notes, add: addNoteLocal, update: updateNoteLocal, remove: removeNoteLocal } = useTripNotes(trip?.id || id)
 
   useEffect(() => {
     let cancelled = false
@@ -667,6 +671,8 @@ export function TripDetailPage() {
             dayIso=""
             notes={notes}
             onAdded={addNoteLocal}
+            onUpdated={updateNoteLocal}
+            onDeleted={removeNoteLocal}
           />
         )}
 
@@ -689,6 +695,8 @@ export function TripDetailPage() {
                       tripId={showing.id}
                       notes={notes}
                       onNoteAdded={addNoteLocal}
+                      onNoteUpdated={updateNoteLocal}
+                      onNoteDeleted={removeNoteLocal}
                     />
                   )
                 })

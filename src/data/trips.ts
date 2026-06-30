@@ -47,6 +47,12 @@ export type TripDay = {
   }
 }
 
+export type GuestEntry = {
+  name: string
+  tentative?: boolean // shown as dashed border / “maybe”
+  note?: string // e.g. “9th birthday Aug 13”
+}
+
 export type Trip = {
   id: string
   name: string
@@ -55,7 +61,10 @@ export type Trip = {
   endDate: string
   hero: { icon: string; gradient: string } // tailwind gradient classes
   days: TripDay[]
-  guests?: string // optional guest list shown on title card
+  /** Free-text legacy guest summary, used when guestList is empty. */
+  guests?: string
+  /** Structured guest list — powers count + chips on title cards. */
+  guestList?: GuestEntry[]
 }
 
 // Convenience builder for Google Maps search links

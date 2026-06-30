@@ -11,9 +11,10 @@ const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 // Specific endpoints viewers are allowed to call even though they're POSTs
 // (login + read-only RPCs). Anything not in here that mutates is blocked.
 const VIEWER_ALLOW = [
-  /\/api\/auth(\?|$)/,                         // login itself
-  /\/api\/extract(\?|$)/,                      // image extraction — read-only AI call, no DB write
-  /\/api\/trips\?action=notes-add(\?|&|$)/,    // trip notes — anyone can add
+  /\/api\/auth(\?|$)/,                            // login itself
+  /\/api\/extract(\?|$)/,                         // image extraction — read-only AI call, no DB write
+  /\/api\/trips\?action=notes-add(\?|&|$)/,       // trip notes — anyone can add
+  /\/api\/trips\?action=notes-update(\?|&|$)/,    // trip notes — author can edit own (server-enforced)
 ]
 
 function isAllowed(url: string): boolean {
