@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useRef, useState, useMemo } from 'react'
 import { useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { TRIPS, loadTrip, saveTrip, type Trip, type GuestEntry } from '@/data/trips'
 import { isLoggedIn, canWrite, getCrewName } from '@/lib/auth'
+import { GuestListEditor } from './GuestListEditor'
 
 // Trip ids that make up Enrico's Summer Trip (Aug 4 – Sep 30 2026).
 // Order matches chronological flow.
@@ -81,6 +82,11 @@ function ChapterCard({ index, trip, onChange, canEditInline }: ChapterProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Guest-list inline editing state.
+  const [editingGuests, setEditingGuests] = useState(false)
+  const [guestSavingStatus, setGuestSavingStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const guestSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Sync local drafts when underlying trip changes from a fresh load.
   useEffect(() => {
     setDraftName(trip.name)
@@ -122,6 +128,30 @@ function ChapterCard({ index, trip, onChange, canEditInline }: ChapterProps) {
       setSaving(false)
     }
   }
+
+  // Update guestList with a short debounce so quick edits batch into one save.
+  function handleGuestListChange(nextList: GuestEntry[]) {
+    onChange({ ...trip, guestList: nextList })
+    setGuestSavingStatus('saving')
+    if (guestSaveTimer.current) clearTimeout(guestSaveTimer.current)
+    guestSaveTimer.current = setTimeout(async () => {
+      try {
+        const next: Trip = { ...trip, guestList: nextList }
+        await saveTrip(next, getCrewName() || 'unknown')
+        setGuestSavingStatus('saved')
+        setTimeout(() => setGuestSavingStatus(s => (s === 'saved' ? 'idle' : s)), 1500)
+      } catch (e) {
+        setGuestSavingStatus('error')
+        console.error('Failed to save guest list:', e)
+      }
+    }, 600)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (guestSaveTimer.current) clearTimeout(guestSaveTimer.current)
+    }
+  }, [])
 
   return (
     <div className={`relative rounded-2xl overflow-hidden border border-border bg-gradient-to-br ${trip.hero.gradient}`}>
@@ -196,6 +226,28 @@ function ChapterCard({ index, trip, onChange, canEditInline }: ChapterProps) {
                 <span className="font-semibold text-white">Guests:</span> {trip.guests}
               </div>
             ) : null}
+
+            {canEditInline && (
+              <div className="mt-2">
+                <button
+                  onClick={() => setEditingGuests(v => !v)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium text-white/90 bg-white/10 border border-white/20 hover:bg-white/20"
+                >
+                  <svg viewBox="0 0 24 24" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                  {editingGuests ? 'Hide guest editor' : 'Edit guest list'}
+                  {guestSavingStatus === 'saving' && <span className="text-white/60">· saving…</span>}
+                  {guestSavingStatus === 'saved' && <span className="text-emerald-300">· saved</span>}
+                  {guestSavingStatus === 'error' && <span className="text-red-300">· save failed</span>}
+                </button>
+                {editingGuests && (
+                  <GuestListEditor
+                    value={trip.guestList || []}
+                    onChange={handleGuestListChange}
+                    compact
+                  />
+                )}
+              </div>
+            )}
             <div className="mt-3 flex items-center gap-2 text-xs text-white/80">
               <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
               <span>{formatRange(trip.startDate, trip.endDate)}</span>

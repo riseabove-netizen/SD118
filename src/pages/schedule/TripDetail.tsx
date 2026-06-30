@@ -6,6 +6,7 @@ import { shareLink } from '@/lib/share-link'
 import { printTripAsPdf } from '@/lib/trip-share'
 import { isLoggedIn, isAdmin, canWrite, getCrewName } from '@/lib/auth'
 import { NotesPanel, useTripNotes } from './NotesPanel'
+import { GuestListEditor } from './GuestListEditor'
 import type { TripNote } from '@/lib/trip-notes'
 
 function formatRange(startIso: string, endIso: string): string {
@@ -643,8 +644,12 @@ export function TripDetailPage() {
                 <input
                   value={draft.guests || ''}
                   onChange={e => updateTripMeta({ guests: e.target.value })}
-                  placeholder="Guests (optional)"
+                  placeholder="Free-text guest summary (legacy / fallback)"
                   className="mt-1 w-full bg-black/30 border border-white/30 rounded px-2 py-1 text-xs text-white placeholder:text-white/50"
+                />
+                <GuestListEditor
+                  value={draft.guestList || []}
+                  onChange={next => updateTripMeta({ guestList: next })}
                 />
               </>
             ) : (
