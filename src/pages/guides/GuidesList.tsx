@@ -4,6 +4,21 @@ import { useQuery } from '@tanstack/react-query'
 import { MenuLayout } from '@/components/MenuLayout'
 import { fetchGuides } from '@/lib/guides'
 
+// Categories owned by other features in the app (their data piggybacks on the
+// same Guides sheet, but they should not appear on the Operational Guides
+// page).
+const SYSTEM_CATEGORIES = new Set(['Anchor Watch', 'System', 'diag'])
+
+// IDs that are system records or test data, not operational guides.
+function isSystemId(id: string): boolean {
+  if (!id) return true
+  if (id.startsWith('FIRE-')) return true
+  if (id.startsWith('DRILLS-')) return true
+  if (id.startsWith('ANCHOR-WATCH')) return true
+  if (id === 'text-overrides') return true
+  return false
+}
+
 export function GuidesListPage() {
   const [, setLocation] = useLocation()
   const [search, setSearch] = useState('')
@@ -13,11 +28,16 @@ export function GuidesListPage() {
   })
 
   const guides = useMemo(() => {
-    // Hide records that are owned by other pages (Fire Equipment list, Drills
-    // / Testing) — they live under the ISM menu, not under Operational Guides.
+    // Show only real operational guides. Hide:
+    //  - records owned by other features (Fire list, Drills, Anchor Watch)
+    //  - system records (text overrides, in-progress markers)
+    //  - records the user has tagged with a system category
     const list = (data || []).filter(g => {
       const id = g.ID || ''
-      return !id.startsWith('FIRE-') && !id.startsWith('DRILLS-')
+      if (isSystemId(id)) return false
+      const cat = (g.Category || '').trim()
+      if (SYSTEM_CATEGORIES.has(cat)) return false
+      return true
     })
     const q = search.trim().toLowerCase()
     if (!q) return list
@@ -26,6 +46,21 @@ export function GuidesListPage() {
       (g.Category || '').toLowerCase().includes(q),
     )
   }, [data, search])
+
+  // Group guides by category for a folder-style display.
+  const grouped = useMemo(() => {
+    const groups: Record<string, typeof guides> = {}
+    for (const g of guides) {
+      const cat = (g.Category || '').trim() || 'Uncategorized'
+      if (!groups[cat]) groups[cat] = []
+      groups[cat].push(g)
+    }
+    return Object.entries(groups).sort(([a], [b]) => {
+      if (a === 'Uncategorized') return 1
+      if (b === 'Uncategorized') return -1
+      return a.localeCompare(b)
+    })
+  }, [guides])
 
   return (
     <MenuLayout
@@ -89,32 +124,80 @@ export function GuidesListPage() {
           </div>
         )}
 
-        {guides.map(g => (
-          <button
-            key={g.ID}
-            onClick={() => setLocation(`/guides/${g.ID}`)}
-            className="w-full text-left p-4 rounded-xl border border-border bg-card hover:bg-secondary transition-colors"
+        {grouped.map(([category, items]) => (
+          <CategoryFolder
+            key={category}
+            category={category}
+            count={items.length}
+            initiallyOpen={!!search.trim() || grouped.length === 1}
           >
-            <div className="flex items-start gap-3">
-              <span className="text-2xl flex-shrink-0">📖</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-base font-semibold truncate">{g.Title}</div>
-                {g.Category && (
-                  <div className="text-xs text-muted-foreground mt-0.5">{g.Category}</div>
-                )}
-                <div className="text-xs text-muted-foreground mt-1">
-                  v{g['Current Version']} · updated {formatDate(g['Updated At'])}
-                  {g['Updated By'] && ` by ${g['Updated By']}`}
-                </div>
-              </div>
-              <svg viewBox="0 0 24 24" className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
+            <div className="space-y-2 pt-2">
+              {items.map(g => (
+                <button
+                  key={g.ID}
+                  onClick={() => setLocation(`/guides/${g.ID}`)}
+                  className="w-full text-left p-3 rounded-lg border border-border bg-card hover:bg-secondary transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl flex-shrink-0">📖</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold truncate">{g.Title}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        v{g['Current Version']} · updated {formatDate(g['Updated At'])}
+                        {g['Updated By'] && ` by ${g['Updated By']}`}
+                      </div>
+                    </div>
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
+                  </div>
+                </button>
+              ))}
             </div>
-          </button>
+          </CategoryFolder>
         ))}
       </div>
     </MenuLayout>
+  )
+}
+
+function CategoryFolder({
+  category,
+  count,
+  children,
+  initiallyOpen,
+}: {
+  category: string
+  count: number
+  children: React.ReactNode
+  initiallyOpen?: boolean
+}) {
+  const [open, setOpen] = useState(initiallyOpen ?? false)
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 p-3 hover:bg-secondary/50 transition-colors text-left"
+      >
+        <span className="text-xl flex-shrink-0">{open ? '📂' : '📁'}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold">{category}</div>
+          <div className="text-xs text-muted-foreground">{count} {count === 1 ? 'guide' : 'guides'}</div>
+        </div>
+        <svg
+          viewBox="0 0 24 24"
+          className={`w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M9 18l6-6-6-6" />
+        </svg>
+      </button>
+      {open && <div className="px-3 pb-3">{children}</div>}
+    </div>
   )
 }
 
