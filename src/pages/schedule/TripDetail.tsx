@@ -287,9 +287,13 @@ export function TripDetailPage() {
     if (!node) return
     // Defer to next frame so layout has settled.
     const handle = requestAnimationFrame(() => {
+      // Account for the sticky page header so the card title stays visible
+      // below it (rather than scrolled behind it).
+      const header = document.querySelector('header.sticky') as HTMLElement | null
+      const headerH = header ? header.getBoundingClientRect().height : 0
       const rect = node.getBoundingClientRect()
-      const top = window.scrollY + rect.top - 12 // small offset above the card
-      window.scrollTo({ top, behavior: 'smooth' })
+      const top = window.scrollY + rect.top - headerH - 12 // gap below header
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
       didScrollToToday.current = true
     })
     return () => cancelAnimationFrame(handle)

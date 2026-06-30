@@ -1,7 +1,7 @@
 import React from 'react'
 import { useLocation } from 'wouter'
 import { getCrewName, logout, getRole } from '@/lib/auth'
-import { EditableText } from '@/lib/textOverrides'
+import { EditableText, useTextOverrides } from '@/lib/textOverrides'
 
 interface MenuItemProps {
   icon: string
@@ -125,10 +125,12 @@ export function MenuPage() {
       {/* Footer */}
       <footer className="px-4 py-6 mt-8 border-t border-border">
         <div className="max-w-lg mx-auto flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            Signed in as <span className="text-foreground font-medium">{crewName || 'Crew'}</span>
+          <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+            <span>
+              Signed in as <span className="text-foreground font-medium">{crewName || 'Crew'}</span>
+            </span>
             {role !== 'crew' && (
-              <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold ${
+              <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider font-semibold ${
                 role === 'admin'
                   ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
                   : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
@@ -136,6 +138,7 @@ export function MenuPage() {
                 {role === 'admin' ? 'Admin' : role === 'viewer' ? 'View only' : ''}
               </span>
             )}
+            {role === 'admin' && <AdminTextEditToggle />}
           </div>
           <button
             onClick={handleLogout}
@@ -146,5 +149,26 @@ export function MenuPage() {
         </div>
       </footer>
     </div>
+  )
+}
+
+function AdminTextEditToggle() {
+  const { editMode, setEditMode } = useTextOverrides()
+  return (
+    <button
+      onClick={() => setEditMode(!editMode)}
+      title={editMode ? 'Stop editing text labels' : 'Edit text labels'}
+      aria-label={editMode ? 'Stop editing text labels' : 'Edit text labels'}
+      className={`inline-flex items-center justify-center w-7 h-7 rounded-md border transition-colors ${
+        editMode
+          ? 'bg-yellow-500/30 border-yellow-500/70 text-yellow-100'
+          : 'bg-transparent border-yellow-500/40 text-yellow-300 hover:bg-yellow-500/15'
+      }`}
+    >
+      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
+      </svg>
+    </button>
   )
 }

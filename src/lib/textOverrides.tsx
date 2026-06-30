@@ -26,6 +26,8 @@ interface TextOverridesContextValue {
   overrides: Overrides
   ready: boolean
   saving: boolean
+  editMode: boolean
+  setEditMode: (on: boolean) => void
   setOverride: (id: string, text: string) => Promise<void>
   clearOverride: (id: string) => Promise<void>
 }
@@ -34,6 +36,8 @@ const TextOverridesContext = createContext<TextOverridesContextValue>({
   overrides: {},
   ready: false,
   saving: false,
+  editMode: false,
+  setEditMode: () => {},
   setOverride: async () => {},
   clearOverride: async () => {},
 })
@@ -60,6 +64,7 @@ export function TextOverridesProvider({ children }: { children: React.ReactNode 
   const [overrides, setOverrides] = useState<Overrides>({})
   const [ready, setReady] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [editMode, setEditMode] = useState(false)
   // Debounce saves so rapid edits don't hammer the API.
   const saveTimerRef = useRef<number | null>(null)
   const pendingRef = useRef<Overrides | null>(null)
@@ -138,8 +143,8 @@ export function TextOverridesProvider({ children }: { children: React.ReactNode 
   )
 
   const value = useMemo(
-    () => ({ overrides, ready, saving, setOverride, clearOverride }),
-    [overrides, ready, saving, setOverride, clearOverride],
+    () => ({ overrides, ready, saving, editMode, setEditMode, setOverride, clearOverride }),
+    [overrides, ready, saving, editMode, setOverride, clearOverride],
   )
 
   return <TextOverridesContext.Provider value={value}>{children}</TextOverridesContext.Provider>
@@ -168,7 +173,7 @@ export function EditableText({
   className?: string
   multiline?: boolean
 }) {
-  const { overrides, setOverride, clearOverride } = useTextOverrides()
+  const { overrides, setOverride, clearOverride, editMode } = useTextOverrides()
   const admin = isAdmin()
   const current = overrides[id] ?? defaultText
   const [editing, setEditing] = useState(false)
@@ -179,14 +184,13 @@ export function EditableText({
     if (!editing) setDraft(current)
   }, [current, editing])
 
-  if (!admin) {
+  // Non-admins, or admins not in text-edit mode, see plain text (normal taps
+  // pass through to whatever underlying button/link the text sits on).
+  if (!admin || !editMode) {
     return <Tag className={className}>{current}</Tag>
   }
 
   function startEdit(e: React.MouseEvent) {
-    // Only respond to clicks that hold the Alt key — otherwise normal taps
-    // on buttons/headings still work. Admin uses Alt+Click to enter edit mode.
-    if (!e.altKey) return
     e.preventDefault()
     e.stopPropagation()
     setEditing(true)
@@ -245,9 +249,9 @@ export function EditableText({
 
   return (
     <Tag
-      className={`${className ?? ''} cursor-text hover:outline hover:outline-1 hover:outline-yellow-500/40 hover:outline-offset-2 rounded`}
+      className={`${className ?? ''} cursor-text outline outline-1 outline-yellow-500/60 outline-offset-2 rounded bg-yellow-500/5`}
       onClick={startEdit}
-      title="Alt+Click to edit"
+      title="Tap to edit"
       data-editable-id={id}
     >
       {current}

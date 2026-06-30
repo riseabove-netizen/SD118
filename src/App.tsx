@@ -267,16 +267,21 @@ function FallbackRedirect() {
   return null
 }
 
-function AdminEditBanner() {
-  const { saving } = useTextOverrides()
-  if (!isAdmin()) return null
+function TextEditModeOverlay() {
+  const { editMode, setEditMode, saving } = useTextOverrides()
+  if (!isAdmin() || !editMode) return null
   return (
-    <div className="sticky top-0 z-40 bg-yellow-500/15 border-b border-yellow-500/40 text-yellow-200 text-xs px-3 py-1.5 flex items-center justify-center gap-2">
-      <span aria-hidden>✎</span>
-      <span>
-        Admin mode — <span className="font-mono">Alt+Click</span> any label to edit.{' '}
-        {saving && <span className="opacity-70">Saving…</span>}
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-3 py-2 rounded-full bg-card border border-yellow-500/60 shadow-lg">
+      <span className="text-xs text-yellow-200">
+        Tap any label to edit
+        {saving && <span className="ml-2 opacity-70">Saving…</span>}
       </span>
+      <button
+        onClick={() => setEditMode(false)}
+        className="px-4 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+      >
+        Done
+      </button>
     </div>
   )
 }
@@ -285,8 +290,8 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TextOverridesProvider>
-        <AdminEditBanner />
         <AppRoutes />
+        <TextEditModeOverlay />
       </TextOverridesProvider>
     </QueryClientProvider>
   )
