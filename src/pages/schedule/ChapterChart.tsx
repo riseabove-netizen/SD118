@@ -12,13 +12,15 @@
 //
 // Attribution is rendered in the chart footer per the OSM/OpenSeaMap license.
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildPolyline, routeBounds, type ChapterRoute, type Coord } from './chapter-ports'
 
 interface ChapterChartProps {
   route: ChapterRoute
-  /** Pixel width of the rendered chart. Height adapts to the route aspect. */
-  width?: number
+  /** Maximum pixel width of the rendered chart. Actual width is measured from
+   *  the container so tile positions and SVG overlay stay pixel-perfect on
+   *  every screen size. Height adapts to the route aspect. */
+  maxWidth?: number
   /** Optional height override; if omitted, computed from the bbox aspect ratio. */
   height?: number
 }
@@ -91,8 +93,28 @@ function pickZoom(
   return { z, lonToPx, latToPx, x0, x1, y0, y1, offsetX, offsetY }
 }
 
-export function ChapterChart({ route, width = 760, height }: ChapterChartProps) {
+export function ChapterChart({ route, maxWidth = 760, height }: ChapterChartProps) {
   const bbox = useMemo(() => routeBounds(route, 0.22), [route])
+
+  // Measure the actual rendered width so tile (px) and SVG (px) coordinates
+  // share the same coordinate space at any viewport size.
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+  const [measuredWidth, setMeasuredWidth] = useState<number>(maxWidth)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const update = () => {
+      const w = Math.max(200, Math.min(maxWidth, el.clientWidth))
+      setMeasuredWidth(Math.round(w))
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [maxWidth])
+
+  const width = measuredWidth
+
   // Compute a height proportional to the bbox aspect if not given.
   const finalHeight = useMemo(() => {
     if (height) return height
@@ -143,8 +165,8 @@ export function ChapterChart({ route, width = 760, height }: ChapterChartProps) 
   }))
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-border bg-card">
-      <div className="relative" style={{ width: '100%', maxWidth: width, height: finalHeight }}>
+    <div ref={wrapRef} className="rounded-2xl overflow-hidden border border-border bg-card">
+      <div className="relative" style={{ width: `${width}px`, height: `${finalHeight}px` }}>
         {/* Tile layers — OSM basemap + OpenSeaMap nautical overlay */}
         <div className="absolute inset-0 overflow-hidden bg-[#aad3df]">
           {tiles.map(t => (
@@ -187,12 +209,14 @@ export function ChapterChart({ route, width = 760, height }: ChapterChartProps) 
           ))}
         </div>
 
-        {/* Route polyline + markers */}
+        {/* Route polyline + markers — SVG uses the same pixel coordinate
+            space as the absolute-positioned tile <img>s above, so markers
+            land exactly on top of the harbor they represent. */}
         <svg
+          width={width}
+          height={finalHeight}
           viewBox={`0 0 ${width} ${finalHeight}`}
-          width="100%"
-          height="100%"
-          className="relative block"
+          className="absolute inset-0"
           style={{ pointerEvents: 'none' }}
         >
           {/* Route glow + line */}

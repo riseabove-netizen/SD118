@@ -510,12 +510,27 @@ export function TripDetailPage() {
     }
   }, [id])
 
+  // Reset the once-per-trip scroll guard whenever the route id changes,
+  // so navigating between trips re-evaluates whether to auto-scroll.
+  useEffect(() => {
+    didScrollToToday.current = false
+  }, [id])
+
   // Auto-scroll today's day card to the top of the viewport once the trip
-  // loads (only when viewing, not editing, and only on first show).
+  // loads — but ONLY for trips that are currently active (today falls within
+  // the trip's date range). Future and past trips should open at the top so
+  // the user sees the hero card and the nautical chart first.
   useEffect(() => {
     if (editMode) return
     if (didScrollToToday.current) return
     if (!trip) return
+    const todayIso = todayIsoLocal()
+    const isActive = todayIso >= trip.startDate && todayIso <= trip.endDate
+    if (!isActive) {
+      // Future or past trip — mark as handled so we never auto-scroll later.
+      didScrollToToday.current = true
+      return
+    }
     const node = todayRef.current
     if (!node) return
     // Defer to next frame so layout has settled.
