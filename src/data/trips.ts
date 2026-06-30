@@ -55,6 +55,7 @@ export type Trip = {
   endDate: string
   hero: { icon: string; gradient: string } // tailwind gradient classes
   days: TripDay[]
+  guests?: string // optional guest list shown on title card
 }
 
 // Convenience builder for Google Maps search links
@@ -538,6 +539,7 @@ export const TRIPS: Trip[] = [
     startDate: '2026-08-13',
     endDate: '2026-08-17',
     hero: { icon: '🇮🇹', gradient: 'from-emerald-900 via-green-800 to-teal-700' },
+    guests: 'Enrico & Antoniette · Maria, husband & Martina (9th birthday Aug 13) · possibly Daniel & Laura',
     days: [
       {
         date: 'Thursday · Aug 13',
@@ -700,6 +702,7 @@ export const TRIPS: Trip[] = [
     startDate: '2026-08-22',
     endDate: '2026-08-25',
     hero: { icon: '🍕', gradient: 'from-red-900 via-rose-800 to-amber-700' },
+    guests: 'Carlo & Denise fly in — very close friends, incredible guests',
     days: [
       {
         date: 'Saturday · Aug 22',

@@ -611,11 +611,23 @@ export function TripDetailPage() {
                   onChange={e => updateTripMeta({ subtitle: e.target.value })}
                   className="mt-1 w-full bg-black/30 border border-white/30 rounded px-2 py-1 text-sm text-white"
                 />
+                <input
+                  value={draft.guests || ''}
+                  onChange={e => updateTripMeta({ guests: e.target.value })}
+                  placeholder="Guests (optional)"
+                  className="mt-1 w-full bg-black/30 border border-white/30 rounded px-2 py-1 text-xs text-white placeholder:text-white/50"
+                />
               </>
             ) : (
               <>
                 <div className="mt-3 text-2xl font-bold text-white">{showing.name}</div>
                 <div className="text-sm text-white/85">{showing.subtitle}</div>
+                {showing.guests && (
+                  <div className="mt-2 flex items-start gap-1.5 text-xs text-white/90">
+                    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 mt-0.5 shrink-0 text-red-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                    <span><span className="font-semibold text-white">Guests:</span> {showing.guests}</span>
+                  </div>
+                )}
               </>
             )}
             <div className="mt-3 flex items-center gap-2 text-xs text-white/80">
