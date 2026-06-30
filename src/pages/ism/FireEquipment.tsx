@@ -6,6 +6,7 @@ import { getCrewName } from '@/lib/auth'
 import {
   FIRE_EQUIPMENT_SEED,
   FIRE_EQUIPMENT_GUIDE_ID,
+  feTag,
   type FireEqTable,
 } from '@/data/fire-equipment-seed'
 
@@ -21,27 +22,75 @@ const DATA_PREFIX = '<!-- FIRE-EQUIPMENT-DATA:'
 const DATA_SUFFIX = '-->'
 
 // Migrate any saved table to the new shape: preserve seed's category/deck
-// metadata and ensure every table has "Pressure" + "Last Checked By".
+// metadata and ensure every table has "Pressure" + "Last Checked By". Also
+// migrates fire-extinguisher tables to lead with a "#" column (FE-NN tags)
+// numbered consecutively across decks (lower → main → upper → sun).
+const FIRE_DECK_ORDER: Array<FireEqTable['deck']> = ['lower', 'main', 'upper', 'sun', 'all']
+
 function migrate(tables: FireEqTable[]): FireEqTable[] {
   const seedById = new Map(FIRE_EQUIPMENT_SEED.map(t => [t.id, t]))
-  return tables.map(t => {
+
+  // Step 1: per-table column / row-length normalisation, including the new
+  // leading "#" column for fire-extinguisher tables.
+  let normalised = tables.map(t => {
     const seed = seedById.get(t.id)
-    const cols = t.columns.slice()
+    const category = (t as any).category || seed?.category || 'fire'
+    let cols = t.columns.slice()
+    let rows = t.rows.map(r => ({ values: r.values.slice() }))
+
+    // Prepend the "#" column for fire-category tables if missing.
+    if (category === 'fire' && cols[0] !== '#') {
+      cols = ['#', ...cols]
+      rows = rows.map(r => ({ values: ['', ...r.values] }))
+    }
+
     if (!cols.some(c => c.toLowerCase() === 'pressure')) cols.push('Pressure')
     if (!cols.some(c => c.toLowerCase().startsWith('last checked'))) cols.push('Last Checked By')
-    const rows = t.rows.map(r => {
+    rows = rows.map(r => {
       const v = r.values.slice()
       while (v.length < cols.length) v.push('')
       return { values: v }
     })
     return {
       ...t,
-      category: (t as any).category || seed?.category || 'fire',
+      category,
       deck:     (t as any).deck     || seed?.deck     || 'all',
       columns: cols,
       rows,
     } as FireEqTable
   })
+
+  // Step 2: backfill consecutive FE-NN tags across all fire-category tables
+  // in deck order, for any row whose "#" cell is still empty. Rows that
+  // already have a manually-set tag are left alone.
+  const fireTables = normalised
+    .filter(t => t.category === 'fire')
+    .sort((a, b) => {
+      const da = FIRE_DECK_ORDER.indexOf(a.deck)
+      const db = FIRE_DECK_ORDER.indexOf(b.deck)
+      return da - db
+    })
+  // Find the highest existing FE-NN so we don't collide with manual tags.
+  let nextN = 1
+  for (const t of fireTables) {
+    for (const r of t.rows) {
+      const m = /^FE-(\d+)$/i.exec((r.values[0] || '').trim())
+      if (m) {
+        const n = parseInt(m[1], 10)
+        if (n >= nextN) nextN = n + 1
+      }
+    }
+  }
+  // Assign tags to empty "#" cells in deck order.
+  for (const t of fireTables) {
+    for (const r of t.rows) {
+      if (!(r.values[0] || '').trim()) {
+        r.values[0] = feTag(nextN++)
+      }
+    }
+  }
+
+  return normalised
 }
 
 function decode(markdown: string): FireEqTable[] {

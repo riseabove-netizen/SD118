@@ -23,7 +23,19 @@ function withTestCols(values: string[]): FireEqRow {
   return { values: [...values, '', ''] }
 }
 
-const FIRE_BASE_COLS  = ['Location', 'Characteristics', 'Expiry Date', 'Pressure', 'Last Checked By']
+// Fire-extinguisher tables now lead with a unit number (FE-NN) so each
+// extinguisher can be identified by tag in checks, drills, and reports.
+// Numbering runs consecutively across decks in walk-down order:
+//   Lower deck:  FE-01 … FE-15
+//   Main deck:   FE-16 … FE-20
+//   Upper deck:  FE-21 … FE-23
+//   Sun deck:    FE-24
+const FIRE_BASE_COLS  = ['#', 'Location', 'Characteristics', 'Expiry Date', 'Pressure', 'Last Checked By']
+
+/** Format a sequential extinguisher tag as a zero-padded "FE-NN". */
+export function feTag(n: number): string {
+  return 'FE-' + String(n).padStart(2, '0')
+}
 
 export const FIRE_EQUIPMENT_SEED: FireEqTable[] = [
   // ---- Fire extinguishers ----
@@ -33,21 +45,21 @@ export const FIRE_EQUIPMENT_SEED: FireEqTable[] = [
     category: 'fire', deck: 'lower',
     columns: FIRE_BASE_COLS,
     rows: [
-      withTestCols(['Crew Cabin PT FWD',   'Powder 2 Kg', '03/23']),
-      withTestCols(['Crew Cabin PT AFT',   'Powder 2 Kg', '03/23']),
-      withTestCols(['Crew Cabin STB FWD',  'Powder 2 Kg', '03/23']),
-      withTestCols(['Crew Cabin STB AFT',  'Powder 2 Kg', '03/23']),
-      withTestCols(['Guest Cabin PT FWD',  'Powder 2 Kg', '03/23']),
-      withTestCols(['Guest Cabin PT AFT',  'Powder 2 Kg', '03/23']),
-      withTestCols(['Guest Cabin STB FWD', 'Powder 2 Kg', '03/23']),
-      withTestCols(['Guest Cabin STB AFT', 'Powder 2 Kg', '03/23']),
-      withTestCols(['Crew mess cupboard',  'Powder 6 Kg', '03/23']),
-      withTestCols(['Under guest staircase', 'Powder 6 Kg', '03/23']),
-      withTestCols(['Engine STB',          'Powder 6 Kg', '03/23']),
-      withTestCols(['Engine PT',           'Powder 6 Kg', '03/23']),
-      withTestCols(['Engine STB',          'Foam 9 L',    '03/23']),
-      withTestCols(['Engine PT',           'Foam 9 L',    '03/23']),
-      withTestCols(['Engine / garage entrance', 'CO2 9 Kg × 2', '03/23']),
+      withTestCols([feTag(1),  'Crew Cabin PT FWD',   'Powder 2 Kg', '03/23']),
+      withTestCols([feTag(2),  'Crew Cabin PT AFT',   'Powder 2 Kg', '03/23']),
+      withTestCols([feTag(3),  'Crew Cabin STB FWD',  'Powder 2 Kg', '03/23']),
+      withTestCols([feTag(4),  'Crew Cabin STB AFT',  'Powder 2 Kg', '03/23']),
+      withTestCols([feTag(5),  'Guest Cabin PT FWD',  'Powder 2 Kg', '03/23']),
+      withTestCols([feTag(6),  'Guest Cabin PT AFT',  'Powder 2 Kg', '03/23']),
+      withTestCols([feTag(7),  'Guest Cabin STB FWD', 'Powder 2 Kg', '03/23']),
+      withTestCols([feTag(8),  'Guest Cabin STB AFT', 'Powder 2 Kg', '03/23']),
+      withTestCols([feTag(9),  'Crew mess cupboard',  'Powder 6 Kg', '03/23']),
+      withTestCols([feTag(10), 'Under guest staircase', 'Powder 6 Kg', '03/23']),
+      withTestCols([feTag(11), 'Engine STB',          'Powder 6 Kg', '03/23']),
+      withTestCols([feTag(12), 'Engine PT',           'Powder 6 Kg', '03/23']),
+      withTestCols([feTag(13), 'Engine STB',          'Foam 9 L',    '03/23']),
+      withTestCols([feTag(14), 'Engine PT',           'Foam 9 L',    '03/23']),
+      withTestCols([feTag(15), 'Engine / garage entrance', 'CO2 9 Kg × 2', '03/23']),
     ],
   },
   {
@@ -56,11 +68,11 @@ export const FIRE_EQUIPMENT_SEED: FireEqTable[] = [
     category: 'fire', deck: 'main',
     columns: FIRE_BASE_COLS,
     rows: [
-      withTestCols(['Emergency Fire Pump',  'Powder 2 Kg', '03/23']),
-      withTestCols(['Main saloon',          'Powder 6 Kg', '03/23']),
-      withTestCols(['Master cupboard',      'Powder 6 Kg', '03/23']),
-      withTestCols(['Galley',               'Foam 9 L',    '03/23']),
-      withTestCols(['Main saloon',          'CO2 5 Kg',    '03/23']),
+      withTestCols([feTag(16), 'Emergency Fire Pump',  'Powder 2 Kg', '03/23']),
+      withTestCols([feTag(17), 'Main saloon',          'Powder 6 Kg', '03/23']),
+      withTestCols([feTag(18), 'Master cupboard',      'Powder 6 Kg', '03/23']),
+      withTestCols([feTag(19), 'Galley',               'Foam 9 L',    '03/23']),
+      withTestCols([feTag(20), 'Main saloon',          'CO2 5 Kg',    '03/23']),
     ],
   },
   {
@@ -69,9 +81,9 @@ export const FIRE_EQUIPMENT_SEED: FireEqTable[] = [
     category: 'fire', deck: 'upper',
     columns: FIRE_BASE_COLS,
     rows: [
-      withTestCols(['Under Bar',            'Powder 2 Kg', '03/23']),
-      withTestCols(['Bridge Behind Sofa',   'Powder 2 Kg', '03/23']),
-      withTestCols(['Bridge PT cupboard',   'Powder 6 Kg', '03/23']),
+      withTestCols([feTag(21), 'Under Bar',            'Powder 2 Kg', '03/23']),
+      withTestCols([feTag(22), 'Bridge Behind Sofa',   'Powder 2 Kg', '03/23']),
+      withTestCols([feTag(23), 'Bridge PT cupboard',   'Powder 6 Kg', '03/23']),
     ],
   },
   {
@@ -80,7 +92,7 @@ export const FIRE_EQUIPMENT_SEED: FireEqTable[] = [
     category: 'fire', deck: 'sun',
     columns: FIRE_BASE_COLS,
     rows: [
-      withTestCols(['Under Bar',            'Powder 6 Kg', '03/23']),
+      withTestCols([feTag(24), 'Under Bar',            'Powder 6 Kg', '03/23']),
     ],
   },
 
