@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useRoute } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { findTripById, loadTrip, saveTrip, mapsLink, type Trip, type TripDay, type TripEvent } from '@/data/trips'
@@ -53,13 +53,30 @@ function EventRow({ event }: { event: TripEvent }) {
   )
 }
 
-function DayCard({ day, index }: { day: TripDay; index: number }) {
+function todayIsoLocal(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const DayCard = React.forwardRef<HTMLDivElement, { day: TripDay; index: number; isToday?: boolean }>(
+  function DayCard({ day, index, isToday }, ref) {
   return (
-    <div className="rounded-2xl border border-border bg-card overflow-hidden">
-      <div className="px-4 py-3 bg-gradient-to-r from-secondary to-card border-b border-border">
+    <div
+      ref={ref}
+      className={`rounded-2xl border bg-card overflow-hidden ${isToday ? 'border-primary ring-2 ring-primary/40 shadow-[0_0_0_4px_rgba(220,38,38,0.08)]' : 'border-border'}`}
+    >
+      <div className={`px-4 py-3 border-b ${isToday ? 'bg-gradient-to-r from-primary/25 to-card border-primary/30' : 'bg-gradient-to-r from-secondary to-card border-border'}`}>
         <div className="flex items-baseline gap-2">
           <span className="text-xs font-mono text-primary">Day {index + 1}</span>
           <span className="text-xs text-muted-foreground">{day.date}</span>
+          {isToday && (
+            <span className="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary text-primary-foreground">
+              Today
+            </span>
+          )}
         </div>
         <div className="mt-1 text-lg font-bold text-foreground">{day.title}</div>
         {day.subtitle && <div className="text-xs text-muted-foreground mt-0.5">{day.subtitle}</div>}
@@ -85,7 +102,7 @@ function DayCard({ day, index }: { day: TripDay; index: number }) {
       )}
     </div>
   )
-}
+})
 
 // ---------------------------------------------------------------------------
 // EDIT MODE
@@ -234,6 +251,8 @@ export function TripDetailPage() {
   const [editMode, setEditMode] = useState(false)
   const [draft, setDraft] = useState<Trip | undefined>(undefined)
   const [saving, setSaving] = useState(false)
+  const todayRef = useRef<HTMLDivElement | null>(null)
+  const didScrollToToday = useRef(false)
   const canEdit = isLoggedIn()
   // Public guests (unauthenticated) reach this page only via a shared link.
   // They must not be able to back-navigate to the schedule list and browse other trips.
@@ -257,6 +276,24 @@ export function TripDetailPage() {
       cancelled = true
     }
   }, [id])
+
+  // Auto-scroll today's day card to the top of the viewport once the trip
+  // loads (only when viewing, not editing, and only on first show).
+  useEffect(() => {
+    if (editMode) return
+    if (didScrollToToday.current) return
+    if (!trip) return
+    const node = todayRef.current
+    if (!node) return
+    // Defer to next frame so layout has settled.
+    const handle = requestAnimationFrame(() => {
+      const rect = node.getBoundingClientRect()
+      const top = window.scrollY + rect.top - 12 // small offset above the card
+      window.scrollTo({ top, behavior: 'smooth' })
+      didScrollToToday.current = true
+    })
+    return () => cancelAnimationFrame(handle)
+  }, [trip, editMode])
 
   if (!trip && !loading) {
     return (
@@ -384,7 +421,21 @@ export function TripDetailPage() {
             ? draft.days.map((day, i) => (
                 <EditableDayCard key={day.isoDate + i} day={day} index={i} onChange={next => updateDay(i, next)} />
               ))
-            : showing.days.map((day, i) => <DayCard key={day.isoDate + i} day={day} index={i} />)}
+            : (() => {
+                const todayIso = todayIsoLocal()
+                return showing.days.map((day, i) => {
+                  const isToday = day.isoDate === todayIso
+                  return (
+                    <DayCard
+                      key={day.isoDate + i}
+                      day={day}
+                      index={i}
+                      isToday={isToday}
+                      ref={isToday ? todayRef : undefined}
+                    />
+                  )
+                })
+              })()}
         </div>
 
         {editMode ? (
