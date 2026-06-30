@@ -49,6 +49,28 @@ export function ScheduleHubPage() {
   return (
     <MenuLayout title="Schedule" showBack backHref="/menu">
       <div className="space-y-3">
+        {/* Featured: consolidated summer-trip page */}
+        <button
+          onClick={() => setLocation('/schedule/enricos-summer-trip')}
+          className="relative w-full text-left rounded-2xl overflow-hidden border border-primary/40 bg-gradient-to-br from-indigo-900 via-purple-800 to-rose-700 active:scale-[0.99] transition-transform"
+        >
+          <div className="absolute inset-0 bg-black/45" />
+          <div className="relative p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="text-3xl">🛥️</div>
+              <div className="px-2.5 py-1 rounded-full text-xs font-medium bg-primary text-primary-foreground">Summer 2026</div>
+            </div>
+            <div className="mt-3 text-xl font-bold text-white">Enrico's Summer Trip</div>
+            <div className="text-sm text-white/85">All 15 chapters · Balearics → Croatia</div>
+            <div className="mt-3 flex items-center gap-2 text-xs text-white/80">
+              <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+              <span>Aug 4 – Sep 30</span>
+              <span className="text-white/50">·</span>
+              <span>Consolidated view</span>
+            </div>
+          </div>
+        </button>
+
         {TRIPS.length === 0 && (
           <div className="text-sm text-muted-foreground text-center py-8">
             No trips on the schedule yet.

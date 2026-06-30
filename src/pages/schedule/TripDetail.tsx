@@ -4,7 +4,7 @@ import { MenuLayout } from '@/components/MenuLayout'
 import { findTripById, loadTrip, saveTrip, mapsLink, type Trip, type TripDay, type TripEvent } from '@/data/trips'
 import { shareLink } from '@/lib/share-link'
 import { printTripAsPdf } from '@/lib/trip-share'
-import { isLoggedIn, isAdmin, getCrewName } from '@/lib/auth'
+import { isLoggedIn, isAdmin, canWrite, getCrewName } from '@/lib/auth'
 import { NotesPanel, useTripNotes } from './NotesPanel'
 import type { TripNote } from '@/lib/trip-notes'
 
@@ -477,7 +477,10 @@ export function TripDetailPage() {
   const [saving, setSaving] = useState(false)
   const todayRef = useRef<HTMLDivElement | null>(null)
   const didScrollToToday = useRef(false)
-  const canEdit = isAdmin()
+  // Any signed-in crew or admin can edit trip text (viewers stay read-only).
+  // `isAdmin` is still imported for places that need admin-only privileges.
+  void isAdmin
+  const canEdit = canWrite()
   // Public guests (unauthenticated) reach this page only via a shared link.
   // They must not be able to back-navigate to the schedule list and browse other trips.
   const isGuest = !isLoggedIn()
@@ -648,12 +651,30 @@ export function TripDetailPage() {
               <>
                 <div className="mt-3 text-2xl font-bold text-white">{showing.name}</div>
                 <div className="text-sm text-white/85">{showing.subtitle}</div>
-                {showing.guests && (
+                {showing.guestList && showing.guestList.length > 0 ? (
+                  <div className="mt-2 flex items-start gap-1.5 text-xs text-white/90">
+                    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 mt-0.5 shrink-0 text-red-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                    <div className="flex-1">
+                      <span className="font-semibold text-white">Guests · {showing.guestList.filter(g => !g.tentative).length}{showing.guestList.some(g => g.tentative) ? ` (+${showing.guestList.filter(g => g.tentative).length} maybe)` : ''}</span>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {showing.guestList.map((g, i) => (
+                          <span
+                            key={i}
+                            title={g.note || (g.tentative ? 'tentative' : g.name)}
+                            className={`px-1.5 py-0.5 rounded-full text-[10px] leading-tight ${g.tentative ? 'border border-dashed border-white/60 text-white/80' : 'bg-white/15 border border-white/25 text-white'}`}
+                          >
+                            {g.name}{g.note ? <span className="text-white/60"> · {g.note}</span> : null}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : showing.guests ? (
                   <div className="mt-2 flex items-start gap-1.5 text-xs text-white/90">
                     <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 mt-0.5 shrink-0 text-red-300" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
                     <span><span className="font-semibold text-white">Guests:</span> {showing.guests}</span>
                   </div>
-                )}
+                ) : null}
               </>
             )}
             <div className="mt-3 flex items-center gap-2 text-xs text-white/80">

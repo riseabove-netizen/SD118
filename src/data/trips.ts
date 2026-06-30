@@ -549,6 +549,15 @@ export const TRIPS: Trip[] = [
     endDate: '2026-08-17',
     hero: { icon: '🇮🇹', gradient: 'from-emerald-900 via-green-800 to-teal-700' },
     guests: 'Enrico & Antoniette · Maria, husband & Martina (9th birthday Aug 13) · possibly Daniel & Laura',
+    guestList: [
+      { name: 'Enrico' },
+      { name: 'Antoniette' },
+      { name: 'Maria' },
+      { name: "Maria's husband" },
+      { name: 'Martina', note: '9th birthday Aug 13' },
+      { name: 'Daniel', tentative: true },
+      { name: 'Laura', tentative: true },
+    ],
     days: [
       {
         date: 'Thursday · Aug 13',
@@ -712,6 +721,12 @@ export const TRIPS: Trip[] = [
     endDate: '2026-08-25',
     hero: { icon: '🍕', gradient: 'from-red-900 via-rose-800 to-amber-700' },
     guests: 'Carlo & Denise fly in — very close friends, incredible guests',
+    guestList: [
+      { name: 'Enrico' },
+      { name: 'Antoniette' },
+      { name: 'Carlo', note: 'very close friend' },
+      { name: 'Denise', note: 'very close friend' },
+    ],
     days: [
       {
         date: 'Saturday · Aug 22',
