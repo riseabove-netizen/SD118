@@ -199,7 +199,7 @@ function buildTripHtml(trip: Trip): string {
 </head>
 <body>
   <div class="header">
-    <div class="vessel">M/Y Rise Above III · Schedule</div>
+    <div class="vessel">M/Y Rise Above · Schedule</div>
     <h1>${safeName}</h1>
     <div class="subtitle">${safeSubtitle}</div>
     <div class="range">

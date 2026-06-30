@@ -134,7 +134,7 @@ export async function applyBranding(pdf: PDFDocument, opts: BrandingOptions = {}
         color: muted,
       })
       // Left side: vessel name in footer (small)
-      page.drawText('M/Y Rise Above III', {
+      page.drawText('M/Y Rise Above', {
         x: margin,
         y: metaY,
         size: pageSize,

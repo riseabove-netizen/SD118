@@ -252,7 +252,7 @@ function buildPrintableHtml(g: PrintGuideArgs): string {
 </head>
 <body>
   <div class="header">
-    <div class="vessel">M/Y Rise Above III · Operational Guide</div>
+    <div class="vessel">M/Y Rise Above · Operational Guide</div>
     <h1>${safeTitle}</h1>
     <div class="meta">
       ${safeCategory ? `<span class="pill">${safeCategory}</span>` : ''}

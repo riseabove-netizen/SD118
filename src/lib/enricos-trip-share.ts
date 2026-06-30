@@ -226,7 +226,7 @@ function buildConsolidatedHtml(chapters: Trip[]): string {
 
   ${sectionsHtml}
 
-  <div class="footer">M/Y Rise Above III · Generated from the Rise Above engine log</div>
+  <div class="footer">M/Y Rise Above · Generated from the Rise Above engine log</div>
 </body>
 </html>`
 }
