@@ -7,6 +7,8 @@ import { printTripAsPdf } from '@/lib/trip-share'
 import { isLoggedIn, isAdmin, canWrite, getCrewName } from '@/lib/auth'
 import { NotesPanel, useTripNotes } from './NotesPanel'
 import { GuestListEditor } from './GuestListEditor'
+import { ChapterChart } from './ChapterChart'
+import { CHAPTER_ROUTES } from './chapter-ports'
 import type { TripNote } from '@/lib/trip-notes'
 
 function formatRange(startIso: string, endIso: string): string {
@@ -690,6 +692,20 @@ export function TripDetailPage() {
             </div>
           </div>
         </div>
+
+        {!editMode && CHAPTER_ROUTES[showing.id] && (
+          <div>
+            <div className="flex items-center gap-2 mb-2 px-0.5">
+              <svg viewBox="0 0 24 24" className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z" />
+                <path d="M9 3v15" />
+                <path d="M15 6v15" />
+              </svg>
+              <div className="text-[11px] font-bold tracking-widest text-muted-foreground">NAUTICAL CHART</div>
+            </div>
+            <ChapterChart route={CHAPTER_ROUTES[showing.id]} />
+          </div>
+        )}
 
         {!editMode && (
           <NotesPanel
