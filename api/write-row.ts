@@ -30,8 +30,14 @@ function getAuth() {
   })
 }
 
-// Engine Log column layout — verified against the actual 2-row merged header
-// on the master "Engine Log" tab (46 columns, A..AT).
+// Engine Log column layout — verified 2026-07-01 against the actual 2-row
+// merged header on the master "Engine Log" tab by reading the live sheet.
+// Note the ordering: the master sheet places ENGINE OIL PRESSURE (Z/AA)
+// BEFORE Engine Oil Temperature (AB/AC), and TRANSMISSION OIL PRESSURE
+// (AD/AE) comes after Oil Temp. Historical rows (before 2026-07-01) were
+// written with an off-by-one layout that put oil_temp values into the
+// Engine Oil Pressure columns and trans_oil_press values into the Engine
+// Oil Temp columns — see api/backfill-oil-pressure.ts.
 //
 // `formula: (row)=>...` means the column holds a computed formula that we
 // write explicitly for each new row (so the formula propagates even when the
@@ -66,28 +72,30 @@ const ENGINE_LOG_COLUMNS: { col: string; key: string; formula?: (row: number) =>
   { col: 'W',  key: 'stbd_coolant_temp' },           // Coolant Temp STBD
   { col: 'X',  key: 'port_trans_oil_temp' },         // Trans Oil Temp Port
   { col: 'Y',  key: 'stbd_trans_oil_temp' },         // Trans Oil Temp STBD
-  { col: 'Z',  key: 'port_oil_temp' },               // Engine Oil Temp Port
-  { col: 'AA', key: 'stbd_oil_temp' },               // Engine Oil Temp STBD
-  { col: 'AB', key: 'port_trans_oil_press' },        // Trans Oil Press Port
-  { col: 'AC', key: 'stbd_trans_oil_press' },        // Trans Oil Press STBD
-  { col: 'AD', key: 'port_fuel_temp' },              // Fuel Temp Port
-  { col: 'AE', key: 'stbd_fuel_temp' },              // Fuel Temp STBD
-  { col: 'AF', key: 'port_fuel_pressure' },          // Fuel Pressure Port
-  { col: 'AG', key: 'stbd_fuel_pressure' },          // Fuel Pressure STBD
-  { col: 'AH', key: 'port_engine_load' },            // Engine Load Port
-  { col: 'AI', key: 'stbd_engine_load' },            // Engine Load STBD
-  { col: 'AJ', key: 'port_coolant_level' },          // Coolant Level Port
-  { col: 'AK', key: 'stbd_coolant_level' },          // Coolant Level STBD
-  { col: 'AL', key: 'port_battery_voltage' },        // ECU Batt Voltage Port
-  { col: 'AM', key: 'stbd_battery_voltage' },        // ECU Batt Voltage STBD
-  { col: 'AN', key: 'port_exhaust_temp_l' },         // Exhaust Temp Left Port
-  { col: 'AO', key: 'stbd_exhaust_temp_l' },         // Exhaust Temp Left STBD
-  { col: 'AP', key: 'port_exhaust_temp_r' },         // Exhaust Temp Right Port
-  { col: 'AQ', key: 'stbd_exhaust_temp_r' },         // Exhaust Temp Right STBD
-  { col: 'AR', key: 'port_inlet_manifold_temp' },    // Inlet Manifold Temp Port
-  { col: 'AS', key: 'stbd_inlet_manifold_temp' },    // Inlet Manifold Temp STBD
-  { col: 'AT', key: '__waves' },                     // Waves (sea + wind)
-  { col: 'AU', key: '__comments' },                  // Comments
+  { col: 'Z',  key: 'port_oil_press' },              // Engine Oil Pressure Port
+  { col: 'AA', key: 'stbd_oil_press' },              // Engine Oil Pressure STBD
+  { col: 'AB', key: 'port_oil_temp' },               // Engine Oil Temp Port
+  { col: 'AC', key: 'stbd_oil_temp' },               // Engine Oil Temp STBD
+  { col: 'AD', key: 'port_trans_oil_press' },        // Trans Oil Press Port
+  { col: 'AE', key: 'stbd_trans_oil_press' },        // Trans Oil Press STBD
+  { col: 'AF', key: 'port_fuel_temp' },              // Fuel Temp Port
+  { col: 'AG', key: 'stbd_fuel_temp' },              // Fuel Temp STBD
+  { col: 'AH', key: 'port_fuel_pressure' },          // Fuel Pressure Port
+  { col: 'AI', key: 'stbd_fuel_pressure' },          // Fuel Pressure STBD
+  { col: 'AJ', key: 'port_engine_load' },            // Engine Load Port
+  { col: 'AK', key: 'stbd_engine_load' },            // Engine Load STBD
+  { col: 'AL', key: 'port_coolant_level' },          // Coolant Level Port
+  { col: 'AM', key: 'stbd_coolant_level' },          // Coolant Level STBD
+  { col: 'AN', key: 'port_battery_voltage' },        // ECU Batt Voltage Port
+  { col: 'AO', key: 'stbd_battery_voltage' },        // ECU Batt Voltage STBD
+  { col: 'AP', key: 'port_exhaust_temp_l' },         // Exhaust Temp Left Port
+  { col: 'AQ', key: 'stbd_exhaust_temp_l' },         // Exhaust Temp Left STBD
+  { col: 'AR', key: 'port_exhaust_temp_r' },         // Exhaust Temp Right Port
+  { col: 'AS', key: 'stbd_exhaust_temp_r' },         // Exhaust Temp Right STBD
+  { col: 'AT', key: 'port_inlet_manifold_temp' },    // Inlet Manifold Temp Port
+  { col: 'AU', key: 'stbd_inlet_manifold_temp' },    // Inlet Manifold Temp STBD
+  { col: 'AV', key: '__waves' },                     // Waves (sea + wind)
+  { col: 'AW', key: '__comments' },                  // Comments
 ]
 
 const LAST_COL = ENGINE_LOG_COLUMNS[ENGINE_LOG_COLUMNS.length - 1].col

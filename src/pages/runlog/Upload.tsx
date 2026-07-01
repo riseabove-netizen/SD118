@@ -57,13 +57,18 @@ export function UploadPage() {
 
   const mutation = useMutation({
     mutationFn: async (fileList: File[]) => {
-      // Compress every photo to 1200 px on the long edge at JPEG quality 0.78.
-      // Digital engine displays stay crisp — Claude Vision downscales anything
-      // larger than ~1568 px anyway, so uploading higher-res wastes bandwidth
-      // and tokens without improving accuracy.
+      // Compression sizing:
+      //   - Small batches (<=3 photos): 1568 px @ q=0.85 — matches Claude Vision's
+      //     native processing size so nothing is lost, and stays well under the
+      //     Vercel body limit for a handful of photos.
+      //   - Larger batches: 1200 px @ q=0.78 — more aggressive to fit more
+      //     photos per API call before we have to auto-chunk.
+      const smallBatch = fileList.length <= 3
+      const maxDim  = smallBatch ? 1568 : 1200
+      const quality = smallBatch ? 0.85 : 0.78
       const images: string[] = []
       for (const file of fileList) {
-        const b64 = await compressImageToJpegBase64(file, { maxDim: 1200, quality: 0.78 })
+        const b64 = await compressImageToJpegBase64(file, { maxDim, quality })
         images.push(b64)
       }
 

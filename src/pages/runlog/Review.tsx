@@ -13,7 +13,7 @@ import { formatDate, formatTime } from '@/lib/utils'
 // Shared suffix list used by both ENGINE_FIELDS (UI) and MERGE_TARGETS (re-upload).
 const ENGINE_FIELDS_LIST = [
   'engine_hours','rpm','fuel_rate','coolant_temp','trans_oil_temp','oil_temp',
-  'trans_oil_press','fuel_temp','fuel_pressure','engine_load','coolant_level',
+  'oil_press','trans_oil_press','fuel_temp','fuel_pressure','engine_load','coolant_level',
   'battery_voltage','exhaust_temp_l','exhaust_temp_r','inlet_manifold_temp',
 ] as const
 
@@ -29,6 +29,7 @@ const ENGINE_FIELD_LABELS: Record<string, string> = {
   coolant_temp: 'Coolant Temp',
   trans_oil_temp: 'Trans Oil Temp',
   oil_temp: 'Engine Oil Temp',
+  oil_press: 'Engine Oil Pressure',
   trans_oil_press: 'Trans Oil Pressure',
   fuel_temp: 'Fuel Temp',
   fuel_pressure: 'Fuel Pressure',
@@ -85,6 +86,7 @@ const ENGINE_FIELDS: { suffix: string; label: string; unit?: string }[] = [
   { suffix: 'coolant_temp', label: 'Coolant Temp', unit: '°C' },
   { suffix: 'trans_oil_temp', label: 'Transmission Oil Temp', unit: '°C' },
   { suffix: 'oil_temp', label: 'Engine Oil Temp', unit: '°C' },
+  { suffix: 'oil_press', label: 'Engine Oil Pressure', unit: 'kPa' },
   { suffix: 'trans_oil_press', label: 'Trans Oil Pressure', unit: 'kPa' },
   { suffix: 'fuel_temp', label: 'Fuel Temp', unit: '°C' },
   { suffix: 'fuel_pressure', label: 'Fuel Pressure', unit: 'kPa' },
@@ -115,6 +117,14 @@ type FormValues = Record<string, string>
 
 export function ReviewPage() {
   const [, setLocation] = useLocation()
+  // Populated in the useState initializer below — tracks how many photos were
+  // sent to Claude and how many fields it returned, so the crew can tell when
+  // the AI came back empty vs. actually populated the form.
+  const [extractInfo, setExtractInfo] = useState<{
+    imagesProcessed: number | null
+    fieldsFilled: number
+    fieldsTotal: number
+  } | null>(null)
   const [values, setValues] = useState<FormValues>(() => {
     // Date / time and lat/lon are read from the photos by the AI —
     // we intentionally do NOT default them to the device's clock/GPS.
@@ -143,12 +153,14 @@ export function ReviewPage() {
     if (raw) {
       try {
         const extracted = JSON.parse(raw) as Record<string, unknown>
+        let filled = 0
         for (const [sectionKey, section] of Object.entries(extracted)) {
           if (sectionKey === '_meta') continue
           if (section && typeof section === 'object') {
             for (const [k, v] of Object.entries(section as Record<string, unknown>)) {
               if (typeof v === 'string' || typeof v === 'number') {
                 defaults[k] = String(v)
+                filled++
               }
             }
           }
@@ -157,8 +169,16 @@ export function ReviewPage() {
           if (k === '_meta') continue
           if (typeof v === 'string' || typeof v === 'number') {
             defaults[k] = String(v)
+            filled++
           }
         }
+        const meta = (extracted as any)._meta
+        // Defer setState to next tick — useState initializer can't call setState
+        setTimeout(() => setExtractInfo({
+          imagesProcessed: typeof meta?.images_processed === 'number' ? meta.images_processed : null,
+          fieldsFilled: filled,
+          fieldsTotal: ALL_MERGEABLE_KEYS.length,
+        }), 0)
       } catch {
         // ignore
       }
@@ -314,6 +334,31 @@ export function ReviewPage() {
             Check and edit values before saving.
           </p>
         </div>
+
+        {/* AI extraction summary — helps the crew tell empty responses apart
+            from populated ones (previously silent when the AI returned all nulls). */}
+        {extractInfo && (extractInfo.imagesProcessed !== null || extractInfo.fieldsFilled > 0) && (
+          <div
+            className={`rounded-lg border px-3 py-2 text-xs ${
+              extractInfo.fieldsFilled === 0
+                ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                : 'border-primary/30 bg-primary/10 text-primary'
+            }`}
+          >
+            {extractInfo.fieldsFilled === 0 ? (
+              <>
+                <span className="font-semibold">AI could not read any values</span> from
+                {' '}{extractInfo.imagesProcessed ?? '?'} photo{extractInfo.imagesProcessed === 1 ? '' : 's'}.
+                Try re-uploading clearer, closer shots of the gauge screens, or fill the form manually.
+              </>
+            ) : (
+              <>
+                AI populated <span className="font-semibold">{extractInfo.fieldsFilled}</span> of {extractInfo.fieldsTotal} fields
+                from {extractInfo.imagesProcessed ?? '?'} photo{extractInfo.imagesProcessed === 1 ? '' : 's'}.
+              </>
+            )}
+          </div>
+        )}
 
         {/* Add more photos & merge — collapsed by default, expands on click */}
         <div className="rounded-xl border border-border bg-card">
