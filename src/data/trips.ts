@@ -195,7 +195,7 @@ export const TRIPS: Trip[] = [
       {
         date: 'Wednesday · July 1',
         isoDate: '2026-07-01',
-        title: 'Back to Mallorca (West Coast)',
+        title: "Back to Mallorca — Dock Port d'Andratx",
         events: [
           { time: '04:00', title: 'Early departure from Ibiza' },
           {
@@ -208,83 +208,100 @@ export const TRIPS: Trip[] = [
             ],
             highlight: true,
           },
-          { title: 'Early evening berthing at Club de Vela Andratx', link: mapsLink('Club de Vela Puerto de Andratx') },
+          {
+            time: '19:00',
+            title: "Dock at Port d'Andratx",
+            link: mapsLink('Club de Vela Puerto de Andratx'),
+            details: ['Overnight berthing at Club de Vela'],
+            highlight: true,
+          },
         ],
-        overnight: 'Club de Vela, Andratx',
+        overnight: "Docked at Port d'Andratx",
       },
 
       // ---------------- Day 6 ----------------
       {
         date: 'Thursday · July 2',
         isoDate: '2026-07-02',
-        title: 'Hiking Day in Andratx',
+        title: 'Guests Explore Deià & Sóller',
+        subtitle: 'Guests off the boat by car; lunch at Sa Pedrita',
         events: [
           {
-            title: 'Morning hike — Option 1 (easier): Andratx → Sant Elm',
-            link: mapsLink('Andratx to Sant Elm trail'),
-            details: ['Approx. 6 km'],
+            time: '09:00',
+            title: 'Guests depart by car to explore Deià & Sóller',
+            link: mapsLink('Deia Soller Mallorca'),
+            details: ['Full morning driving the northwest coast'],
+            highlight: true,
           },
           {
-            title: 'Morning hike — Option 2 (challenging): Andratx → La Trapa → Sant Elm',
-            link: mapsLink('La Trapa Sant Elm Mallorca'),
-            details: ['Approx. 13 km'],
+            title: 'Explore Deià village',
+            link: mapsLink('Deia Mallorca village'),
           },
-          { title: 'Yacht relocates and anchors in Sant Elm during the hike', link: mapsLink('Sant Elm Mallorca anchorage') },
+          {
+            title: 'Continue to Sóller',
+            link: mapsLink('Soller Mallorca'),
+          },
+          {
+            time: '14:00',
+            title: 'Lunch at Sa Pedrita',
+            link: mapsLink('Sa Pedrita Mallorca'),
+            highlight: true,
+          },
+          { title: "Return to yacht in Port d'Andratx in the afternoon" },
         ],
-        overnight: 'Anchored in Sant Elm',
+        overnight: "Docked at Port d'Andratx",
       },
 
       // ---------------- Day 7 ----------------
       {
         date: 'Friday · July 3',
         isoDate: '2026-07-03',
-        title: 'Towards Deià & Sóller',
-        subtitle: 'Scenic cruise along the northwest coast',
+        title: 'Day with Annabel & Yannick',
+        subtitle: "Morning hike, lunch, and dinner in Port d'Andratx",
         events: [
-          { title: 'Swimming stop at Sa Foradada', link: mapsLink('Sa Foradada Mallorca') },
-          { title: 'Breakfast and lunch on board' },
-          { title: 'Afternoon: anchor near Cala Deià', link: mapsLink('Cala Deia Mallorca') },
-          { title: 'Tender ashore, then taxi to Deià village', link: mapsLink('Deia Mallorca village') },
+          {
+            time: '08:00',
+            title: 'Morning hike with Annabel',
+            link: mapsLink('Andratx hiking trails'),
+            details: ['Approx. 3 hours'],
+            highlight: true,
+          },
+          {
+            time: '12:30',
+            title: 'Lunch with Annabel',
+            highlight: true,
+          },
           {
             time: '20:00',
-            title: 'Dinner at Sa Pedrissa',
-            link: mapsLink('Sa Pedrissa Deia Mallorca'),
-            details: ['Hilltop restaurant near Deià with panoramic views'],
+            title: "Dinner with Annabel & Yannick — Port d'Andratx",
+            link: mapsLink("Port d'Andratx Mallorca restaurants"),
+            details: ['Venue TBD'],
             highlight: true,
           },
         ],
-        overnight: 'Anchored near Deià',
+        overnight: "Docked at Port d'Andratx",
       },
 
       // ---------------- Day 8 ----------------
       {
         date: 'Saturday · July 4',
         isoDate: '2026-07-04',
-        title: 'Cruise to Menorca',
+        title: 'TBD — Weather Dependent',
+        subtitle: 'Plans to be determined based on weather',
         events: [
-          { title: 'Morning departure past Cap Formentor', link: mapsLink('Cap Formentor Mallorca') },
-          { title: 'Approx. 4–5 hour cruise to Menorca' },
-          {
-            time: '18:30–20:00',
-            title: "Cova d'en Xoroi — Terrace Box Side",
-            link: mapsLink("Cova d'en Xoroi Menorca"),
-            details: ['Sunset cliffside cave bar on the south coast'],
-            highlight: true,
-          },
+          { title: 'Plans to be determined based on weather conditions' },
         ],
-        overnight: 'Menorca',
       },
 
       // ---------------- Day 9 ----------------
       {
         date: 'Sunday · July 5',
         isoDate: '2026-07-05',
-        title: 'Menorca — Beach Day',
+        title: 'TBD — Weather Dependent',
+        subtitle: 'Plans to be determined based on weather',
         events: [
-          { title: 'Day exploring Menorca: beaches & coves' },
-          { title: 'Lunch on board or ashore' },
+          { title: 'Plans to be determined based on weather conditions' },
         ],
-        overnight: 'Menorca',
       },
 
       // ---------------- Day 10 ----------------
