@@ -178,22 +178,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     }))
 
-    const message = await client.messages.create({
-      model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            ...imageContent,
+    // Model selection: prefer the env override, then the current recommended
+    // Sonnet model, with a fallback to the previous 4.6 generation in case
+    // the account hasn't been upgraded yet. If Anthropic returns a
+    // model-not-found error we retry with the next candidate.
+    const modelCandidates = [
+      process.env.ANTHROPIC_MODEL,
+      'claude-sonnet-5',
+      'claude-sonnet-4-6',
+    ].filter((m): m is string => !!m)
+
+    let message: Anthropic.Message | null = null
+    let lastErr: any = null
+    for (const model of modelCandidates) {
+      try {
+        message = await client.messages.create({
+          model,
+          max_tokens: 4096,
+          messages: [
             {
-              type: 'text',
-              text: EXTRACTION_PROMPT,
+              role: 'user',
+              content: [
+                ...imageContent,
+                {
+                  type: 'text',
+                  text: EXTRACTION_PROMPT,
+                },
+              ],
             },
           ],
-        },
-      ],
-    })
+        })
+        break
+      } catch (err: any) {
+        lastErr = err
+        // Retry only on model-not-found / 404 errors; surface everything else.
+        const status = err?.status
+        const type = err?.error?.error?.type || err?.error?.type
+        const msg  = (err?.error?.error?.message || err?.message || '').toLowerCase()
+        const isModelMiss =
+          status === 404 ||
+          type === 'not_found_error' ||
+          msg.includes('model') && (msg.includes('not found') || msg.includes('does not exist') || msg.includes('invalid'))
+        if (!isModelMiss) throw err
+        // Otherwise continue to the next candidate.
+      }
+    }
+    if (!message) {
+      throw lastErr || new Error('No usable Anthropic model available')
+    }
 
     const text = message.content[0]?.type === 'text' ? message.content[0].text : '{}'
     const jsonMatch = text.match(/\{[\s\S]*\}/)

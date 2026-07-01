@@ -159,9 +159,15 @@ export function UploadPage() {
         )}
 
         {mutation.isError && (
-          <p className="text-sm text-destructive">
-            {mutation.error instanceof Error ? mutation.error.message : 'Extraction failed. Please try again.'}
-          </p>
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5">
+            <p className="text-sm font-medium text-destructive">Extraction failed</p>
+            <p className="mt-1 text-xs text-destructive/90 break-words">
+              {mutation.error instanceof Error ? mutation.error.message : 'Please try again.'}
+            </p>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              Try fewer or smaller photos, retry in a moment, or use “Skip — Fill Manually” below.
+            </p>
+          </div>
         )}
 
         <Button
