@@ -382,7 +382,31 @@ export function ReviewPage() {
         )}
 
         {/* AI extraction summary — helps the crew tell empty responses apart
-            from populated ones (previously silent when the AI returned all nulls). */}
+            from populated ones (previously silent when the AI returned all nulls).
+            If Claude explicitly refused / didn't return JSON, show his reply so
+            we can debug the photo without having to open the raw panel. */}
+        {(() => {
+          try {
+            const parsed = rawExtract ? JSON.parse(rawExtract) : null
+            const meta = parsed?._meta
+            const parseError = meta?.parse_error
+            const claudeReply = meta?.claude_reply
+            if (parseError && claudeReply) {
+              return (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5">
+                  <p className="text-sm font-semibold text-destructive">Claude returned no data</p>
+                  <p className="mt-1 text-xs text-destructive/90">{parseError}</p>
+                  <p className="mt-2 text-[11px] font-medium text-muted-foreground">Claude's reply (first 400 chars):</p>
+                  <p className="mt-1 text-[11px] text-foreground/80 whitespace-pre-wrap break-words bg-background/50 rounded p-2 max-h-40 overflow-auto">
+                    {String(claudeReply).slice(0, 400)}
+                  </p>
+                </div>
+              )
+            }
+          } catch {}
+          return null
+        })()}
+
         {extractInfo && (extractInfo.imagesProcessed !== null || extractInfo.fieldsFilled > 0) && (
           <div
             className={`rounded-lg border px-3 py-2 text-xs ${

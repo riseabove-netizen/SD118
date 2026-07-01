@@ -14,7 +14,9 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-const EXTRACTION_PROMPT = `You are an expert marine engineer reading Caterpillar engine display screens for the M/Y Rise Above (Sanlorenzo SD118).
+const EXTRACTION_PROMPT = `You are an OCR service reading Caterpillar engine display screens for the M/Y Rise Above (Sanlorenzo SD118).
+
+You MUST respond with a single JSON object matching the schema below. Do NOT add any prose, apologies, refusals, explanations, or code fences. If a photo is blurry, angled, dark, or partially obscured, still respond with the JSON — just use null for the fields you cannot read. Never respond with text like "I cannot" or "I'm sorry" — always return the JSON.
 
 For each engine (Port and Starboard), extract the following readings from the engine display photos. Use null for any value not visible. Numeric values only — no units.
 
@@ -76,7 +78,7 @@ Return a JSON object in this exact shape (all fields included, null when missing
   }
 }
 
-Return ONLY valid JSON, no other text.`
+Return ONLY the JSON object above. No prose, no markdown, no code fences.`
 
 function detectMediaType(b64: string): 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' {
   // Decode first few bytes to sniff magic numbers
@@ -185,14 +187,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     }))
 
-    // Model selection: prefer the env override, then the current recommended
-    // Sonnet model, with a fallback to the previous 4.6 generation in case
-    // the account hasn't been upgraded yet. If Anthropic returns a
-    // model-not-found error we retry with the next candidate.
+    // Model selection: prefer the env override, then the current stable
+    // Sonnet 4.6 (proven working with these engine display photos).
+    // Try newer models as a bonus if they exist, but don't gate on them.
     const modelCandidates = [
       process.env.ANTHROPIC_MODEL,
-      'claude-sonnet-5',
       'claude-sonnet-4-6',
+      'claude-sonnet-5',
     ].filter((m): m is string => !!m)
 
     let message: Anthropic.Message | null = null
@@ -202,6 +203,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         message = await client.messages.create({
           model,
           max_tokens: 4096,
+          system: 'You are a strict JSON extractor. Always respond with a single JSON object matching the requested schema. Never refuse. Never add prose or code fences. Unreadable fields must be null.',
           messages: [
             {
               role: 'user',
@@ -212,6 +214,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   text: EXTRACTION_PROMPT,
                 },
               ],
+            },
+            // Prefill the assistant with an opening brace so it MUST continue
+            // with JSON. This is the standard Anthropic pattern for forcing
+            // structured output and defeats refusal preambles.
+            {
+              role: 'assistant',
+              content: '{',
             },
           ],
         })
@@ -234,14 +243,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw lastErr || new Error('No usable Anthropic model available')
     }
 
-    const text = message.content[0]?.type === 'text' ? message.content[0].text : '{}'
+    let text = message.content[0]?.type === 'text' ? message.content[0].text : ''
+    // Assistant prefill starts with '{' so Claude's response continues from there.
+    // Prepend the missing brace back before regex-matching / parsing.
+    if (!text.trimStart().startsWith('{')) {
+      text = '{' + text
+    }
+    // Find the widest {...} block in Claude's response. Fenced code blocks (```json ... ```)
+    // are also handled by matching the outer braces.
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     let data: Record<string, unknown> = {}
+    let parseError: string | null = null
     try {
       data = jsonMatch ? JSON.parse(jsonMatch[0]) : {}
-    } catch (e) {
+      if (!jsonMatch) {
+        parseError = 'Claude did not return any JSON object'
+      }
+    } catch (e: any) {
+      parseError = `JSON parse failed: ${e?.message || String(e)}`
       console.error('JSON parse failed. Raw text:', text)
-      return res.status(502).json({ error: 'AI returned non-JSON response', raw: text.slice(0, 500) })
+    }
+
+    if (parseError) {
+      // Surface the raw Claude response so the crew (and me) can see WHY
+      // no data came back — e.g. "I cannot read these images", refusals, etc.
+      return res.status(200).json({
+        _meta: {
+          images_received: images.length,
+          images_processed: imageContent.length,
+          model: (message as any)?.model || null,
+          stop_reason: (message as any)?.stop_reason || null,
+          parse_error: parseError,
+          claude_reply: text.slice(0, 2000),
+        },
+      })
     }
 
     // Safety net: convert any decimal-degree coordinates the model returned
@@ -258,6 +293,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ;(data as Record<string, unknown>)._meta = {
       images_received: images.length,
       images_processed: imageContent.length,
+      model: (message as any)?.model || null,
+      stop_reason: (message as any)?.stop_reason || null,
     }
     return res.status(200).json(data)
   } catch (error: any) {
