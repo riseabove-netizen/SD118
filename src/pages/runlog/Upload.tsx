@@ -6,6 +6,43 @@ import { extractFromImages } from '@/lib/api'
 import { compressImageToJpegBase64 } from '@/lib/imageCompress'
 import { useMutation } from '@tanstack/react-query'
 
+/**
+ * Merge multiple extraction responses — for each field, take the first
+ * non-null value across the chunks. This lets us split a large photo batch
+ * into multiple API calls (to stay under Vercel's 4.5 MB body limit) and
+ * still produce a single unified reading set for the review page.
+ */
+function mergeExtractions(parts: Record<string, unknown>[]): Record<string, unknown> {
+  if (parts.length === 0) return {}
+  if (parts.length === 1) return parts[0]
+
+  const out: Record<string, unknown> = {}
+  for (const p of parts) {
+    for (const [k, v] of Object.entries(p)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        const existing = (out[k] as Record<string, unknown> | undefined) || {}
+        const incoming = v as Record<string, unknown>
+        const merged: Record<string, unknown> = { ...existing }
+        for (const [ik, iv] of Object.entries(incoming)) {
+          if (merged[ik] === undefined || merged[ik] === null || merged[ik] === '') {
+            merged[ik] = iv
+          }
+        }
+        out[k] = merged
+      } else {
+        if (out[k] === undefined || out[k] === null || out[k] === '') out[k] = v
+      }
+    }
+  }
+  // Reflect the actual chunking in _meta so we can debug in the field.
+  const totalImages = parts.reduce(
+    (acc, p) => acc + (((p as any)._meta?.images_processed as number) || 0),
+    0,
+  )
+  out._meta = { chunks: parts.length, images_processed: totalImages }
+  return out
+}
+
 export function UploadPage() {
   const [, setLocation] = useLocation()
   const [files, setFiles] = useState<File[]>([])
@@ -13,16 +50,45 @@ export function UploadPage() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const libraryInputRef = useRef<HTMLInputElement>(null)
 
+  // Vercel's request body limit is 4.5 MB. Base64 inflates payload by ~33 %,
+  // so we target a per-photo budget of ~450 KB and split into multiple API
+  // calls if the batch would exceed the limit — then merge the results.
+  const MAX_BODY_BYTES = 4_000_000
+
   const mutation = useMutation({
     mutationFn: async (fileList: File[]) => {
-      // Compress / convert each photo to a moderate JPEG so we stay under
-      // Vercel's 4.5 MB request body limit and avoid HEIC issues.
+      // Compress every photo to 1200 px on the long edge at JPEG quality 0.78.
+      // Digital engine displays stay crisp — Claude Vision downscales anything
+      // larger than ~1568 px anyway, so uploading higher-res wastes bandwidth
+      // and tokens without improving accuracy.
       const images: string[] = []
       for (const file of fileList) {
-        const b64 = await compressImageToJpegBase64(file, { maxDim: 1600, quality: 0.82 })
+        const b64 = await compressImageToJpegBase64(file, { maxDim: 1200, quality: 0.78 })
         images.push(b64)
       }
-      return extractFromImages(images)
+
+      // Split the compressed batch into chunks that each fit under the body
+      // limit, run each chunk through the extractor, and deep-merge results.
+      const chunks: string[][] = []
+      let bucket: string[] = []
+      let bucketBytes = 0
+      for (const img of images) {
+        const bytes = img.length // rough proxy for JSON body cost
+        if (bucket.length > 0 && bucketBytes + bytes > MAX_BODY_BYTES) {
+          chunks.push(bucket)
+          bucket = []
+          bucketBytes = 0
+        }
+        bucket.push(img)
+        bucketBytes += bytes
+      }
+      if (bucket.length > 0) chunks.push(bucket)
+
+      const results: Record<string, unknown>[] = []
+      for (const c of chunks) {
+        results.push(await extractFromImages(c))
+      }
+      return mergeExtractions(results)
     },
     onSuccess: data => {
       sessionStorage.setItem('extractedData', JSON.stringify(data))
