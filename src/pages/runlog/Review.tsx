@@ -125,6 +125,10 @@ export function ReviewPage() {
     fieldsFilled: number
     fieldsTotal: number
   } | null>(null)
+  // Raw AI response for on-device debugging (previous session or last extract).
+  // Kept inside a collapsed panel — surfaces silent-null / wrong-key issues.
+  const [rawExtract, setRawExtract] = useState<string>('')
+  const [rawOpen, setRawOpen] = useState(false)
   const [values, setValues] = useState<FormValues>(() => {
     // Date / time and lat/lon are read from the photos by the AI —
     // we intentionally do NOT default them to the device's clock/GPS.
@@ -151,6 +155,8 @@ export function ReviewPage() {
     // Pull any AI-extracted values
     const raw = sessionStorage.getItem('extractedData')
     if (raw) {
+      // Keep raw payload around so the crew can inspect it if fields don't populate.
+      setTimeout(() => setRawExtract(raw), 0)
       try {
         const extracted = JSON.parse(raw) as Record<string, unknown>
         let filled = 0
@@ -334,6 +340,46 @@ export function ReviewPage() {
             Check and edit values before saving.
           </p>
         </div>
+
+        {/* Raw AI response — debug panel for when fields don't populate.
+            Collapsed by default; opens on tap. Always visible if there IS a raw payload. */}
+        {rawExtract && (
+          <div className="rounded-lg border border-border bg-card">
+            <button
+              type="button"
+              onClick={() => setRawOpen(o => !o)}
+              className="w-full flex items-center justify-between px-3 py-2 text-left text-xs"
+              aria-expanded={rawOpen}
+            >
+              <span className="font-medium text-muted-foreground">
+                Debug: raw AI response ({rawExtract.length.toLocaleString()} chars)
+              </span>
+              <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${rawOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+            {rawOpen && (
+              <div className="px-3 pb-3 border-t border-border">
+                <pre className="text-[10px] leading-tight whitespace-pre-wrap break-all bg-background rounded p-2 mt-2 max-h-64 overflow-auto font-mono">
+                  {(() => {
+                    try {
+                      return JSON.stringify(JSON.parse(rawExtract), null, 2)
+                    } catch {
+                      return rawExtract
+                    }
+                  })()}
+                </pre>
+                <button
+                  type="button"
+                  onClick={() => { navigator.clipboard?.writeText(rawExtract).catch(() => {}) }}
+                  className="mt-2 text-xs text-primary hover:underline"
+                >
+                  Copy to clipboard
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* AI extraction summary — helps the crew tell empty responses apart
             from populated ones (previously silent when the AI returned all nulls). */}
