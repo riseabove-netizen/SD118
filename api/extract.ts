@@ -203,7 +203,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         message = await client.messages.create({
           model,
           max_tokens: 4096,
-          system: 'You are a strict JSON extractor. Always respond with a single JSON object matching the requested schema. Never refuse. Never add prose or code fences. Unreadable fields must be null.',
+          system: 'You are a strict JSON extractor for a marine engine-room running log. ALWAYS respond with a single JSON object matching the requested schema and NOTHING else. Do not include any prose, greeting, explanation, apology, refusal, markdown, or code fences before or after the object. Your first output character MUST be `{` and your last output character MUST be `}`. If a value is unreadable, use null. If ALL values are unreadable, still return the JSON object with every field set to null.',
           messages: [
             {
               role: 'user',
@@ -214,13 +214,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   text: EXTRACTION_PROMPT,
                 },
               ],
-            },
-            // Prefill the assistant with an opening brace so it MUST continue
-            // with JSON. This is the standard Anthropic pattern for forcing
-            // structured output and defeats refusal preambles.
-            {
-              role: 'assistant',
-              content: '{',
             },
           ],
         })
@@ -244,13 +237,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     let text = message.content[0]?.type === 'text' ? message.content[0].text : ''
-    // Assistant prefill starts with '{' so Claude's response continues from there.
-    // Prepend the missing brace back before regex-matching / parsing.
-    if (!text.trimStart().startsWith('{')) {
-      text = '{' + text
-    }
-    // Find the widest {...} block in Claude's response. Fenced code blocks (```json ... ```)
-    // are also handled by matching the outer braces.
+    // Find the widest {...} block in Claude's response. Handles unfenced,
+    // fenced (```json ... ```), and mixed prose+JSON replies.
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     let data: Record<string, unknown> = {}
     let parseError: string | null = null
