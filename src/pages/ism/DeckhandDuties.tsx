@@ -1,7 +1,27 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { DECKHAND_DUTIES_SECTIONS, type DeckhandSection } from '@/data/deckhand-duties'
+
+function todayKey(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+
+function getSectionProgress(sectionId: string): number {
+  try {
+    const raw = localStorage.getItem(`deckhand-duties:${sectionId}`)
+    if (!raw) return 0
+    const parsed = JSON.parse(raw) as { date: string; items: Record<number, { checked: boolean }> }
+    if (parsed.date !== todayKey()) return 0
+    return Object.values(parsed.items || {}).filter(v => v?.checked).length
+  } catch {
+    return 0
+  }
+}
 
 interface TileProps {
   onClick: () => void
@@ -9,10 +29,11 @@ interface TileProps {
   description: string
   tone: DeckhandSection['tone']
   itemCount: number
+  doneCount: number
   icon: React.ReactNode
 }
 
-function Tile({ onClick, title, description, tone, itemCount, icon }: TileProps) {
+function Tile({ onClick, title, description, tone, itemCount, doneCount, icon }: TileProps) {
   const toneClasses: Record<DeckhandSection['tone'], { border: string; bg: string; iconBg: string; iconColor: string; hover: string }> = {
     blue:   { border: 'border-border',           bg: 'bg-card', iconBg: 'bg-blue-500/10',    iconColor: 'text-blue-400',    hover: 'hover:bg-secondary active:bg-secondary/80' },
     red:    { border: 'border-destructive/30',   bg: 'bg-card', iconBg: 'bg-destructive/10', iconColor: 'text-destructive', hover: 'hover:bg-destructive/5 active:bg-destructive/10' },
@@ -20,6 +41,7 @@ function Tile({ onClick, title, description, tone, itemCount, icon }: TileProps)
     amber:  { border: 'border-amber-500/30',     bg: 'bg-card', iconBg: 'bg-amber-500/10',   iconColor: 'text-amber-400',   hover: 'hover:bg-amber-500/5 active:bg-amber-500/10' },
   }
   const t = toneClasses[tone]
+  const complete = doneCount === itemCount && itemCount > 0
   return (
     <button
       onClick={onClick}
@@ -29,8 +51,17 @@ function Tile({ onClick, title, description, tone, itemCount, icon }: TileProps)
         <span className={`w-6 h-6 ${t.iconColor}`}>{icon}</span>
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-base">{title}</div>
-        <div className="text-sm text-muted-foreground mt-0.5">{description} · {itemCount} {itemCount === 1 ? 'item' : 'items'}</div>
+        <div className="font-semibold text-base flex items-center gap-2">
+          <span>{title}</span>
+          {complete && (
+            <svg viewBox="0 0 24 24" className={`w-4 h-4 ${t.iconColor}`} fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          )}
+        </div>
+        <div className="text-sm text-muted-foreground mt-0.5">
+          {description} · <span className={complete ? t.iconColor : ''}>{doneCount}/{itemCount}</span>
+        </div>
       </div>
       <svg viewBox="0 0 24 24" className="w-5 h-5 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 18l6-6-6-6" />
@@ -107,13 +138,36 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
 
 export function DeckhandDutiesPage() {
   const [, setLocation] = useLocation()
+  const [progress, setProgress] = useState<Record<string, number>>({})
+
+  useEffect(() => {
+    // Read localStorage on mount + whenever page becomes visible again
+    const refresh = () => {
+      const next: Record<string, number> = {}
+      DECKHAND_DUTIES_SECTIONS.forEach(s => { next[s.id] = getSectionProgress(s.id) })
+      setProgress(next)
+    }
+    refresh()
+    const onVis = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [])
+
+  const totalItems = DECKHAND_DUTIES_SECTIONS.reduce((a, s) => a + s.items.length, 0)
+  const totalDone = Object.values(progress).reduce((a, n) => a + n, 0)
 
   return (
     <MenuLayout title="Exterior Daily Duties" showBack backHref="/ism">
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold">Deckhand Duties SOP</h2>
-          <p className="text-sm text-muted-foreground mt-1">M/Y Rise Above · Guests on board</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            M/Y Rise Above · Guests on board · {totalDone}/{totalItems} done today
+          </p>
         </div>
 
         <div className="space-y-3">
@@ -125,6 +179,7 @@ export function DeckhandDutiesPage() {
               description={section.description}
               tone={section.tone}
               itemCount={section.items.length}
+              doneCount={progress[section.id] ?? 0}
               icon={SECTION_ICONS[section.id] ?? SECTION_ICONS['general-notes']}
             />
           ))}
