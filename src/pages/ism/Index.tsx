@@ -110,6 +110,21 @@ export function IsmIndexPage() {
               </svg>
             }
           />
+
+          <Tile
+            onClick={() => setLocation('/ism/deckhand-duties')}
+            id="deckhand-duties"
+            title="Exterior Daily Duties"
+            description="Deckhand SOP for guests on board"
+            tone="blue"
+            icon={
+              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 18h18"/>
+                <path d="M5 18V9l7-4 7 4v9"/>
+                <path d="M9 22V12h6v10"/>
+              </svg>
+            }
+          />
         </div>
       </div>
     </MenuLayout>

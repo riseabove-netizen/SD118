@@ -27,6 +27,8 @@ import { DrillsPage } from '@/pages/ism/Drills'
 import { PerformDrillPage } from '@/pages/ism/PerformDrill'
 import { SafetyEquipmentTestPage } from '@/pages/ism/SafetyEquipmentTest'
 import { AnchorWatchPage } from '@/pages/ism/AnchorWatch'
+import { DeckhandDutiesPage } from '@/pages/ism/DeckhandDuties'
+import { DeckhandDutiesSectionPage } from '@/pages/ism/DeckhandDutiesSection'
 
 // Inspection
 import { InspectionPage } from '@/pages/inspection/Inspection'
@@ -150,6 +152,12 @@ function AppRoutes() {
       </Route>
       <Route path="/ism/drills">
         <AuthGuard><DrillsPage /></AuthGuard>
+      </Route>
+      <Route path="/ism/deckhand-duties">
+        <AuthGuard><DeckhandDutiesPage /></AuthGuard>
+      </Route>
+      <Route path="/ism/deckhand-duties/:sectionId">
+        <AuthGuard><DeckhandDutiesSectionPage /></AuthGuard>
       </Route>
 
       {/* Engine Room Inspection */}
