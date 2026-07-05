@@ -58,7 +58,38 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
     return out
   }, [enrolledUsers, data.signatures, data.startedBy])
 
-  const slots = useMemo(() => buildHourSlots(data.startedAt, hoursToShow), [data.startedAt, hoursToShow])
+  // Build the visible slot list:
+  //   • Always include every hour the admin has already assigned or notified.
+  //     These stay visible to every crew member (not just admins), so they can
+  //     see who is on which watch even hours ahead.
+  //   • Admins additionally see `hoursToShow` blank upcoming rows they can fill
+  //     (the “+ Add 3 more hours” button grows this).
+  //   • Non-admin viewers get at least the next 1 upcoming hour visible even
+  //     when nothing is assigned yet, so the card is never empty.
+  const slots = useMemo(() => {
+    if (!data.startedAt) return []
+    const set = new Set<string>()
+    // 1) All hours that carry an assignment or a notified flag — for everyone.
+    Object.keys(schedule).forEach(k => { if (k) set.add(k) })
+    Object.keys(notified).forEach(k => { if (k) set.add(k) })
+    // 2) Upcoming lookahead. Take the next N sequential hours starting from
+    //    the next top-of-hour after startedAt and add them to the set. This
+    //    ensures the admin’s “+ Add 3 more hours” button surfaces blank rows
+    //    beyond what’s already filled.
+    const nowMs = Date.now()
+    const lookaheadCount = admin ? hoursToShow : 1
+    const sequential = buildHourSlots(data.startedAt, 48) // upper bound; filter below
+    let added = 0
+    for (const iso of sequential) {
+      if (added >= lookaheadCount) break
+      // Skip past hours for the lookahead — only surface upcoming empty rows.
+      if (Date.parse(iso) < nowMs - 60 * 60 * 1000) continue
+      if (set.has(iso)) continue
+      set.add(iso)
+      added++
+    }
+    return Array.from(set).sort()
+  }, [data.startedAt, schedule, notified, hoursToShow, admin])
 
   useEffect(() => {
     let cancel = false
@@ -174,7 +205,7 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
       <p className="text-xs text-muted-foreground">
         {admin
           ? 'Assign a keeper for the next hour. Add more hours 3 at a time as you plan ahead. They\u2019ll get a push notification when it\u2019s their turn.'
-          : 'The captain assigns the watch schedule. Enable notifications below to be pinged when it\u2019s your turn.'}
+          : 'The captain assigns the watch schedule. Enable notifications below to be pinged when it\u2019s your turn \u2014 all assigned hours are shown so you can see who\u2019s on next.'}
       </p>
 
       {/* Push enrollment card — every crew member sees this */}
