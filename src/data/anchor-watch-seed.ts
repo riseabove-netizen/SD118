@@ -65,6 +65,14 @@ export interface AnchorWatchData {
   // Hourly signatures
   signatures: AnchorWatchSign[]
 
+  // Hourly watch schedule (admin-editable): ISO hour start -> crew name
+  // e.g. { "2026-07-05T21:00:00.000Z": "Alex", "2026-07-05T22:00:00.000Z": "Sam" }
+  schedule?: Record<string, string>
+
+  // Server-side bookkeeping: which schedule slots have already been notified
+  // (so the cron doesn't ping the same person twice). Written by /api/watch-cron.
+  notifiedSlots?: Record<string, string>  // hourIso -> notifiedAt ISO
+
   // Close-out
   closed: boolean
   closedAt?: string

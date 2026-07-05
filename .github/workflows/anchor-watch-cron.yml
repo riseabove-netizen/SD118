@@ -1,0 +1,25 @@
+name: Anchor watch hourly notifier
+
+on:
+  # Vercel Hobby's built-in cron is daily-only, so we run the dispatcher from
+  # GitHub Actions every 5 minutes. The endpoint itself decides whether any
+  # notifications are due right now.
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit /api/watch-cron
+        env:
+          WATCH_CRON_URL: https://sd118-runlog.vercel.app/api/watch-cron
+          WATCH_CRON_SECRET: ${{ secrets.WATCH_CRON_SECRET }}
+        run: |
+          set -e
+          if [ -z "$WATCH_CRON_SECRET" ]; then
+            echo "WATCH_CRON_SECRET not set in repo secrets; skipping"
+            exit 0
+          fi
+          curl -sS -f -H "Authorization: Bearer $WATCH_CRON_SECRET" "$WATCH_CRON_URL"

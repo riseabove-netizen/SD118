@@ -1,0 +1,13 @@
+{
+  "name": "M/Y Rise Above",
+  "short_name": "Rise Above",
+  "description": "M/Y Rise Above Engine Log and ISM",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#121212",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

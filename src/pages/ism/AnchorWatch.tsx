@@ -3,6 +3,7 @@ import { useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { fetchGuide, saveGuide, uploadGuidePhoto, uploadDrivePdf } from '@/lib/guides'
 import { getCrewName, isAdmin } from '@/lib/auth'
+import { AnchorWatchSchedule } from './AnchorWatchSchedule'
 import { useGeolocation, formatCoords } from '@/lib/useGeolocation'
 import {
   ANCHOR_CHECKLIST,
@@ -756,6 +757,9 @@ function ActivePanel(props: {
           </ul>
         )}
       </div>
+
+      {/* Watch schedule + notifications */}
+      <AnchorWatchSchedule data={data} disabled={disabled} />
 
       {/* Sign-watch form */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
