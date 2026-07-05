@@ -38,6 +38,13 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
   // the <select> is replaced with a free-text input.
   const [customSlots, setCustomSlots] = useState<Record<string, boolean>>({})
 
+  // Row filters. By default, past hours are hidden and everyone’s watches are
+  // shown. “Show past times” unhides completed hours; “Only show my watches”
+  // narrows the list to rows where the crew name matches the logged-in user.
+  const [showPast, setShowPast] = useState(false)
+  const [onlyMine, setOnlyMine] = useState(false)
+  const currentCrewName = (getCrewName() || '').trim()
+
   // Names offered in the admin dropdown — merge push-enrolled users,
   // people who have already signed the watch, and the watch starter.
   const suggestedNames = useMemo(() => {
@@ -261,13 +268,35 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
             <span>Watch keeper</span>
             <span>Status</span>
           </div>
-          {slots.length === 0 ? (
-            <div className="px-3 py-3 text-xs text-muted-foreground">
-              Waiting for the watch to be started.
-            </div>
-          ) : (
+          {(() => {
+            // Apply the two row filters here (past + only-mine). We keep the
+            // full `slots` for the currentSlotIdx computation elsewhere, and
+            // only narrow what we render.
+            const cutoffMs = nowMs - 60 * 60 * 1000
+            const filtered = slots.filter(iso => {
+              const past = Date.parse(iso) < cutoffMs
+              if (!showPast && past) return false
+              if (onlyMine) {
+                const val = (schedule[iso] || '').trim().toLowerCase()
+                if (!val || val !== currentCrewName.toLowerCase()) return false
+              }
+              return true
+            })
+            if (filtered.length === 0) {
+              return (
+                <div className="px-3 py-3 text-xs text-muted-foreground">
+                  {onlyMine
+                    ? 'No watches assigned to you yet.'
+                    : slots.length === 0
+                      ? 'Waiting for the watch to be started.'
+                      : 'No upcoming watches to show. Toggle “Show past times” to see completed hours.'}
+                </div>
+              )
+            }
+            return (
             <ul className="divide-y divide-border">
-              {slots.map((iso, i) => {
+              {filtered.map((iso) => {
+                const i = slots.indexOf(iso)
                 const val = schedule[iso] || ''
                 const notifyAt = notified[iso]
                 const slotMs = Date.parse(iso)
@@ -345,9 +374,32 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
                 )
               })}
             </ul>
-          )}
+            )
+          })()}
         </div>
       )}
+
+      {/* Row filters — available to everyone. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowPast(v => !v)}
+          className={`text-xs px-2.5 py-1 rounded border ${showPast ? 'bg-red-600/20 border-red-500 text-red-200' : 'border-border hover:bg-secondary'}`}
+          aria-pressed={showPast}
+        >
+          {showPast ? '✓ Showing past times' : 'Show past times'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOnlyMine(v => !v)}
+          disabled={!currentCrewName}
+          className={`text-xs px-2.5 py-1 rounded border ${onlyMine ? 'bg-red-600/20 border-red-500 text-red-200' : 'border-border hover:bg-secondary disabled:opacity-40'}`}
+          aria-pressed={onlyMine}
+          title={currentCrewName ? '' : 'Set your name in Settings first'}
+        >
+          {onlyMine ? '✓ Showing only my watches' : 'Only show my watches'}
+        </button>
+      </div>
 
       {admin && (
         <div className="flex items-center justify-between">
