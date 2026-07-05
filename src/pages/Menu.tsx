@@ -72,13 +72,6 @@ export function MenuPage() {
           description="Upload and log engine readings"
         />
         <MenuItem
-          icon="🛡️"
-          id="ism"
-          label="ISM"
-          href="/ism"
-          description="Operating, Emergency, Fire Safety & Drills"
-        />
-        <MenuItem
           icon="🔍"
           id="inspection"
           label="Engine Room Inspection Log"
@@ -86,18 +79,11 @@ export function MenuPage() {
           description="Walk-around inspection with PDF report"
         />
         <MenuItem
-          icon="📦"
-          id="inventory"
-          label="Inventory"
-          href="/inventory"
-          description="Spares & consumables onboard"
-        />
-        <MenuItem
-          icon="📖"
-          id="guides"
-          label="Operational Guides"
-          href="/guides"
-          description="Crew procedures & how-tos"
+          icon="🕒"
+          id="watch"
+          label="Watch Duties"
+          href="/watch"
+          description="Daily checklist & watch calendar"
         />
         <MenuItem
           icon="🗓️"
@@ -107,11 +93,25 @@ export function MenuPage() {
           description="Upcoming trips & itineraries"
         />
         <MenuItem
-          icon="🕒"
-          id="watch"
-          label="Watch Duties"
-          href="/watch"
-          description="Daily checklist & watch calendar"
+          icon="🛡️"
+          id="ism"
+          label="ISM"
+          href="/ism"
+          description="Operating, Emergency, Fire Safety & Drills"
+        />
+        <MenuItem
+          icon="📖"
+          id="guides"
+          label="Operational Guides"
+          href="/guides"
+          description="Crew procedures & how-tos"
+        />
+        <MenuItem
+          icon="📦"
+          id="inventory"
+          label="Inventory"
+          href="/inventory"
+          description="Spares & consumables onboard"
         />
         <MenuItem
           icon="⚙️"
