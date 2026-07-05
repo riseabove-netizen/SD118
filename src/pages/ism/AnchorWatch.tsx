@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { fetchGuide, saveGuide, uploadGuidePhoto, uploadDrivePdf } from '@/lib/guides'
-import { getCrewName } from '@/lib/auth'
+import { getCrewName, isAdmin } from '@/lib/auth'
 import { useGeolocation, formatCoords } from '@/lib/useGeolocation'
 import {
   ANCHOR_CHECKLIST,
@@ -294,6 +294,7 @@ export function AnchorWatchPage() {
 
   const handleCloseAndSign = async () => {
     setError(null)
+    if (!isAdmin()) { setError('Only admins can close the watch and generate the PDF.'); return }
     if (!captainName.trim()) { setError('Captain name is required to close the watch'); return }
     setBusy('Building report…')
     try {
@@ -779,7 +780,15 @@ function ActivePanel(props: {
         </button>
       </div>
 
-      {/* Captain close-out */}
+      {/* Captain close-out — admins only */}
+      {!isAdmin() ? (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h3 className="font-semibold">Close watch — captain only</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Closing the anchor watch and generating the PDF requires an admin login. Ask the captain to sign in as admin to finish the watch.
+          </p>
+        </div>
+      ) : (
       <div className="rounded-xl border border-amber-500/30 bg-card p-4 space-y-3">
         <h3 className="font-semibold">Close watch — captain only</h3>
         <p className="text-xs text-muted-foreground">Add a photo or screenshot of the chart tracks, then sign as captain. A PDF will be created and uploaded to Google Drive.</p>
@@ -843,6 +852,7 @@ function ActivePanel(props: {
           Close & sign — generate PDF
         </button>
       </div>
+      )}
     </div>
   )
 }
