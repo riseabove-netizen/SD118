@@ -7,6 +7,8 @@
 //     body { startedAt, schedule?, notified?, user? }
 //   POST /api/anchor-notify?op=subscribe
 //     body { name, subscription, action: 'subscribe' | 'unsubscribe' }
+//   GET  /api/anchor-notify?op=users
+//     -> { users: [<name>, ...] } — unique names enrolled for push.
 //   GET|POST /api/anchor-notify?op=cron
 //     Fires pending hourly pushes for the active watch. Requires
 //     Authorization: Bearer <WATCH_CRON_SECRET> or ?key=<secret> unless the
@@ -323,6 +325,27 @@ async function handleCron(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({ ok: true, active: active.startedAt, results })
 }
 
+// ---------- users op ----------
+
+async function handleUsers(_req: VercelRequest, res: VercelResponse) {
+  const sheets = getSheets()
+  await ensureSheet(sheets, 'PushSubs', ['Endpoint', 'Name', 'P256dh', 'Auth', 'CreatedAt', 'UpdatedAt'])
+  const resp = await sheets.spreadsheets.values.get({ spreadsheetId: INVENTORY_ID, range: 'PushSubs!A:F' })
+  const rows = resp.data.values || []
+  const seen = new Set<string>()
+  const users: string[] = []
+  for (const r of rows.slice(1)) {
+    const name = String(r[1] || '').trim()
+    if (!name) continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    users.push(name)
+  }
+  users.sort((a, b) => a.localeCompare(b))
+  return res.status(200).json({ users })
+}
+
 // ---------- dispatcher ----------
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -338,6 +361,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (op === 'subscribe') {
       if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
       return await handleSubscribe(req, res)
+    }
+    if (op === 'users') {
+      if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' })
+      return await handleUsers(req, res)
     }
     if (op === 'cron') {
       if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'GET or POST' })

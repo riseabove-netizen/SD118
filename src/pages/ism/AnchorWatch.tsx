@@ -763,10 +763,10 @@ function ActivePanel(props: {
         </button>
       </div>
 
-      {/* Watch Logged — signature history */}
+      {/* Log history — signature history */}
       <div className="rounded-xl border border-border bg-card">
         <div className="px-4 py-3 border-b border-border">
-          <h3 className="font-semibold">Watch Logged ({data.signatures.length})</h3>
+          <h3 className="font-semibold">Log history ({data.signatures.length})</h3>
         </div>
         {data.signatures.length === 0 ? (
           <div className="px-4 py-3 text-sm text-muted-foreground">No signatures yet.</div>
@@ -1141,7 +1141,7 @@ async function buildPdf(data: AnchorWatchData, wind: WindForecast | null, satell
   y -= 8
 
   // Signatures table header
-  page.drawText('Watch Logged', { x: margin, y: y - 11, size: 11, font: helvBold, color: ink })
+  page.drawText('Log history', { x: margin, y: y - 11, size: 11, font: helvBold, color: ink })
   y -= 16
   page.drawText('Time', { x: margin, y: y - 10, size: 9, font: helvBold, color: muted })
   page.drawText('Name', { x: margin + 110, y: y - 10, size: 9, font: helvBold, color: muted })

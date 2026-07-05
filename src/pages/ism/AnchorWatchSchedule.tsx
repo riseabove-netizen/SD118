@@ -3,7 +3,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import type { AnchorWatchData, AnchorWatchSign } from '@/data/anchor-watch-seed'
-import { fetchSchedule, saveSchedule, buildHourSlots, formatHourLocal, SIGN_MATCH_WINDOW_MS } from '@/lib/anchor-schedule'
+import { fetchSchedule, saveSchedule, buildHourSlots, formatHourLocal, SIGN_MATCH_WINDOW_MS, fetchSubscribedUsers } from '@/lib/anchor-schedule'
 import { getCrewName, isAdmin } from '@/lib/auth'
 import {
   isIosSafari, isStandalone, pushSupported,
@@ -30,23 +30,33 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
   const [pushBusy, setPushBusy] = useState(false)
   const [pushError, setPushError] = useState<string | null>(null)
 
-  // People who have already signed the watch — used to autocomplete the
-  // per-hour name field (per the user's design: auto-collect from signatures).
+  // Crew names enrolled for push — fetched from the server so the admin
+  // dropdown lists everyone who can actually receive a notification.
+  const [enrolledUsers, setEnrolledUsers] = useState<string[]>([])
+
+  // Per-slot “write in a new name” state. When a slot flips into custom mode
+  // the <select> is replaced with a free-text input.
+  const [customSlots, setCustomSlots] = useState<Record<string, boolean>>({})
+
+  // Names offered in the admin dropdown — merge push-enrolled users,
+  // people who have already signed the watch, and the watch starter.
   const suggestedNames = useMemo(() => {
     const seen = new Set<string>()
     const out: string[] = []
-    for (const s of (data.signatures || []) as AnchorWatchSign[]) {
-      const n = (s.name || '').trim()
-      if (!n) continue
+    const push = (raw: string) => {
+      const n = (raw || '').trim()
+      if (!n) return
       const key = n.toLowerCase()
-      if (seen.has(key)) continue
+      if (seen.has(key)) return
       seen.add(key)
       out.push(n)
     }
-    const started = (data.startedBy || '').trim()
-    if (started && !seen.has(started.toLowerCase())) out.push(started)
+    for (const u of enrolledUsers) push(u)
+    for (const s of (data.signatures || []) as AnchorWatchSign[]) push(s.name || '')
+    push(data.startedBy || '')
+    out.sort((a, b) => a.localeCompare(b))
     return out
-  }, [data.signatures, data.startedBy])
+  }, [enrolledUsers, data.signatures, data.startedBy])
 
   const slots = useMemo(() => buildHourSlots(data.startedAt, hoursToShow), [data.startedAt, hoursToShow])
 
@@ -67,8 +77,28 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
     getSubscriptionState().then(setPushState).catch(() => setPushState({ subscribed: false, permission: 'default' }))
   }, [])
 
+  // Pull the list of push-enrolled crew so the admin dropdown shows them.
+  // Refetch after the schedule loads (so newly-added subscribers show up when
+  // the panel is re-opened) and after a successful save.
+  useEffect(() => {
+    fetchSubscribedUsers().then(setEnrolledUsers).catch(() => setEnrolledUsers([]))
+  }, [data.startedAt])
+
   const setName = (iso: string, name: string) => {
     setScheduleState(prev => ({ ...prev, [iso]: name }))
+  }
+
+  // Sentinel value used inside the <select> to switch to free-text mode.
+  const CUSTOM_OPT = '__custom__'
+
+  const handleSelectChange = (iso: string, value: string) => {
+    if (value === CUSTOM_OPT) {
+      setCustomSlots(prev => ({ ...prev, [iso]: true }))
+      setName(iso, '')
+      return
+    }
+    setCustomSlots(prev => ({ ...prev, [iso]: false }))
+    setName(iso, value)
   }
 
   const persist = async () => {
@@ -224,23 +254,55 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
                     <span className={`font-medium ${isPast && !wasSignedFor ? 'text-muted-foreground line-through' : ''}`}>
                       {formatHourLocal(iso)}
                     </span>
-                    {admin ? (
-                      <input
-                        list={`crew-names-${i}`}
-                        value={val}
-                        disabled={disabled}
-                        onChange={e => setName(iso, e.target.value)}
-                        placeholder="Assign crew…"
-                        className="w-full rounded border border-border bg-secondary/40 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50"
-                      />
-                    ) : (
+                    {admin ? (() => {
+                      // Custom (write-in) mode: either the admin explicitly chose
+                      // “Type a new name…”, or the current value is not one of
+                      // the enrolled/known names.
+                      const isCustom =
+                        customSlots[iso] ||
+                        (!!val && !suggestedNames.some(n => n.toLowerCase() === val.toLowerCase()))
+                      if (isCustom) {
+                        return (
+                          <div className="flex items-center gap-1">
+                            <input
+                              autoFocus
+                              value={val}
+                              disabled={disabled}
+                              onChange={e => setName(iso, e.target.value)}
+                              placeholder="Type a new name…"
+                              className="w-full rounded border border-border bg-secondary/40 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => { setCustomSlots(prev => ({ ...prev, [iso]: false })); setName(iso, '') }}
+                              disabled={disabled}
+                              className="text-[11px] text-muted-foreground hover:text-foreground underline"
+                              title="Back to dropdown"
+                            >
+                              list
+                            </button>
+                          </div>
+                        )
+                      }
+                      return (
+                        <select
+                          value={val || ''}
+                          disabled={disabled}
+                          onChange={e => handleSelectChange(iso, e.target.value)}
+                          className="w-full rounded border border-border bg-secondary/40 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                        >
+                          <option value="">— Unassigned —</option>
+                          {suggestedNames.map(n => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                          <option value={CUSTOM_OPT}>+ Type a new name…</option>
+                        </select>
+                      )
+                    })() : (
                       <span className={wasSignedFor ? 'line-through text-muted-foreground' : ''}>
                         {val || <span className="text-muted-foreground">—</span>}
                       </span>
                     )}
-                    <datalist id={`crew-names-${i}`}>
-                      {suggestedNames.map(n => <option key={n} value={n} />)}
-                    </datalist>
                     <span className="text-[11px]">
                       {wasSignedFor ? <span className="text-emerald-300 font-semibold">Signed</span>
                         : notifyAt ? <span className="text-amber-300">Notified</span>

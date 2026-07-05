@@ -12,6 +12,18 @@ export async function fetchSchedule(startedAt: string): Promise<ScheduleState> {
   return { schedule: j.schedule || {}, notified: j.notified || {} }
 }
 
+/** Returns the list of crew names enrolled for push notifications (unique). */
+export async function fetchSubscribedUsers(): Promise<string[]> {
+  try {
+    const resp = await fetch('/api/anchor-notify?op=users')
+    if (!resp.ok) return []
+    const j = await resp.json()
+    return Array.isArray(j?.users) ? j.users : []
+  } catch {
+    return []
+  }
+}
+
 export async function saveSchedule(startedAt: string, schedule: Record<string, string>, user: string): Promise<ScheduleState> {
   const resp = await fetch('/api/anchor-notify?op=schedule', {
     method: 'POST',
