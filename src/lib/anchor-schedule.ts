@@ -42,6 +42,13 @@ export function buildHourSlots(startedAt: string, hours: number = 12): string[] 
   return out
 }
 
+/**
+ * How close (in ms) a sign-off must be to the scheduled slot for it to count
+ * as fulfilling that slot. Anything outside this window won't apply to the
+ * schedule (i.e. the hour will not be marked Signed).
+ */
+export const SIGN_MATCH_WINDOW_MS = 20 * 60 * 1000
+
 export function formatHourLocal(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })

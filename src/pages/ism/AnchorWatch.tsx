@@ -307,8 +307,10 @@ export function AnchorWatchPage() {
       }
       // 1) Build PDF
       const pdfBytes = await buildPdf(closedData, wind, satelliteUrl)
-      // 2) Upload PDF to Drive
-      const filename = `Anchor-Watch-${(closedData.locationName || 'untitled').replace(/[^\w-]+/g, '_')}-${closedData.closedAt!.slice(0, 10)}.pdf`
+      // 2) Upload PDF to Drive — filename format: YYYY_MM_DD-<Anchorage>.pdf
+      const datePart = closedData.closedAt!.slice(0, 10).replace(/-/g, '_')
+      const anchorPart = (closedData.locationName || 'untitled').trim().replace(/[^\w\-]+/g, '_').replace(/^_+|_+$/g, '') || 'untitled'
+      const filename = `${datePart}-${anchorPart}.pdf`
       const pdfB64 = uint8ToBase64(pdfBytes)
       const up = await uploadDrivePdf(pdfB64, filename, 'AnchorWatch')
       closedData.pdfUrl = up.viewUrl
@@ -734,34 +736,11 @@ function ActivePanel(props: {
         </ul>
       </div>
 
-      {/* Signatures list */}
-      <div className="rounded-xl border border-border bg-card">
-        <div className="px-4 py-3 border-b border-border">
-          <h3 className="font-semibold">Watch keepers ({data.signatures.length})</h3>
-        </div>
-        {data.signatures.length === 0 ? (
-          <div className="px-4 py-3 text-sm text-muted-foreground">No signatures yet.</div>
-        ) : (
-          <ul className="divide-y divide-border">
-            {data.signatures.map((s, i) => (
-              <li key={i} className="px-4 py-3 text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{s.name}</span>
-                  <span className="text-xs text-muted-foreground">{new Date(s.timestamp).toLocaleString()}</span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Wind: {s.wind || '—'}{s.notes ? ` · ${s.notes}` : ''}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
       {/* Watch schedule + notifications */}
       <AnchorWatchSchedule data={data} disabled={disabled} />
 
-      {/* Sign-watch form */}
+      {/* Sign-watch form — kept above the Watch Logged history so the
+          current keeper reaches it first when scrolling. */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
         <h3 className="font-semibold">Sign hourly watch</h3>
         <div className="grid grid-cols-2 gap-3">
@@ -782,6 +761,30 @@ function ActivePanel(props: {
         >
           Sign — {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </button>
+      </div>
+
+      {/* Watch Logged — signature history */}
+      <div className="rounded-xl border border-border bg-card">
+        <div className="px-4 py-3 border-b border-border">
+          <h3 className="font-semibold">Watch Logged ({data.signatures.length})</h3>
+        </div>
+        {data.signatures.length === 0 ? (
+          <div className="px-4 py-3 text-sm text-muted-foreground">No signatures yet.</div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {data.signatures.map((s, i) => (
+              <li key={i} className="px-4 py-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{s.name}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(s.timestamp).toLocaleString()}</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Wind: {s.wind || '—'}{s.notes ? ` · ${s.notes}` : ''}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Captain close-out — admins only */}
@@ -1138,7 +1141,7 @@ async function buildPdf(data: AnchorWatchData, wind: WindForecast | null, satell
   y -= 8
 
   // Signatures table header
-  page.drawText('Watch keepers', { x: margin, y: y - 11, size: 11, font: helvBold, color: ink })
+  page.drawText('Watch Logged', { x: margin, y: y - 11, size: 11, font: helvBold, color: ink })
   y -= 16
   page.drawText('Time', { x: margin, y: y - 10, size: 9, font: helvBold, color: muted })
   page.drawText('Name', { x: margin + 110, y: y - 10, size: 9, font: helvBold, color: muted })

@@ -3,7 +3,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import type { AnchorWatchData, AnchorWatchSign } from '@/data/anchor-watch-seed'
-import { fetchSchedule, saveSchedule, buildHourSlots, formatHourLocal } from '@/lib/anchor-schedule'
+import { fetchSchedule, saveSchedule, buildHourSlots, formatHourLocal, SIGN_MATCH_WINDOW_MS } from '@/lib/anchor-schedule'
 import { getCrewName, isAdmin } from '@/lib/auth'
 import {
   isIosSafari, isStandalone, pushSupported,
@@ -22,7 +22,9 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
-  const [hoursToShow, setHoursToShow] = useState(12)
+  // Default view: show only the next upcoming hour. Admin can grow by 3 slots
+  // at a time via the button below.
+  const [hoursToShow, setHoursToShow] = useState(1)
 
   const [pushState, setPushState] = useState<{ subscribed: boolean; permission: NotificationPermission } | null>(null)
   const [pushBusy, setPushBusy] = useState(false)
@@ -141,7 +143,7 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
       </div>
       <p className="text-xs text-muted-foreground">
         {admin
-          ? 'Assign a watch keeper for each hour. They\u2019ll get a push notification when it\u2019s their turn to sign the log.'
+          ? 'Assign a keeper for the next hour. Add more hours 3 at a time as you plan ahead. They\u2019ll get a push notification when it\u2019s their turn.'
           : 'The captain assigns the watch schedule. Enable notifications below to be pinged when it\u2019s your turn.'}
       </p>
 
@@ -210,9 +212,11 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
                 const slotMs = Date.parse(iso)
                 const isNow = i === currentSlotIdx
                 const isPast = slotMs < nowMs - 60 * 60 * 1000
-                const wasSignedFor = (data.signatures || []).some(s => {
+                // A sign-off counts against a slot only if it's within the
+                // configured window of the scheduled hour (default: 20 min).
+                const wasSignedFor = !!val && (data.signatures || []).some(s => {
                   const t = Date.parse(s.timestamp)
-                  return Math.abs(t - slotMs) < 60 * 60 * 1000 &&
+                  return Math.abs(t - slotMs) < SIGN_MATCH_WINDOW_MS &&
                     (s.name || '').trim().toLowerCase() === val.trim().toLowerCase()
                 })
                 return (
@@ -255,10 +259,10 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
       {admin && (
         <div className="flex items-center justify-between">
           <button
-            onClick={() => setHoursToShow(h => h + 12)}
-            className="text-xs text-muted-foreground underline hover:text-foreground"
+            onClick={() => setHoursToShow(h => h + 3)}
+            className="text-xs px-2.5 py-1 rounded border border-border hover:bg-secondary"
           >
-            + Show 12 more hours
+            + Add 3 more hours
           </button>
           {msg && <span className="text-xs text-emerald-300">{msg}</span>}
         </div>
