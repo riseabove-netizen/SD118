@@ -60,7 +60,7 @@ export async function subscribeToPush(name: string): Promise<PushSubscription> {
     })
   }
   const json = sub.toJSON()
-  const resp = await fetch('/api/push-subscribe', {
+  const resp = await fetch('/api/anchor-notify?op=subscribe', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name, subscription: json, action: 'subscribe' }),
@@ -76,7 +76,7 @@ export async function unsubscribeFromPush(): Promise<void> {
   const sub = await reg.pushManager.getSubscription()
   if (!sub) return
   try {
-    await fetch('/api/push-subscribe', {
+    await fetch('/api/anchor-notify?op=subscribe', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ subscription: sub.toJSON(), action: 'unsubscribe' }),

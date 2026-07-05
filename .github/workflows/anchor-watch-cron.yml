@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Hit /api/watch-cron
         env:
-          WATCH_CRON_URL: https://sd118-runlog.vercel.app/api/watch-cron
+          WATCH_CRON_URL: https://sd118-runlog.vercel.app/api/anchor-notify?op=cron
           WATCH_CRON_SECRET: ${{ secrets.WATCH_CRON_SECRET }}
         run: |
           set -e

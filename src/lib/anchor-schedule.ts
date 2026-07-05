@@ -6,14 +6,14 @@ export interface ScheduleState {
 }
 
 export async function fetchSchedule(startedAt: string): Promise<ScheduleState> {
-  const resp = await fetch(`/api/anchor-schedule?startedAt=${encodeURIComponent(startedAt)}`)
+  const resp = await fetch(`/api/anchor-notify?op=schedule&startedAt=${encodeURIComponent(startedAt)}`)
   if (!resp.ok) return { schedule: {}, notified: {} }
   const j = await resp.json()
   return { schedule: j.schedule || {}, notified: j.notified || {} }
 }
 
 export async function saveSchedule(startedAt: string, schedule: Record<string, string>, user: string): Promise<ScheduleState> {
-  const resp = await fetch('/api/anchor-schedule', {
+  const resp = await fetch('/api/anchor-notify?op=schedule', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ startedAt, schedule, user }),
