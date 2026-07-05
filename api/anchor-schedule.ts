@@ -75,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const startedAt = String(req.query.startedAt || '').trim()
     if (!startedAt) return res.status(400).json({ error: 'startedAt required' })
     const rows = await readAll(sheets)
-    const idx = rows.slice(1).findIndex(r => (r[0] || '') === startedAt)
+    const idx = rows.slice(1).findIndex((r: any[]) => (r[0] || '') === startedAt)
     if (idx < 0) return res.status(200).json({ schedule: {}, notified: {} })
     const row = rows[idx + 1]
     return res.status(200).json({
@@ -96,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const startedAt = (body?.startedAt || '').trim()
     if (!startedAt) return res.status(400).json({ error: 'startedAt required' })
     const rows = await readAll(sheets)
-    const idx = rows.slice(1).findIndex(r => (r[0] || '') === startedAt)
+    const idx = rows.slice(1).findIndex((r: any[]) => (r[0] || '') === startedAt)
     const nowIso = new Date().toISOString()
     const user = (body.user || 'crew').trim()
     const existing = idx >= 0 ? rows[idx + 1] : null

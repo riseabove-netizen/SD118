@@ -68,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   })
   const rows = resp.data.values || []
   const dataRows = rows.slice(1)
-  const idx = dataRows.findIndex(r => (r[0] || '') === sub.endpoint)
+  const idx = dataRows.findIndex((r: any[]) => (r[0] || '') === sub.endpoint)
   const now = new Date().toISOString()
 
   if (action === 'unsubscribe') {

@@ -28,7 +28,10 @@ function verifyToken(token: string | undefined | null): { ok: boolean; role?: 'a
   const expected = _hmac(payload)
   if (sig.length !== expected.length) return { ok: false }
   try {
-    if (!crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))) return { ok: false }
+    // Cast Buffer -> Uint8Array so tsc treats it as ArrayBufferView across @types/node versions.
+    const sigBuf = new Uint8Array(Buffer.from(sig, 'hex'))
+    const expBuf = new Uint8Array(Buffer.from(expected, 'hex'))
+    if (!crypto.timingSafeEqual(sigBuf, expBuf)) return { ok: false }
   } catch {
     return { ok: false }
   }
