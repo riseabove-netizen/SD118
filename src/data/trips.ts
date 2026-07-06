@@ -731,18 +731,16 @@ export const TRIPS: Trip[] = [
     ],
   },
   {
-    id: 'naples-capri-amalfi-2026',
-    name: 'Naples · Capri · Amalfi · Leg 5',
-    subtitle: 'Naples · Pompeii · Capri · Positano · Aug 22–25',
-    startDate: '2026-08-22',
-    endDate: '2026-08-25',
+    id: 'naples-family-2026',
+    name: 'Naples · Family Chapter · Leg 5a',
+    subtitle: 'Naples · Pompeii · Big Family Party at the Dock · Aug 20–23',
+    startDate: '2026-08-20',
+    endDate: '2026-08-23',
     hero: { icon: '🍕', gradient: 'from-red-900 via-rose-800 to-amber-700' },
-    guests: 'Carlo & Denise fly in — very close friends, incredible guests',
+    guests: 'Family chapter — big family party at the dock the evening of Aug 22',
     guestList: [
       { name: 'Enrico' },
       { name: 'Antoniette' },
-      { name: 'Carlo', note: 'very close friend' },
-      { name: 'Denise', note: 'very close friend' },
     ],
     days: [
       {
@@ -766,7 +764,8 @@ export const TRIPS: Trip[] = [
           { title: 'Cathedral of San Gennaro', time: '13:30' },
           { title: 'Di Matteo pilgrimage — pizza margherita', time: '14:30', link: mapsLink('Di Matteo pizzeria Naples'), details: ['World’s finest pizza margherita'] },
           { title: 'Provisioning for remaining voyage' },
-          { title: 'Terrazza Calabritto — Vesuvius views rooftop', time: '21:00', link: mapsLink('Terrazza Calabritto Naples'), details: ['Fine dining · Chiaia'] },
+          { title: 'Big family party at the dock — Mergellina', time: '20:00', link: mapsLink('Porto di Mergellina Napoli'), details: ['Family gathering aboard and dockside', 'Music, dinner, celebration through the evening'], highlight: true },
+          { title: 'Terrazza Calabritto (alt) — Vesuvius views rooftop', link: mapsLink('Terrazza Calabritto Naples'), details: ['Fine dining · Chiaia'] },
           { title: 'La Bersagliera (alt) — since 1919, Santa Lucia waterfront', link: mapsLink('La Bersagliera Naples') },
         ],
       },
@@ -780,9 +779,26 @@ export const TRIPS: Trip[] = [
         events: [
           { title: 'Pompeii excursion', time: '09:00', link: mapsLink('Pompeii archaeological site'), highlight: true, locationImage: satelliteImage('14.46,40.74,14.52,40.77', '320,160') },
           { title: 'Vesuvius crater rim hike', time: '14:00', link: mapsLink('Mount Vesuvius crater'), details: ['Sweeping Bay of Naples views'], locationImage: satelliteImage('14.40,40.79,14.46,40.84', '320,160') },
-          { title: 'Return to the yacht for dinner', time: '20:30' },
+          { title: 'Farewell family dinner aboard — last evening together', time: '20:30', highlight: true },
         ],
       },
+    ],
+  },
+  {
+    id: 'capri-amalfi-aeolian-2026',
+    name: 'Capri · Amalfi · Aeolian · Catania · Leg 5b–7',
+    subtitle: 'New Guests · Capri · Positano · Stromboli · Aeolians · Catania · Aug 24–28',
+    startDate: '2026-08-24',
+    endDate: '2026-08-28',
+    hero: { icon: '🌋', gradient: 'from-rose-900 via-purple-800 to-fuchsia-700' },
+    guests: 'New guests come aboard — Carlo & Denise fly in, very close friends',
+    guestList: [
+      { name: 'Enrico' },
+      { name: 'Antoniette' },
+      { name: 'Carlo', note: 'new guest · very close friend' },
+      { name: 'Denise', note: 'new guest · very close friend' },
+    ],
+    days: [
       {
         date: 'Monday · Aug 24',
         isoDate: '2026-08-24',
@@ -824,16 +840,6 @@ export const TRIPS: Trip[] = [
           knots: '12',
         },
       },
-    ],
-  },
-  {
-    id: 'aeolian-catania-2026',
-    name: 'Aeolian Islands · Catania · Leg 6–7',
-    subtitle: 'Stromboli · Panarea · Lipari · Salina · Vulcano · Catania · Aug 26–28',
-    startDate: '2026-08-26',
-    endDate: '2026-08-28',
-    hero: { icon: '🌋', gradient: 'from-violet-900 via-purple-800 to-fuchsia-700' },
-    days: [
       {
         date: 'Wednesday · Aug 26',
         isoDate: '2026-08-26',

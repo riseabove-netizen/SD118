@@ -108,26 +108,25 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
     },
   },
 
-  // Chapter 5 — Naples / Capri / Amalfi
-  'naples-capri-amalfi-2026': {
+  // Chapter 5a — Naples · Family Chapter (Aug 20–23, big family party 22nd evening)
+  'naples-family-2026': {
     stops: [
-      { name: 'Ponza',          coord: { lat: 40.900, lon: 12.965 } },
-      { name: 'Ischia',         coord: { lat: 40.735, lon: 13.890 } },
-      { name: 'Capri',          coord: { lat: 40.553, lon: 14.243 } },
-      { name: 'Positano',       coord: { lat: 40.625, lon: 14.485 } },
-      { name: 'Amalfi',         coord: { lat: 40.633, lon: 14.605 } },
+      { name: 'Ponza',      coord: { lat: 40.900, lon: 12.965 } },
+      { name: 'Ischia',     coord: { lat: 40.735, lon: 13.890 } },
+      { name: 'Napoli',     coord: { lat: 40.833, lon: 14.245 } },
     ],
     waypoints: {
       // Ponza → Ischia: open water south
       '0-1': [{ lat: 40.800, lon: 13.500 }],
-      // Capri → Positano: short coastal hop, stay south of Sorrentine peninsula
-      '2-3': [{ lat: 40.580, lon: 14.380 }],
     },
   },
 
-  // Chapter 6 — Aeolian Islands → Catania
-  'aeolian-catania-2026': {
+  // Chapter 5b–7 — New guests: Capri / Amalfi → Aeolian Islands → Catania (Aug 24–28)
+  'capri-amalfi-aeolian-2026': {
     stops: [
+      { name: 'Napoli',     coord: { lat: 40.833, lon: 14.245 } },
+      { name: 'Capri',      coord: { lat: 40.553, lon: 14.243 } },
+      { name: 'Positano',   coord: { lat: 40.625, lon: 14.485 } },
       { name: 'Amalfi',     coord: { lat: 40.633, lon: 14.605 } },
       { name: 'Stromboli',  coord: { lat: 38.793, lon: 15.213 } },
       { name: 'Panarea',    coord: { lat: 38.640, lon: 15.075 } },
@@ -135,10 +134,12 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
       { name: 'Taormina',   coord: { lat: 37.852, lon: 15.295 } },
     ],
     waypoints: {
+      // Capri → Positano: short coastal hop, stay south of Sorrentine peninsula
+      '1-2': [{ lat: 40.580, lon: 14.380 }],
       // Amalfi → Stromboli: open Tyrrhenian crossing
-      '0-1': [{ lat: 40.000, lon: 14.900 }, { lat: 39.300, lon: 15.150 } ],
+      '3-4': [{ lat: 40.000, lon: 14.900 }, { lat: 39.300, lon: 15.150 } ],
       // Lipari → Taormina: south to round NE Sicily through Messina Strait approaches
-      '3-4': [{ lat: 38.300, lon: 15.350 }, { lat: 38.000, lon: 15.400 }],
+      '6-7': [{ lat: 38.300, lon: 15.350 }, { lat: 38.000, lon: 15.400 }],
     },
   },
 

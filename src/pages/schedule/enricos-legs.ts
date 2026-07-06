@@ -27,8 +27,8 @@ export const CHAPTER_ANCHORS: ChapterAnchor[] = [
   { id: 'menorca-corsica-2026',       label: 'Cap de Creus / Corsica',  coord: { lat: 41.620, lon: 9.380 } }, // Bonifacio
   { id: 'sardinia-2026',              label: 'Costa Smeralda',          coord: { lat: 41.130, lon: 9.540 } }, // Porto Cervo
   { id: 'ponza-2026',                 label: 'Ponza',                   coord: { lat: 40.900, lon: 12.965 } },
-  { id: 'naples-capri-amalfi-2026',   label: 'Bay of Naples',           coord: { lat: 40.620, lon: 14.260 } }, // Capri
-  { id: 'aeolian-catania-2026',       label: 'Aeolian Islands',         coord: { lat: 38.500, lon: 14.950 } }, // Lipari
+  { id: 'naples-family-2026',         label: 'Naples · Family',          coord: { lat: 40.833, lon: 14.245 } }, // Naples
+  { id: 'capri-amalfi-aeolian-2026',  label: 'Capri · Aeolian · Catania', coord: { lat: 38.500, lon: 14.950 } }, // Lipari
   { id: 'malta-2026',                 label: 'Valletta, Malta',         coord: { lat: 35.895, lon: 14.515 } },
   { id: 'gozo-2026',                  label: 'Mgarr, Gozo',             coord: { lat: 36.025, lon: 14.300 } },
   { id: 'sicily-aeolian-revisit-2026',label: 'Taormina / Sicily E.',    coord: { lat: 37.850, lon: 15.300 } },
