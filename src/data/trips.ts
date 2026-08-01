@@ -343,8 +343,8 @@ export const TRIPS: Trip[] = [
   // =================================================================
   {
     id: 'balearics-2026',
-    name: 'Balearic Islands · Leg 1',
-    subtitle: 'Palma · Formentera · Ibiza · Aug 4–9',
+    name: 'CANCELLED — Balearic Islands',
+    subtitle: 'Original plan (cancelled) · Palma · Formentera · Ibiza · Aug 4–9',
     startDate: '2026-08-04',
     endDate: '2026-08-09',
     hero: { icon: '🏝️', gradient: 'from-purple-900 via-fuchsia-800 to-rose-700' },
@@ -471,7 +471,7 @@ export const TRIPS: Trip[] = [
   },
   {
     id: 'menorca-corsica-2026',
-    name: 'Menorca & Corsica · Leg 1B–2',
+    name: 'CANCELLED — Menorca & Corsica',
     subtitle: 'Ciutadella · Port Mahon · Bonifacio · Lavezzi · Aug 10–12',
     startDate: '2026-08-10',
     endDate: '2026-08-12',
@@ -558,41 +558,165 @@ export const TRIPS: Trip[] = [
       },
     ],
   },
+
+  // =================================================================
+  // NEW LEG 1 — Crew delivery to Alghero (Aug 9–11, crew only)
+  // =================================================================
+  {
+    id: 'crew-alghero-2026',
+    name: 'Crew Delivery · Alghero',
+    subtitle: 'Crew only · Cruise to Alghero · Dock until guests arrive · Aug 9–11',
+    startDate: '2026-08-09',
+    endDate: '2026-08-11',
+    hero: { icon: '⚓', gradient: 'from-slate-900 via-slate-800 to-slate-700' },
+    guests: 'Crew only',
+    guestList: [],
+    days: [
+      {
+        date: 'Sunday · Aug 9',
+        isoDate: '2026-08-09',
+        title: 'Depart for Alghero — Crew Delivery',
+        subtitle: 'Crew only · Sea passage to NW Sardinia',
+        events: [
+          { title: 'Final provisioning & pre-departure checks', time: '08:00' },
+          { title: 'Depart for Alghero, Sardinia', time: '10:00', highlight: true },
+          { title: 'Watch rotations underway', details: ['See Watch Duties'] },
+        ],
+        leg: {
+          label: 'DELIVERY LEG',
+          route: 'Departure port → Alghero, Sardinia',
+          sub: 'Depart Aug 9 morning · Arrive Aug 10',
+          knots: '12',
+        },
+      },
+      {
+        date: 'Monday · Aug 10',
+        isoDate: '2026-08-10',
+        title: 'Arrive Alghero — Dock',
+        subtitle: 'Marina di Alghero · Dock until guests arrive',
+        imageUrl: satelliteImage('8.28,40.53,8.36,40.59', '640,320'),
+        imageCaption: 'Alghero — coral-coloured bastions, Catalan heritage',
+        dock: {
+          marina: 'Marina di Alghero',
+          marinaLink: mapsLink('Marina di Alghero Sardinia'),
+          radioChannel: 'Ch 09',
+          eta: 'Aug 10 (arrival day)',
+          etd: '~evening Aug 11',
+          notes: 'Dockage confirmed until guest arrival Aug 11 afternoon.',
+        },
+        events: [
+          { title: 'Arrive Marina di Alghero', highlight: true },
+          { title: 'Refuel · fresh water · pump-outs' },
+          { title: 'Deep clean interior & exterior — charter-ready standard' },
+          { title: 'Provision for guest arrival' },
+          { title: 'Crew rest & meal ashore' },
+        ],
+      },
+      {
+        date: 'Tuesday · Aug 11',
+        isoDate: '2026-08-11',
+        title: 'Alghero — Final Prep · Guests Arrive PM',
+        subtitle: 'Marina di Alghero · Guest embarkation afternoon',
+        dock: {
+          marina: 'Marina di Alghero',
+          marinaLink: mapsLink('Marina di Alghero Sardinia'),
+          radioChannel: 'Ch 09',
+          eta: 'Docked',
+          etd: 'Depart Aug 12 AM for Bonifacio',
+          notes: 'Guests embark afternoon Aug 11. Overnight at dock.',
+        },
+        events: [
+          { title: 'Fresh flowers · guest cabins final touches', time: '08:00' },
+          { title: 'Provisioning finalised', time: '10:00' },
+          { title: 'Crew brief & guest welcome walkthrough', time: '14:00' },
+          { title: 'Enrico, Antoniette, Maria, husband & Martina arrive Alghero', time: 'PM', highlight: true, details: ['Guest embarkation'] },
+          { title: 'Welcome cocktails on sundeck', time: '19:00' },
+          { title: 'Welcome dinner ashore — Il Pavone (old-town seafront)', time: '21:00', link: mapsLink('Il Pavone Alghero') },
+          { title: 'Andreini (alt) — regional Sardinian, excellent wine', link: mapsLink('Andreini Alghero') },
+          { title: 'Overnight at Marina di Alghero' },
+        ],
+      },
+    ],
+  },
+
+  // =================================================================
+  // LEG 2 — Alghero → Bonifacio → Sardinia (Aug 12–17)
+  // Location plans preserved from prior Sardinia chapter, just reordered
+  // to match the new stops and dates.
+  // =================================================================
   {
     id: 'sardinia-2026',
-    name: 'Sardinia · Leg 3',
-    subtitle: 'Porto Cervo · Maddalena · Ferragosto · Alghero · Cala Luna · Aug 13–17',
-    startDate: '2026-08-13',
+    name: 'Sardinia · Alghero → Cala Luna',
+    subtitle: 'Bonifacio · Maddalena · Porto Cervo · Cala di Volpe · Costa Smeralda · Cala Luna · Aug 12–17',
+    startDate: '2026-08-12',
     endDate: '2026-08-17',
     hero: { icon: '🇮🇹', gradient: 'from-emerald-900 via-green-800 to-teal-700' },
-    guests: 'Enrico & Antoniette · Maria, husband & Martina (9th birthday Aug 13) · possibly Daniel & Laura',
+    guests: 'Enrico & Antoniette · Maria, husband & Martina (9th birthday Aug 13)',
     guestList: [
       { name: 'Enrico' },
       { name: 'Antoniette' },
       { name: 'Maria' },
       { name: "Maria's husband" },
       { name: 'Martina', note: '9th birthday Aug 13' },
-      { name: 'Daniel', tentative: true },
-      { name: 'Laura', tentative: true },
     ],
     days: [
       {
+        date: 'Wednesday · Aug 12',
+        isoDate: '2026-08-12',
+        title: 'Alghero → Bonifacio — Anchor',
+        subtitle: 'Depart Alghero AM · Cross to Corsica · Anchor Bonifacio',
+        imageUrl: satelliteImage('9.14,41.36,9.20,41.42', '640,320'),
+        imageCaption: 'Bonifacio — dramatic chalk-cliff citadel on southern Corsica',
+        overnight: 'At anchor · Bonifacio (Cala di Paraguan / Rondinara depending on wind)',
+        events: [
+          { title: 'Depart Marina di Alghero for Bonifacio', time: '08:00', highlight: true },
+          { title: 'Arrive Bonifacio approaches', time: '~14:00' },
+          { title: 'Anchor — admire the chalk-cliff citadel from the sea', link: mapsLink('Bonifacio Corsica'), highlight: true },
+          { title: 'Tender ashore — stroll the medieval upper town' },
+          { title: 'Swim / paddleboard the sheltered anchorage' },
+          { title: 'Sunset anchor dinner aboard' },
+        ],
+        leg: {
+          label: 'COASTAL LEG',
+          route: 'Alghero → Bonifacio',
+          sub: 'Depart Aug 12 AM · Arrive Aug 12 PM',
+          knots: '12',
+        },
+      },
+      {
         date: 'Thursday · Aug 13',
         isoDate: '2026-08-13',
-        title: 'Porto Cervo & Costa Smeralda',
-        subtitle: 'Sardinia · Arrive ~11:30 PM (Aug 12) · Wake in Porto Cervo',
+        title: 'La Maddalena Archipelago — Anchor',
+        subtitle: 'Northern Sardinia · National Park · 60+ Islands · Martina turns 9',
+        imageUrl: satelliteImage('9.34,41.18,9.50,41.32', '640,320'),
+        imageCaption: 'La Maddalena National Park — pink sand, world-class clarity',
+        overnight: 'At anchor · Maddalena archipelago',
+        events: [
+          { title: 'Cruise to La Maddalena archipelago', time: '09:00', link: mapsLink('La Maddalena National Park Sardinia'), highlight: true },
+          { title: 'Anchor off Spargi or Budelli pink-sand beach' },
+          { title: 'Snorkel · kayak · paddleboard', details: ['Some of the world\'s clearest water'] },
+          { title: 'Martina’s 9th birthday celebration onboard', time: '18:00', highlight: true },
+          { title: 'Sunset anchor dinner' },
+        ],
+      },
+      {
+        date: 'Friday · Aug 14',
+        isoDate: '2026-08-14',
+        title: 'Porto Cervo — Dock for the Night',
+        subtitle: 'Costa Smeralda · YCCS Marina overnight',
         imageUrl: satelliteImage('9.50,41.10,9.58,41.16', '640,320'),
         imageCaption: 'Porto Cervo — Aga Khan’s legendary Costa Smeralda',
         dock: {
           marina: 'Marina di Porto Cervo (YCCS)',
           marinaLink: mapsLink('Marina di Porto Cervo YCCS'),
           radioChannel: 'Ch 09',
-          eta: '~23:30 Aug 12',
-          etd: 'Multi-day',
-          notes: 'YCCS marina is the most glamorous in the Mediterranean. Confirm berth & port agent for August.',
+          eta: 'Afternoon Aug 14',
+          etd: 'Morning Aug 15',
+          notes: 'YCCS marina — the most glamorous in the Mediterranean. Confirm berth & port agent for August.',
         },
         events: [
-          { title: 'Wake in Porto Cervo — superyacht parade', time: '08:30', link: mapsLink('Porto Cervo Sardinia'), highlight: true },
+          { title: 'Short hop from Maddalena → Porto Cervo', time: '10:00' },
+          { title: 'Dock at Marina di Porto Cervo (YCCS) — superyacht parade', highlight: true },
           { title: 'Stroll the boutique-lined piazzetta' },
           { title: 'Swim emerald coves by tender' },
           { title: 'Dinner at ConFusion — Chef Italo Bassi', time: '21:00', link: mapsLink('ConFusion Porto Cervo'), details: ['1 Michelin Star · 6 consecutive years'] },
@@ -600,82 +724,57 @@ export const TRIPS: Trip[] = [
         ],
       },
       {
-        date: 'Friday · Aug 14',
-        isoDate: '2026-08-14',
-        title: 'La Maddalena Archipelago',
-        subtitle: 'Northern Sardinia · National Park · 60+ Islands',
-        imageUrl: satelliteImage('9.34,41.18,9.50,41.32', '640,320'),
-        imageCaption: 'La Maddalena National Park — pink sand, world-class clarity',
-        overnight: 'At anchor · Maddalena archipelago',
-        events: [
-          { title: 'Cruise to La Maddalena archipelago', time: '09:00', link: mapsLink('La Maddalena National Park Sardinia'), highlight: true },
-          { title: 'Anchor off Spargi or Budelli pink-sand beach', locationImage: satelliteImage('9.34,41.18,9.50,41.32', '320,160') },
-          { title: 'Snorkel · kayak · paddleboard', details: ['Some of the world\'s clearest water'] },
-          { title: 'Sunset anchor dinner' },
-        ],
-      },
-      {
         date: 'Saturday · Aug 15',
         isoDate: '2026-08-15',
-        title: 'Ferragosto — Italy’s National Holiday at Sea',
-        subtitle: 'Sardinia · Aug 15 · Italy\'s biggest summer celebration',
-        imageUrl: satelliteImage('9.40,40.85,9.55,40.95', '640,320'),
-        imageCaption: 'Ferragosto — fireworks light up the Sardinian coast',
+        title: 'Cala di Volpe — Mooring Ball · Ferragosto Fireworks',
+        subtitle: 'Italy\'s biggest summer celebration · Aug 15 · Mooring for the night',
+        imageUrl: satelliteImage('9.55,41.09,9.62,41.14', '640,320'),
+        imageCaption: 'Cala di Volpe — Costa Smeralda’s most photographed bay',
+        overnight: 'Mooring ball · Cala di Volpe',
         events: [
-          { title: 'Anchor in a perfect Sardinian cove', time: '10:00', highlight: true },
+          { title: 'Short hop from Porto Cervo → Cala di Volpe', time: '10:00', link: mapsLink('Cala di Volpe Sardinia') },
+          { title: 'Pick up mooring ball for the night', highlight: true },
           { title: 'Provision fully — everything closes on the 15th', details: ['Critical: confirm with stewardess before noon'] },
+          { title: 'Swim, tender, paddleboard the bay' },
           { title: 'Champagne dinner on deck', time: '20:30' },
-          { title: 'Ferragosto fireworks from the sundeck', time: '23:00', highlight: true },
+          { title: 'Ferragosto fireworks from the sundeck', time: '23:00', highlight: true, details: ['Big holiday — fireworks light up the Sardinian coast'] },
         ],
-        leg: {
-          label: 'COASTAL LEG',
-          route: 'Porto Cervo → Alghero',
-          sub: 'Morning Aug 15 · Arrive ~1 PM',
-          miles: '75',
-          duration: '5h 25m',
-          knots: '12',
-        },
       },
       {
         date: 'Sunday · Aug 16',
         isoDate: '2026-08-16',
-        title: 'Alghero — The Catalan City',
-        subtitle: 'Northwest Sardinia · Medieval Walled City',
-        imageUrl: satelliteImage('8.28,40.53,8.36,40.59', '640,320'),
-        imageCaption: 'Alghero — coral-coloured bastions, Catalan heritage',
-        dock: {
-          marina: 'Marina di Alghero',
-          marinaLink: mapsLink('Marina di Alghero Sardinia'),
-          radioChannel: 'Ch 09',
-          eta: '~13:00 Aug 15',
-          etd: '~10:00 Aug 17',
-          notes: 'Old-town walking distance from marina.',
-        },
+        title: 'Costa Smeralda — Anchor',
+        subtitle: 'Emerald coast · Anchor day · Swim, tender, beach picks',
+        imageUrl: satelliteImage('9.45,41.05,9.60,41.15', '640,320'),
+        imageCaption: 'Costa Smeralda — emerald water, granite coves',
+        overnight: 'At anchor · Costa Smeralda',
         events: [
-          { title: 'Stroll the coral-coloured medieval bastions', time: '10:00', link: mapsLink('Alghero bastions Sardinia'), highlight: true },
-          { title: 'Neptune’s Grotto sea caves by tender', time: '14:00', link: mapsLink('Neptune’s Grotto Alghero'), locationImage: satelliteImage('8.28,40.53,8.36,40.59', '320,160') },
-          { title: 'Aragosta alla catalana — Sardinian lobster', time: '21:00' },
-          { title: 'Il Pavone — old-town seafront', link: mapsLink('Il Pavone Alghero'), details: ['Seafood fine dining'] },
-          { title: 'Andreini (alt) — regional Sardinian, excellent wine', link: mapsLink('Andreini Alghero') },
+          { title: 'Move off mooring — explore Costa Smeralda coves', time: '09:00', highlight: true },
+          { title: 'Anchor off a chosen cove — Spiaggia del Principe / Liscia Ruja / Romazzino', link: mapsLink('Spiaggia del Principe Costa Smeralda') },
+          { title: 'Beach picnic ashore by tender' },
+          { title: 'Snorkel · kayak · paddleboard' },
+          { title: 'Sunset cocktails on deck' },
+          { title: 'Anchor dinner aboard — casual Sardinian night' },
         ],
       },
       {
         date: 'Monday · Aug 17',
         isoDate: '2026-08-17',
-        title: 'Cala Luna & Farewell Anchorage',
-        subtitle: 'East Sardinia · Final Day · Depart ~10 PM for Ponza',
+        title: 'Cala Luna — Anchor · Depart Evening for Ponza',
+        subtitle: 'East Sardinia · Final anchor · Depart ~10 PM night passage to Ponza',
         imageUrl: satelliteImage('9.60,40.20,9.67,40.25', '640,320'),
         imageCaption: 'Cala Luna — limestone arch, accessible only by sea',
         events: [
           { title: 'Cruise to Cala Luna — accessible only by sea', time: '10:00', link: mapsLink('Cala Luna Sardinia'), highlight: true },
           { title: 'Long final Sardinian swim — limestone arch anchorage', details: ['Vivid turquoise · absolute silence'] },
-          { title: 'Depart ~10 PM for Ponza — Leg 5 night passage', time: '22:00', details: ['~235 nm · 19h 35m at 12 kn'], highlight: true },
+          { title: 'Farewell anchor dinner aboard', time: '20:00' },
+          { title: 'Depart ~10 PM for Ponza — night passage', time: '22:00', details: ['~235 nm · 19h 35m at 12 kn'], highlight: true },
         ],
         leg: {
-          label: 'LEG 5 · NIGHT PASSAGE',
-          route: 'Alghero, Sardinia → Ponza, Pontine Islands',
+          label: 'NIGHT PASSAGE',
+          route: 'Cala Luna, Sardinia → Ponza, Pontine Islands',
           sub: 'Depart ~10 PM Aug 17 · Arrive ~5 PM Aug 18',
-          miles: '270',
+          miles: '235',
           duration: '19h 35m',
           knots: '12',
         },
@@ -732,22 +831,24 @@ export const TRIPS: Trip[] = [
   },
   {
     id: 'naples-family-2026',
-    name: 'Naples · Family Chapter · Leg 5a',
-    subtitle: 'Naples · Pompeii · Big Family Party at the Dock · Aug 20–23',
+    name: 'Naples · Family Chapter',
+    subtitle: 'Naples · Daniel & Marco onboard · Big family dock party · Aug 20–21',
     startDate: '2026-08-20',
-    endDate: '2026-08-23',
+    endDate: '2026-08-21',
     hero: { icon: '🍕', gradient: 'from-red-900 via-rose-800 to-amber-700' },
-    guests: 'Family chapter — big family party at the dock the evening of Aug 22',
+    guests: 'Enrico, Antoniette, Daniel & Marco onboard · big family party at the dock (evening of Aug 20 or 21 — date to confirm)',
     guestList: [
       { name: 'Enrico' },
       { name: 'Antoniette' },
+      { name: 'Daniel', note: 'onboard' },
+      { name: 'Marco', note: 'onboard' },
     ],
     days: [
       {
-        date: 'Saturday · Aug 22',
-        isoDate: '2026-08-22',
-        title: 'Naples — UNESCO Historic Centre',
-        subtitle: 'Campania · Italy’s most electrifying city',
+        date: 'Thursday · Aug 20',
+        isoDate: '2026-08-20',
+        title: 'Naples — Arrive Mergellina',
+        subtitle: 'Campania · UNESCO historic centre · Family dock (tentative party night)',
         imageUrl: satelliteImage('14.20,40.81,14.30,40.87', '640,320'),
         imageCaption: 'Naples — Spaccanapoli, Vesuvius across the bay',
         dock: {
@@ -755,8 +856,8 @@ export const TRIPS: Trip[] = [
           marinaLink: mapsLink('Porto di Mergellina Napoli'),
           radioChannel: 'Ch 09',
           eta: '~03:00 Aug 20',
-          etd: 'Day 24 morning',
-          notes: 'Overnight arrival ~3 AM Aug 20. Full provisioning for remaining voyage from Naples.',
+          etd: 'Overnight to Aug 22',
+          notes: 'Overnight arrival ~3 AM Aug 20. Daniel & Marco onboard. Big family dock party tentatively this evening (or Aug 21 — to confirm).',
         },
         events: [
           { title: 'Wake aboard at Mergellina', time: '09:00', link: mapsLink('Mergellina Napoli'), highlight: true },
@@ -764,41 +865,85 @@ export const TRIPS: Trip[] = [
           { title: 'Cathedral of San Gennaro', time: '13:30' },
           { title: 'Di Matteo pilgrimage — pizza margherita', time: '14:30', link: mapsLink('Di Matteo pizzeria Naples'), details: ['World’s finest pizza margherita'] },
           { title: 'Provisioning for remaining voyage' },
-          { title: 'Big family party at the dock — Mergellina', time: '20:00', link: mapsLink('Porto di Mergellina Napoli'), details: ['Family gathering aboard and dockside', 'Music, dinner, celebration through the evening'], highlight: true },
+          { title: 'Big family party at the dock — Mergellina (Aug 20 OR Aug 21 — confirm)', time: '20:00', link: mapsLink('Porto di Mergellina Napoli'), details: ['Family gathering aboard and dockside', 'Music, dinner, celebration through the evening', 'Party is night of Aug 20 or Aug 21 — to be confirmed'], highlight: true },
           { title: 'Terrazza Calabritto (alt) — Vesuvius views rooftop', link: mapsLink('Terrazza Calabritto Naples'), details: ['Fine dining · Chiaia'] },
           { title: 'La Bersagliera (alt) — since 1919, Santa Lucia waterfront', link: mapsLink('La Bersagliera Naples') },
         ],
       },
       {
-        date: 'Sunday · Aug 23',
-        isoDate: '2026-08-23',
-        title: 'Pompeii & Mount Vesuvius',
-        subtitle: 'Campania · Ancient World',
+        date: 'Friday · Aug 21',
+        isoDate: '2026-08-21',
+        title: 'Naples · Pompeii & Vesuvius — Family Day',
+        subtitle: 'Campania · Ancient world · Alternate party night',
         imageUrl: satelliteImage('14.46,40.74,14.52,40.77', '640,320'),
         imageCaption: 'Pompeii — frozen in 79 AD, Vesuvius overhead',
         events: [
           { title: 'Pompeii excursion', time: '09:00', link: mapsLink('Pompeii archaeological site'), highlight: true, locationImage: satelliteImage('14.46,40.74,14.52,40.77', '320,160') },
           { title: 'Vesuvius crater rim hike', time: '14:00', link: mapsLink('Mount Vesuvius crater'), details: ['Sweeping Bay of Naples views'], locationImage: satelliteImage('14.40,40.79,14.46,40.84', '320,160') },
-          { title: 'Farewell family dinner aboard — last evening together', time: '20:30', highlight: true },
+          { title: 'Big family party at the dock — Mergellina (Aug 20 OR Aug 21 — confirm)', time: '20:00', link: mapsLink('Porto di Mergellina Napoli'), details: ['Alternate party night — confirm with family'], highlight: true },
+          { title: 'Farewell family dinner aboard — Daniel & Marco last night', time: '20:30' },
         ],
       },
     ],
   },
   {
-    id: 'capri-amalfi-aeolian-2026',
-    name: 'Capri · Amalfi · Aeolian · Catania · Leg 5b–7',
-    subtitle: 'New Guests · Capri · Positano · Stromboli · Aeolians · Catania · Aug 24–28',
-    startDate: '2026-08-24',
+    id: 'naples-friends-2026',
+    name: 'Naples → Aeolians · Friends Chapter',
+    subtitle: '4 couples embark Naples · Capri · Positano · Stromboli · Aeolians · Catania · Aug 22–28',
+    startDate: '2026-08-22',
     endDate: '2026-08-28',
     hero: { icon: '🌋', gradient: 'from-rose-900 via-purple-800 to-fuchsia-700' },
-    guests: 'New guests come aboard — Carlo & Denise fly in, very close friends',
+    guests: 'New chapter — 4 couples embark in Naples: Carlo & Denise, Charlie & Cecile, Vinny & Morissa, Stacy & husband',
     guestList: [
       { name: 'Enrico' },
       { name: 'Antoniette' },
-      { name: 'Carlo', note: 'new guest · very close friend' },
-      { name: 'Denise', note: 'new guest · very close friend' },
+      { name: 'Carlo', note: 'couple · embark Naples Aug 22' },
+      { name: 'Denise', note: 'couple · embark Naples Aug 22' },
+      { name: 'Charlie', note: 'couple · embark Naples Aug 22' },
+      { name: 'Cecile', note: 'couple · embark Naples Aug 22' },
+      { name: 'Vinny', note: 'couple · embark Naples Aug 22' },
+      { name: 'Morissa', note: 'couple · embark Naples Aug 22' },
+      { name: 'Stacy', note: 'couple · embark Naples Aug 22' },
+      { name: "Stacy’s husband", note: 'couple · embark Naples Aug 22' },
     ],
     days: [
+      {
+        date: 'Saturday · Aug 22',
+        isoDate: '2026-08-22',
+        title: 'Naples — Welcome the Friends',
+        subtitle: 'Mergellina · 4 couples embark · First evening aboard',
+        imageUrl: satelliteImage('14.20,40.81,14.30,40.87', '640,320'),
+        imageCaption: 'Naples — Mergellina harbour, Vesuvius across the bay',
+        dock: {
+          marina: 'Porto di Mergellina · Napoli',
+          marinaLink: mapsLink('Porto di Mergellina Napoli'),
+          radioChannel: 'Ch 09',
+          eta: 'Docked from Aug 20',
+          etd: 'Overnight to Capri',
+          notes: 'Carlo & Denise, Charlie & Cecile, Vinny & Morissa, Stacy & husband embark today.',
+        },
+        events: [
+          { title: 'Cabin turnover & fresh flowers', time: '08:00' },
+          { title: 'Final provisioning for the friends leg' },
+          { title: 'Charlie & Cecile, Vinny & Morissa, Stacy & husband, Carlo & Denise arrive', time: '15:00', highlight: true, details: ['Full welcome walkthrough · champagne on the sundeck'] },
+          { title: 'Welcome cocktails on sundeck', time: '19:00' },
+          { title: 'Welcome dinner aboard — Bay of Naples backdrop', time: '20:30', highlight: true },
+          { title: 'Terrazza Calabritto (alt ashore) — Vesuvius rooftop', link: mapsLink('Terrazza Calabritto Naples') },
+        ],
+      },
+      {
+        date: 'Sunday · Aug 23',
+        isoDate: '2026-08-23',
+        title: 'Naples → Capri — Set Sail',
+        subtitle: 'Short hop · Anchor Marina Piccola · Ease the friends into the trip',
+        events: [
+          { title: 'Depart Mergellina for Capri', time: '10:00', highlight: true },
+          { title: 'Anchor Marina Piccola — Faraglioni views' },
+          { title: 'Afternoon swim off the Faraglioni rocks', link: mapsLink('Faraglioni rocks Capri') },
+          { title: 'Aperitivo on the sundeck', time: '18:30' },
+          { title: 'Dinner aboard at anchor', time: '20:30' },
+        ],
+      },
       {
         date: 'Monday · Aug 24',
         isoDate: '2026-08-24',
@@ -916,12 +1061,37 @@ export const TRIPS: Trip[] = [
   },
   {
     id: 'malta-2026',
-    name: 'Malta · Leg 8',
-    subtitle: 'Valletta · Three Cities · Mdina · Comino · 10 nights · Aug 29–Sep 6',
-    startDate: '2026-08-29',
-    endDate: '2026-09-06',
-    hero: { icon: '🏛️', gradient: 'from-red-900 via-rose-800 to-stone-700' },
+    name: 'Malta — Brianna’s Wedding',
+    subtitle: 'La Valletta marina dockage · Brianna & Matthew’s wedding · Blue Lagoon expedition · Aug 28–Sep 8',
+    startDate: '2026-08-28',
+    endDate: '2026-09-08',
+    hero: { icon: '💒', gradient: 'from-red-900 via-rose-800 to-stone-700' },
+    guests: 'Wedding chapter — Brianna & Matthew’s wedding in Malta · dockage at La Valletta marina Aug 28 – Sep 8 · Blue Lagoon expedition Sep 3 (≈30 guests)',
+    guestList: [
+      { name: 'Enrico' },
+      { name: 'Antoniette' },
+      { name: 'Brianna', note: 'bride' },
+      { name: 'Matthew', note: 'groom' },
+    ],
     days: [
+      {
+        date: 'Friday · Aug 28',
+        isoDate: '2026-08-28',
+        title: 'Catania → Malta — Night Passage',
+        subtitle: 'Depart Catania ~21:00 · Overnight crossing to Grand Harbour',
+        events: [
+          { title: 'Depart Porto di Catania at ~21:00 — handoff from friends chapter', time: '21:00', highlight: true, details: ['See Friends chapter Aug 28 for daytime Catania plan'] },
+          { title: 'Night watches underway', details: ['Standard sea watches · arrive Grand Harbour dawn'] },
+        ],
+        leg: {
+          label: 'NIGHT PASSAGE',
+          route: 'Catania, Sicily → Valletta, Malta',
+          sub: 'Depart ~9 PM Aug 28 · Arrive ~5:30 AM Aug 29',
+          miles: '115',
+          duration: '8h 20m',
+          knots: '12',
+        },
+      },
       {
         date: 'Saturday · Aug 29',
         isoDate: '2026-08-29',
@@ -933,9 +1103,9 @@ export const TRIPS: Trip[] = [
           marina: 'Marina di Valletta',
           marinaLink: mapsLink('Marina di Valletta'),
           radioChannel: 'Ch 13',
-          eta: '~05:30',
-          etd: '~07:00 Sep 7',
-          notes: '10 nights at Marina di Valletta. Confirm berth allocation with VTS Grand Harbour on Ch 13.',
+          eta: '~05:30 Aug 29',
+          etd: '~07:00 Sep 8',
+          notes: 'Full-chapter dockage at La Valletta marina (Aug 28 arrival evening → Sep 8 departure). Confirm berth allocation with VTS Grand Harbour on Ch 13. Wedding party access & shore-power confirmed.',
         },
         events: [
           { title: 'Grand Harbour dawn arrival — one of the great Med sights', time: '05:30', link: mapsLink('Grand Harbour Valletta'), highlight: true },
@@ -1002,15 +1172,20 @@ export const TRIPS: Trip[] = [
       {
         date: 'Thursday · Sep 3',
         isoDate: '2026-09-03',
-        title: 'South Malta Coast & Anchorages',
-        subtitle: 'Malta · Day Cruise',
-        imageUrl: satelliteImage('14.55,35.83,14.59,35.85', '640,320'),
-        imageCaption: 'St Peter’s Pool · Wied iż-Żurrieq · Blue Grotto cliffs',
+        title: 'Blue Lagoon Expedition — 30 Guests',
+        subtitle: 'Comino · Blue Lagoon day charter · ≈30 guests aboard',
+        imageUrl: satelliteImage('14.30,36.00,14.37,36.04', '640,320'),
+        imageCaption: 'Blue Lagoon, Comino — turquoise between Comino & Cominotto',
+        overnight: 'Return to Marina di Valletta',
         events: [
-          { title: 'St Peter’s Pool swim', time: '10:30', link: mapsLink('St Peter’s Pool Malta'), highlight: true, locationImage: satelliteImage('14.55,35.83,14.59,35.85', '320,160') },
-          { title: 'Wied iż-Żurrieq sea inlet', time: '13:00', link: mapsLink('Wied iz-Zurrieq Malta') },
-          { title: 'Blue Grotto cliffs anchorage', time: '15:00', link: mapsLink('Blue Grotto Malta'), locationImage: satelliteImage('14.42,35.81,14.46,35.84', '320,160') },
-          { title: 'Alchemy cocktails — old city', time: '21:00', link: mapsLink('Alchemy Valletta') },
+          { title: 'Guest muster & briefing — lifejackets, tender ops, headcount', time: '08:00', highlight: true, details: ['≈30 guests aboard for the day', 'Extra staff on deck · water toys prepped'] },
+          { title: 'Depart Marina di Valletta for Blue Lagoon', time: '09:00' },
+          { title: 'Anchor Blue Lagoon — turquoise shallows between Comino & Cominotto', time: '10:30', link: mapsLink('Blue Lagoon Comino Malta'), highlight: true },
+          { title: 'Swim, snorkel, paddleboards, tender ops all day' },
+          { title: 'Buffet lunch on the aft deck', time: '13:00' },
+          { title: 'Return to Marina di Valletta', time: '17:30' },
+          { title: 'Guest disembark · crew reset for evening', time: '18:30' },
+          { title: 'Alchemy cocktails — old city (crew/guests optional)', time: '21:00', link: mapsLink('Alchemy Valletta') },
         ],
       },
       {
@@ -1042,19 +1217,42 @@ export const TRIPS: Trip[] = [
       {
         date: 'Sunday · Sep 6',
         isoDate: '2026-09-06',
-        title: 'Farewell Day Before Gozo',
-        subtitle: 'Malta · Final Day',
+        title: 'Wedding Party Recovery Day',
+        subtitle: 'Malta · Dockage day · Rest before farewell',
         events: [
           { title: 'Rest & spa day aboard', time: '10:00', highlight: true },
           { title: 'Last souvenirs in the city', time: '15:00' },
           { title: 'Palazzo Parisio rooftop — sunset drinks', time: '19:30', link: mapsLink('Palazzo Parisio Valletta') },
-          { title: 'Bahia farewell dinner — Valletta waterfront', time: '21:00', link: mapsLink('Bahia restaurant Valletta'), details: ['Grand Harbour views'] },
-          { title: 'Prep for morning departure to Gozo' },
+          { title: 'Bahia dinner — Valletta waterfront', time: '21:00', link: mapsLink('Bahia restaurant Valletta'), details: ['Grand Harbour views'] },
+        ],
+      },
+      {
+        date: 'Monday · Sep 7',
+        isoDate: '2026-09-07',
+        title: 'Malta Reset — Guest Turnover Prep',
+        subtitle: 'La Valletta marina · Prepare cabins for post-wedding chapter',
+        events: [
+          { title: 'Provisioning for the Adriatic voyage', time: '09:00' },
+          { title: 'Cabin turnover, laundry, deep clean', time: '10:00' },
+          { title: 'Fuel & fresh water top-up' },
+          { title: 'Post-wedding guests arrive: Daniel & Laura, Marco & Deanna', time: 'PM', highlight: true, details: ['Enrico & Antoniette + Brianna & Matthew stay aboard'] },
+          { title: 'Welcome dinner aboard — new chapter kickoff', time: '20:30' },
+        ],
+      },
+      {
+        date: 'Tuesday · Sep 8',
+        isoDate: '2026-09-08',
+        title: 'Farewell Malta — Depart for Gozo',
+        subtitle: 'La Valletta marina → Mgarr, Gozo · Short morning hop',
+        events: [
+          { title: 'Final departure checks', time: '07:00' },
+          { title: 'Depart Marina di Valletta for Gozo', time: '08:00', highlight: true },
+          { title: 'Arrive Mgarr Harbour, Gozo', time: '~09:30' },
         ],
         leg: {
-          label: 'LEG 10 · DAY HOP',
+          label: 'DAY HOP',
           route: 'Valletta → Mgarr Harbour, Gozo',
-          sub: 'Morning Sep 7 · Arrive ~9:30 AM',
+          sub: 'Morning Sep 8 · Arrive ~9:30 AM',
           miles: '17',
           duration: '1h 15m',
           knots: '12',
@@ -1068,15 +1266,26 @@ export const TRIPS: Trip[] = [
   {
     id: 'gozo-2026',
     name: 'Gozo — Malta\u2019s Wild Sister',
-    subtitle: 'Mgarr Harbour · Xlendi Bay · Inland Sea · Ggantija',
-    startDate: '2026-09-07',
-    endDate: '2026-09-09',
+    subtitle: 'Mgarr Harbour · Xlendi Bay · Inland Sea · Ggantija · Sep 8–10',
+    startDate: '2026-09-08',
+    endDate: '2026-09-10',
     hero: { icon: '\ud83c\udfdd\ufe0f', gradient: 'from-fuchsia-950 via-purple-900 to-rose-900' },
+    guests: 'Post-wedding chapter — Enrico & Antoniette, Daniel & Laura, Marco & Deanna, Brianna & Matthew',
+    guestList: [
+      { name: 'Enrico' },
+      { name: 'Antoniette' },
+      { name: 'Daniel' },
+      { name: 'Laura' },
+      { name: 'Marco' },
+      { name: 'Deanna' },
+      { name: 'Brianna' },
+      { name: 'Matthew' },
+    ],
     days: [
       {
-        date: 'Monday · September 7',
-        isoDate: '2026-09-07',
-        title: 'Gozo — Xlendi Bay & Inland Sea',
+        date: 'Tuesday · September 8',
+        isoDate: '2026-09-08',
+        title: 'Arrive Gozo — Xlendi Bay & Inland Sea',
         subtitle: 'Day 35 · Arrive Mgarr · Greener, quieter, more rugged than Malta',
         imageUrl: satelliteImage({ west: 14.18, south: 36.00, east: 14.36, north: 36.10 }, { w: 1000, h: 450 }),
         imageCaption: 'Gozo — northern Maltese archipelago',
@@ -1105,8 +1314,8 @@ export const TRIPS: Trip[] = [
         overnight: 'Mgarr Harbour, Gozo',
       },
       {
-        date: 'Tuesday · September 8',
-        isoDate: '2026-09-08',
+        date: 'Wednesday · September 9',
+        isoDate: '2026-09-09',
         title: 'Ggantija Temples & Ramla Bay',
         subtitle: 'Day 36 · Ancient wonders & red sand beach',
         events: [
@@ -1118,8 +1327,8 @@ export const TRIPS: Trip[] = [
         overnight: 'Mgarr Harbour, Gozo',
       },
       {
-        date: 'Wednesday · September 9',
-        isoDate: '2026-09-09',
+        date: 'Thursday · September 10',
+        isoDate: '2026-09-10',
         title: 'Gozo Farewell · Night Departure for Sicily',
         subtitle: 'Day 37 · Final morning swim · Depart ~9 PM',
         events: [
@@ -1132,7 +1341,7 @@ export const TRIPS: Trip[] = [
         leg: {
           label: 'Leg 11 · Night Departure',
           route: 'Gozo \u2192 Syracuse, Sicily',
-          sub: 'Depart ~9 PM Sep 9 · Arrive ~4 AM Sep 10',
+          sub: 'Depart ~9 PM Sep 10 · Arrive ~4 AM Sep 11',
           miles: 69, // 60 nm × 1.15078
           duration: '5h 0m',
           knots: 12,
@@ -1151,6 +1360,14 @@ export const TRIPS: Trip[] = [
     startDate: '2026-09-10',
     endDate: '2026-09-15',
     hero: { icon: '\ud83c\udfdb\ufe0f', gradient: 'from-slate-900 via-zinc-800 to-amber-900' },
+    guests: 'Post-wedding voyage — Enrico & Antoniette, Daniel & Laura, Marco & Deanna, Brianna & Matthew',
+    guestList: [
+      { name: 'Enrico' }, { name: 'Antoniette' },
+      { name: 'Daniel' }, { name: 'Laura' },
+      { name: 'Marco' }, { name: 'Deanna' },
+      { name: 'Brianna' }, { name: 'Matthew' },
+    ],
+
     days: [
       {
         date: 'Thursday · September 10',
@@ -1278,6 +1495,14 @@ export const TRIPS: Trip[] = [
     startDate: '2026-09-16',
     endDate: '2026-09-16',
     hero: { icon: '\ud83c\udff0', gradient: 'from-red-950 via-red-900 to-amber-800' },
+    guests: 'Post-wedding voyage — Enrico & Antoniette, Daniel & Laura, Marco & Deanna, Brianna & Matthew',
+    guestList: [
+      { name: 'Enrico' }, { name: 'Antoniette' },
+      { name: 'Daniel' }, { name: 'Laura' },
+      { name: 'Marco' }, { name: 'Deanna' },
+      { name: 'Brianna' }, { name: 'Matthew' },
+    ],
+
     days: [
       {
         date: 'Wednesday · September 16',
@@ -1327,6 +1552,14 @@ export const TRIPS: Trip[] = [
     startDate: '2026-09-17',
     endDate: '2026-09-17',
     hero: { icon: '\ud83c\uddec\ud83c\uddf7', gradient: 'from-blue-950 via-sky-900 to-emerald-800' },
+    guests: 'Post-wedding voyage — Enrico & Antoniette, Daniel & Laura, Marco & Deanna, Brianna & Matthew',
+    guestList: [
+      { name: 'Enrico' }, { name: 'Antoniette' },
+      { name: 'Daniel' }, { name: 'Laura' },
+      { name: 'Marco' }, { name: 'Deanna' },
+      { name: 'Brianna' }, { name: 'Matthew' },
+    ],
+
     days: [
       {
         date: 'Thursday · September 17',
@@ -1377,6 +1610,14 @@ export const TRIPS: Trip[] = [
     startDate: '2026-09-18',
     endDate: '2026-09-19',
     hero: { icon: '\ud83c\udde6\ud83c\uddf1', gradient: 'from-red-950 via-rose-900 to-orange-800' },
+    guests: 'Post-wedding voyage — Enrico & Antoniette, Daniel & Laura, Marco & Deanna, Brianna & Matthew',
+    guestList: [
+      { name: 'Enrico' }, { name: 'Antoniette' },
+      { name: 'Daniel' }, { name: 'Laura' },
+      { name: 'Marco' }, { name: 'Deanna' },
+      { name: 'Brianna' }, { name: 'Matthew' },
+    ],
+
     days: [
       {
         date: 'Friday · September 18',
@@ -1437,6 +1678,14 @@ export const TRIPS: Trip[] = [
     startDate: '2026-09-20',
     endDate: '2026-09-22',
     hero: { icon: '\ud83c\udf0a', gradient: 'from-amber-900 via-stone-800 to-slate-900' },
+    guests: 'Post-wedding voyage — Enrico & Antoniette, Daniel & Laura, Marco & Deanna, Brianna & Matthew',
+    guestList: [
+      { name: 'Enrico' }, { name: 'Antoniette' },
+      { name: 'Daniel' }, { name: 'Laura' },
+      { name: 'Marco' }, { name: 'Deanna' },
+      { name: 'Brianna' }, { name: 'Matthew' },
+    ],
+
     days: [
       {
         date: 'Sunday · September 20',
@@ -1507,6 +1756,14 @@ export const TRIPS: Trip[] = [
     startDate: '2026-09-22',
     endDate: '2026-09-24',
     hero: { icon: '\ud83c\udff0', gradient: 'from-sky-950 via-blue-900 to-amber-700' },
+    guests: 'Post-wedding voyage — Enrico & Antoniette, Daniel & Laura, Marco & Deanna, Brianna & Matthew',
+    guestList: [
+      { name: 'Enrico' }, { name: 'Antoniette' },
+      { name: 'Daniel' }, { name: 'Laura' },
+      { name: 'Marco' }, { name: 'Deanna' },
+      { name: 'Brianna' }, { name: 'Matthew' },
+    ],
+
     days: [
       {
         date: 'Tuesday · September 22',
@@ -1571,6 +1828,14 @@ export const TRIPS: Trip[] = [
     startDate: '2026-09-25',
     endDate: '2026-09-30',
     hero: { icon: '\ud83c\udf47', gradient: 'from-blue-950 via-indigo-900 to-rose-800' },
+    guests: 'Post-wedding voyage — Enrico & Antoniette, Daniel & Laura, Marco & Deanna, Brianna & Matthew',
+    guestList: [
+      { name: 'Enrico' }, { name: 'Antoniette' },
+      { name: 'Daniel' }, { name: 'Laura' },
+      { name: 'Marco' }, { name: 'Deanna' },
+      { name: 'Brianna' }, { name: 'Matthew' },
+    ],
+
     days: [
       {
         date: 'Friday · September 25',
@@ -1700,8 +1965,21 @@ export function findTripById(id: string): Trip | undefined {
 }
 
 /**
- * Fetch a trip — returns the server override (if any) merged on top of the baked-in trip.
- * Falls back to the baked-in trip if no override exists or the request fails.
+ * Fetch a trip — returns the server override merged on top of the baked-in trip.
+ *
+ * Merge policy (bug fix 2026-08): earlier versions returned the server
+ * snapshot verbatim, which meant that once a user had ever saved a trip,
+ * later seed changes (renames, added days, corrected times, new locations)
+ * were permanently masked by the stale snapshot — exactly the "my edits
+ * disappeared" symptom we saw with the Naples chapter split.
+ *
+ * The seed is now source of truth for structure. The server override only
+ * contributes the fields users actually author on trip cards: `guests` and
+ * `guestList`. All other fields (name/subtitle/dates/hero/days/events/
+ * locations) flow through from the current seed, so future seed edits are
+ * visible immediately and cannot be silently overwritten by an old row.
+ * (Per-day free-text notes live in a separate `Notes` sheet keyed by
+ * tripId+date; they are unaffected by seed changes.)
  */
 export async function loadTrip(id: string): Promise<Trip | undefined> {
   const baseline = findTripById(id)
@@ -1709,7 +1987,10 @@ export async function loadTrip(id: string): Promise<Trip | undefined> {
     const resp = await fetch(`/api/trips?id=${encodeURIComponent(id)}`, { cache: 'no-store' })
     if (resp.ok) {
       const data = (await resp.json()) as { trip: Trip | null }
-      if (data?.trip) return data.trip
+      const override = data?.trip
+      if (override && baseline) return mergeTripOverride(baseline, override)
+      // If we have no baseline (unknown id) but the server has a snapshot, use it.
+      if (override && !baseline) return override
     }
   } catch {
     // ignore — fall back to baseline
@@ -1717,13 +1998,37 @@ export async function loadTrip(id: string): Promise<Trip | undefined> {
   return baseline
 }
 
-/** Persist a trip override to the backend. */
+/**
+ * Merge a saved override onto a seed baseline. Only user-authored fields
+ * are copied from the override so seed changes remain visible.
+ */
+function mergeTripOverride(baseline: Trip, override: Partial<Trip>): Trip {
+  const merged: Trip = { ...baseline }
+  if (override.guests !== undefined) merged.guests = override.guests
+  if (override.guestList !== undefined) merged.guestList = override.guestList
+  return merged
+}
+
+/**
+ * Persist a trip override to the backend.
+ *
+ * We only send the user-authored fields (`guests`, `guestList`) so we don't
+ * bake the current seed into the override row. The load path is
+ * override-on-top-of-seed, so preserving the full snapshot buys us nothing
+ * and would only re-introduce the "stale snapshot masks seed changes" bug
+ * that we just fixed in `loadTrip`.
+ */
 export async function saveTrip(trip: Trip, user?: string): Promise<{ ok: boolean; detail?: string }> {
+  const overrideOnly: Partial<Trip> & { id: string } = {
+    id: trip.id,
+    guests: trip.guests,
+    guestList: trip.guestList,
+  }
   try {
     const resp = await fetch('/api/trips', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: trip.id, trip, user: user || 'crew' }),
+      body: JSON.stringify({ id: trip.id, trip: overrideOnly, user: user || 'crew' }),
     })
     if (!resp.ok) {
       const text = await resp.text()

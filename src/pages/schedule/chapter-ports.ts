@@ -69,6 +69,14 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
     },
   },
 
+  // Chapter 2b — Crew delivery to Alghero (Aug 9–11) · guest embark Aug 11 PM
+  'crew-alghero-2026': {
+    stops: [
+      { name: 'Alghero (dock)', coord: { lat: 40.560, lon: 8.315 } },
+    ],
+    waypoints: {},
+  },
+
   // Chapter 3 — Sardinia (Costa Smeralda, Maddalena archipelago, west coast)
   'sardinia-2026': {
     stops: [
@@ -121,8 +129,8 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
     },
   },
 
-  // Chapter 5b–7 — New guests: Capri / Amalfi → Aeolian Islands → Catania (Aug 24–28)
-  'capri-amalfi-aeolian-2026': {
+  // Chapter 5b–7 — Naples · Friends: Capri / Amalfi → Aeolian Islands → Catania (Aug 22–28)
+  'naples-friends-2026': {
     stops: [
       { name: 'Napoli',     coord: { lat: 40.833, lon: 14.245 } },
       { name: 'Capri',      coord: { lat: 40.553, lon: 14.243 } },
