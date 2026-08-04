@@ -276,15 +276,14 @@ function ChapterCard({ index, trip, onChange, canEditInline }: ChapterProps) {
 
 export function EnricosSummerTripPage() {
   const [, setLocation] = useLocation()
+  void setLocation
   const [chapters, setChapters] = useState<Trip[]>(() =>
     CHAPTER_IDS.map(id => TRIPS.find(t => t.id === id)).filter((t): t is Trip => !!t),
   )
 
-  useEffect(() => {
-    if (!isLoggedIn()) {
-      setLocation('/')
-    }
-  }, [setLocation])
+  // Consolidated itinerary is public via shared link. Editing controls stay
+  // gated by `canWrite()`; unauthenticated guests get a read-only view.
+  const isGuest = !isLoggedIn()
 
   // Fetch latest persisted overlay for each trip in parallel.
   useEffect(() => {
@@ -354,24 +353,11 @@ export function EnricosSummerTripPage() {
     printConsolidatedTripAsPdf(chapters)
   }
 
-  if (!isLoggedIn()) {
-    return (
-      <div className="min-h-dvh bg-background flex items-center justify-center px-6">
-        <div className="max-w-sm text-center space-y-3">
-          <div className="text-base font-semibold">Sign in required</div>
-          <p className="text-sm text-muted-foreground">
-            Sign in to view Enrico's Attempt at Retirement.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <MenuLayout
       title="Enrico's Attempt at Retirement"
-      showBack
-      backHref="/schedule"
+      showBack={!isGuest}
+      backHref={isGuest ? undefined : '/schedule'}
       rightAction={{
         icon: (
           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
