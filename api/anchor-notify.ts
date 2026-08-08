@@ -17,34 +17,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
 import webpush from 'web-push'
-import crypto from 'crypto'
-
-// === Inlined auth verifier (mirrors api/auth.ts) ============================
-const _HMAC_SECRET = process.env.HMAC_SECRET || process.env.APP_SECRET || 'fallback-secret'
-function _hmac(payload: string): string {
-  return crypto.createHmac('sha256', _HMAC_SECRET).update(payload).digest('hex')
-}
-function verifyToken(token: string | undefined | null): { ok: boolean; role?: 'admin' | 'viewer' | 'crew' } {
-  if (!token || typeof token !== 'string') return { ok: false }
-  const dot = token.indexOf('.')
-  if (dot < 0) return { ok: false }
-  const b64 = token.slice(0, dot)
-  const sig = token.slice(dot + 1)
-  let payload = ''
-  try { payload = Buffer.from(b64, 'base64').toString('utf-8') } catch { return { ok: false } }
-  const expected = _hmac(payload)
-  if (sig.length !== expected.length) return { ok: false }
-  try {
-    const sigBuf = new Uint8Array(Buffer.from(sig, 'hex'))
-    const expBuf = new Uint8Array(Buffer.from(expected, 'hex'))
-    if (!crypto.timingSafeEqual(sigBuf, expBuf)) return { ok: false }
-  } catch { return { ok: false } }
-  const parts = payload.split(':')
-  if (parts.length < 3 || parts[0] !== 'auth') return { ok: false }
-  const role = parts[1]
-  if (role === 'admin' || role === 'viewer' || role === 'crew') return { ok: true, role }
-  return { ok: false }
-}
 
 export const config = { api: { bodyParser: { sizeLimit: '1mb' } }, maxDuration: 30 }
 
@@ -353,76 +325,6 @@ async function handleCron(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({ ok: true, active: active.startedAt, results })
 }
 
-// ---------- test op (admin-only) ----------
-
-async function handleTest(req: VercelRequest, res: VercelResponse) {
-  // Admin-only. Auth token comes from the same cookie/header the app uses.
-  const bearer = String(req.headers['authorization'] || '').replace(/^Bearer\s+/i, '')
-  const cookieHeader = String(req.headers['cookie'] || '')
-  const cookieToken = cookieHeader.split(/;\s*/).find(c => c.startsWith('auth='))?.slice(5) || ''
-  const token = bearer || cookieToken || String(req.query.token || '')
-  const info = verifyToken(token)
-  if (!info.ok || info.role !== 'admin') {
-    return res.status(401).json({ error: 'admin required' })
-  }
-
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
-    return res.status(500).json({ error: 'VAPID keys not set' })
-  }
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE)
-
-  const sheets = getSheets()
-  await ensureSheet(sheets, 'PushSubs', ['Endpoint', 'Name', 'P256dh', 'Auth', 'CreatedAt', 'UpdatedAt'])
-  await ensureSheet(sheets, 'AdminUsers', ['Name'])
-
-  // Admin roster from AdminUsers sheet. Fallback list is used only if the sheet is empty.
-  const adminResp = await sheets.spreadsheets.values.get({ spreadsheetId: INVENTORY_ID, range: 'AdminUsers!A:A' })
-  const adminRows = adminResp.data.values || []
-  const rosterFromSheet = adminRows.slice(1).map((r: any[]) => String(r[0] || '').trim()).filter(Boolean)
-  const fallbackAdmins = ['Gabriel Garcez']
-  const admins = rosterFromSheet.length ? rosterFromSheet : fallbackAdmins
-  const adminSet = new Set(admins.map(a => a.toLowerCase()))
-
-  const subsResp = await sheets.spreadsheets.values.get({ spreadsheetId: INVENTORY_ID, range: 'PushSubs!A:F' })
-  const subsRows = subsResp.data.values || []
-  const targets = subsRows.slice(1)
-    .map((r: any[]) => ({ endpoint: r[0], name: String(r[1] || '').trim(), p256dh: r[2], auth: r[3] }))
-    .filter(s => s.endpoint && s.p256dh && s.auth && adminSet.has(s.name.toLowerCase()))
-
-  const body = (req.body || {}) as { title?: string; message?: string }
-  const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 16) + 'Z'
-  const payload = JSON.stringify({
-    title: body.title || 'Anchor watch — test notification',
-    body: body.message || `Test push from Rise Above ops (${nowStr}). If you see this, notifications work.`,
-    url: '/ism/anchor-watch',
-    tag: 'anchor-watch-test',
-    requireInteraction: false,
-  })
-
-  const results: { name: string; endpoint: string; ok: boolean; status?: number; error?: string }[] = []
-  for (const sub of targets) {
-    try {
-      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 60 })
-      results.push({ name: sub.name, endpoint: sub.endpoint.slice(-16), ok: true })
-    } catch (e: any) {
-      const status = e?.statusCode
-      if (status === 404 || status === 410) {
-        try { await removeSub(sheets, sub.endpoint) } catch {}
-      }
-      results.push({ name: sub.name, endpoint: sub.endpoint.slice(-16), ok: false, status, error: String(e?.message || e) })
-    }
-  }
-
-  return res.status(200).json({
-    ok: true,
-    admins,
-    targetCount: targets.length,
-    sent: results.filter(r => r.ok).length,
-    failed: results.filter(r => !r.ok).length,
-    results,
-  })
-}
-
 // ---------- users op ----------
 
 async function handleUsers(_req: VercelRequest, res: VercelResponse) {
@@ -468,11 +370,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'GET or POST' })
       return await handleCron(req, res)
     }
-    if (op === 'test') {
-      if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
-      return await handleTest(req, res)
-    }
-    return res.status(400).json({ error: 'op required: schedule | subscribe | users | cron | test' })
+    return res.status(400).json({ error: 'op required: schedule | subscribe | users | cron' })
   } catch (e: any) {
     console.error('anchor-notify error', e)
     return res.status(500).json({ error: 'internal', detail: e?.message || String(e) })

@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import type { AnchorWatchData, AnchorWatchSign } from '@/data/anchor-watch-seed'
 import { fetchSchedule, saveSchedule, buildHourSlots, formatHourLocal, SIGN_MATCH_WINDOW_MS, fetchSubscribedUsers } from '@/lib/anchor-schedule'
-import { getCrewName, isAdmin, getToken } from '@/lib/auth'
+import { getCrewName, isAdmin } from '@/lib/auth'
 import {
   isIosSafari, isStandalone, pushSupported,
   subscribeToPush, unsubscribeFromPush, getSubscriptionState,
@@ -29,43 +29,6 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
   const [pushState, setPushState] = useState<{ subscribed: boolean; permission: NotificationPermission } | null>(null)
   const [pushBusy, setPushBusy] = useState(false)
   const [pushError, setPushError] = useState<string | null>(null)
-
-  // Admin-only “send a test push” state (targets admin subscribers only).
-  const [testBusy, setTestBusy] = useState(false)
-  const [testMsg, setTestMsg] = useState<string | null>(null)
-
-  async function sendTestPush() {
-    setTestBusy(true)
-    setTestMsg(null)
-    try {
-      const token = getToken()
-      const resp = await fetch('/api/anchor-notify?op=test', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({}),
-      })
-      const data = await resp.json().catch(() => ({}))
-      if (!resp.ok) {
-        setTestMsg(data?.error || `Failed (${resp.status})`)
-      } else {
-        const sent = Number(data?.sent || 0)
-        const failed = Number(data?.failed || 0)
-        const targets = Number(data?.targetCount || 0)
-        if (targets === 0) {
-          setTestMsg('No admin devices enrolled for push yet.')
-        } else {
-          setTestMsg(`Sent to ${sent} device${sent === 1 ? '' : 's'}${failed ? ` · ${failed} failed` : ''}.`)
-        }
-      }
-    } catch (e: any) {
-      setTestMsg(e?.message || 'Failed to send test push')
-    } finally {
-      setTestBusy(false)
-    }
-  }
 
   // Crew names enrolled for push — fetched from the server so the admin
   // dropdown lists everyone who can actually receive a notification.
@@ -293,22 +256,6 @@ export function AnchorWatchSchedule({ data, disabled }: Props) {
           </div>
         )}
         {pushError && <div className="text-xs text-red-400">{pushError}</div>}
-
-        {admin && (
-          <div className="pt-2 border-t border-border/60 mt-2 flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">
-              Admin: send a test push to all admin devices.
-            </span>
-            <button
-              onClick={sendTestPush}
-              disabled={testBusy}
-              className="text-xs px-3 py-1.5 rounded border border-red-600 text-red-300 hover:bg-red-600/20 disabled:opacity-50"
-            >
-              {testBusy ? 'Sending…' : 'Send test push'}
-            </button>
-          </div>
-        )}
-        {testMsg && <div className="text-xs text-amber-300">{testMsg}</div>}
       </div>
 
       {/* Schedule table */}
