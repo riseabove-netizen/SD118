@@ -107,6 +107,13 @@ export function MenuPage() {
           description="Crew procedures & how-tos"
         />
         <MenuItem
+          icon="🔧"
+          id="maintenance"
+          label="Maintenance Logs"
+          href="/maintenance"
+          description="Service history & upcoming due dates"
+        />
+        <MenuItem
           icon="📦"
           id="inventory"
           label="Inventory"

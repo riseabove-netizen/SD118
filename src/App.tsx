@@ -54,6 +54,11 @@ import { WatchHubPage } from '@/pages/watch/Hub'
 import { WatchCalendarPage } from '@/pages/watch/Calendar'
 import { WatchDutiesPage } from '@/pages/watch/Duties'
 
+// Maintenance
+import { MaintenanceHubPage } from '@/pages/maintenance/Hub'
+import { GeneratorDetailPage } from '@/pages/maintenance/GeneratorDetail'
+import { PerformMaintenancePage } from '@/pages/maintenance/Perform'
+
 // Operational Guides
 import { GuidesListPage } from '@/pages/guides/GuidesList'
 import { GuideViewPage } from '@/pages/guides/GuideView'
@@ -226,6 +231,17 @@ function AppRoutes() {
       </Route>
       <Route path="/watch/duties">
         <AuthGuard><WatchDutiesPage /></AuthGuard>
+      </Route>
+
+      {/* Maintenance */}
+      <Route path="/maintenance">
+        <AuthGuard><MaintenanceHubPage /></AuthGuard>
+      </Route>
+      <Route path="/maintenance/perform">
+        <AuthGuard><PerformMaintenancePage /></AuthGuard>
+      </Route>
+      <Route path="/maintenance/generator/:side">
+        <AuthGuard><GeneratorDetailPage /></AuthGuard>
       </Route>
 
       {/* Operational Guides */}
