@@ -65,6 +65,9 @@ interface SelectedInventory {
   name: string
   partNumber?: string
   qty: number
+  addToPurchase: boolean
+  sourceTab?: string
+  sourceRow?: number
 }
 
 interface PhotoDraft {
@@ -326,7 +329,31 @@ function PerformStep({ system, selectedKits, setSelectedKits, currentHours, crew
         attachedPdfBase64: attachedPdf?.base64 || null,
         attachedPdfFileName: attachedPdf?.name || null,
       })
-      setSuccessMsg(`Saved ${resp.eventId}. PDF uploaded.`)
+
+      // Fire-and-forget: push flagged items to the purchase list. Non-fatal.
+      const flagged = inventoryPicked.filter(i => i.addToPurchase)
+      if (flagged.length > 0) {
+        try {
+          const { addToPurchaseList } = await import('@/lib/purchase-list-api')
+          await addToPurchaseList(
+            flagged.map(i => ({
+              name: i.name,
+              partNumber: i.partNumber,
+              qty: i.qty,
+              sourceTab: i.sourceTab,
+              sourceRow: i.sourceRow,
+            })),
+            { addedBy: technician.trim() || crewName, sourceEventId: resp.eventId }
+          )
+        } catch (e) {
+          console.warn('Purchase list add failed (non-fatal):', e)
+        }
+      }
+
+      setSuccessMsg(
+        `Saved ${resp.eventId}. PDF uploaded.` +
+        (flagged.length > 0 ? ` ${flagged.length} item(s) queued for the purchase list.` : '')
+      )
       setTimeout(() => onDone(resp.eventId), 800)
     } catch (e: any) {
       setErrorMsg(e?.message || 'Failed to submit')
@@ -544,13 +571,25 @@ function InventoryPicker({ picked, setPicked }: { picked: SelectedInventory[]; s
     if (picked.some(p => p.key === key)) return
     setPicked([
       ...picked,
-      { key, name: displayName(it), partNumber: partNumber(it) || undefined, qty: 1 },
+      {
+        key,
+        name: displayName(it),
+        partNumber: partNumber(it) || undefined,
+        qty: 1,
+        addToPurchase: true,
+        sourceTab: (it as any)._tab,
+        sourceRow: it.rowIndex,
+      },
     ])
     setQuery('')
   }
 
   function updateQty(key: string, qty: number) {
     setPicked(picked.map(p => p.key === key ? { ...p, qty } : p))
+  }
+
+  function togglePurchase(key: string) {
+    setPicked(picked.map(p => p.key === key ? { ...p, addToPurchase: !p.addToPurchase } : p))
   }
 
   function remove(key: string) {
@@ -586,26 +625,37 @@ function InventoryPicker({ picked, setPicked }: { picked: SelectedInventory[]; s
         </div>
       )}
       {picked.length > 0 && (
-        <ul className="space-y-1.5">
+        <ul className="space-y-2">
           {picked.map(p => (
-            <li key={p.key} className="flex items-center gap-2 text-xs">
-              <span className="flex-1 min-w-0 truncate">
-                <span className="font-medium">{p.name}</span>
-                {p.partNumber && <span className="text-muted-foreground"> · P/N {p.partNumber}</span>}
-              </span>
-              <input
-                type="number"
-                min={0}
-                value={p.qty}
-                onChange={e => updateQty(p.key, Number(e.target.value) || 0)}
-                className="w-16 rounded-md border border-border bg-background px-2 py-1 text-xs"
-              />
-              <button
-                onClick={() => remove(p.key)}
-                className="text-xs px-2 py-1 rounded border border-border hover:bg-secondary"
-              >
-                Remove
-              </button>
+            <li key={p.key} className="rounded-md border border-border/60 bg-background/50 p-2">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="flex-1 min-w-0 truncate">
+                  <span className="font-medium">{p.name}</span>
+                  {p.partNumber && <span className="text-muted-foreground"> · P/N {p.partNumber}</span>}
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  value={p.qty}
+                  onChange={e => updateQty(p.key, Number(e.target.value) || 0)}
+                  className="w-16 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                />
+                <button
+                  onClick={() => remove(p.key)}
+                  className="text-xs px-2 py-1 rounded border border-border hover:bg-secondary"
+                >
+                  Remove
+                </button>
+              </div>
+              <label className="flex items-center gap-2 text-[11px] mt-1.5 text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-primary"
+                  checked={p.addToPurchase}
+                  onChange={() => togglePurchase(p.key)}
+                />
+                Add to purchase list
+              </label>
             </li>
           ))}
         </ul>

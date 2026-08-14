@@ -40,6 +40,7 @@ import { ConsumablesListPage } from '@/pages/inventory/ConsumablesList'
 import { ToolsListPage } from '@/pages/inventory/ToolsList'
 import { SuppliesListPage } from '@/pages/inventory/SuppliesList'
 import { TransactionsListPage } from '@/pages/inventory/TransactionsList'
+import { PurchaseListPage } from '@/pages/inventory/PurchaseList'
 import { AddItemPage } from '@/pages/inventory/AddItem'
 import { ItemDetailPage } from '@/pages/inventory/ItemDetail'
 import { BulkAddPage } from '@/pages/inventory/BulkAdd'
@@ -212,6 +213,9 @@ function AppRoutes() {
       </Route>
       <Route path="/inventory/supplies/:row">
         <AuthGuard><ItemDetailPage tab="Supplies" /></AuthGuard>
+      </Route>
+      <Route path="/inventory/purchase-list">
+        <AuthGuard><PurchaseListPage /></AuthGuard>
       </Route>
       <Route path="/inventory/transactions">
         <AuthGuard><TransactionsListPage /></AuthGuard>

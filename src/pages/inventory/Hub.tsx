@@ -30,6 +30,7 @@ export function InventoryHubPage() {
         <HubCard icon="📦" label="Consumables" description="Galley provisions and frequently restocked goods" href="/inventory/consumables" />
         <HubCard icon="🧰" label="Supplies" description="Lines, fenders, paint, hardware, deck supplies" href="/inventory/supplies" />
         <HubCard icon="🛠️" label="Tools" description="Hand tools, power tools, diagnostic gear" href="/inventory/tools" />
+        <HubCard icon="🛒" label="Purchase List" description="Items to buy · transfer to storage on arrival" href="/inventory/purchase-list" />
         <HubCard icon="📜" label="Transactions" description="Recent quantity changes" href="/inventory/transactions" />
       </div>
     </MenuLayout>
