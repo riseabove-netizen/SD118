@@ -59,6 +59,8 @@ import { WatchDutiesPage } from '@/pages/watch/Duties'
 import { MaintenanceHubPage } from '@/pages/maintenance/Hub'
 import { GeneratorDetailPage } from '@/pages/maintenance/GeneratorDetail'
 import { PerformMaintenancePage } from '@/pages/maintenance/Perform'
+import { AirHandlersPage } from '@/pages/maintenance/AirHandlers'
+import { PerformAirHandlersPage } from '@/pages/maintenance/PerformAirHandlers'
 
 // Operational Guides
 import { GuidesListPage } from '@/pages/guides/GuidesList'
@@ -243,6 +245,12 @@ function AppRoutes() {
       </Route>
       <Route path="/maintenance/perform">
         <AuthGuard><PerformMaintenancePage /></AuthGuard>
+      </Route>
+      <Route path="/maintenance/air-handlers">
+        <AuthGuard><AirHandlersPage /></AuthGuard>
+      </Route>
+      <Route path="/maintenance/air-handlers/:zone">
+        <AuthGuard><PerformAirHandlersPage /></AuthGuard>
       </Route>
       <Route path="/maintenance/generator/:side">
         <AuthGuard><GeneratorDetailPage /></AuthGuard>

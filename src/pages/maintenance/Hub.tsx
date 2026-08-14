@@ -92,6 +92,26 @@ export function MaintenanceHubPage() {
           <div className="text-xs text-muted-foreground">Loading current hours…</div>
         )}
 
+        {/* Calendar-based systems (not hours-based) */}
+        <div className="space-y-2">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+            HVAC · Monthly service
+          </div>
+          <button
+            onClick={() => setLocation('/maintenance/air-handlers')}
+            className="w-full flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:bg-secondary active:bg-secondary/80 transition-colors text-left min-h-[80px]"
+          >
+            <div className="text-2xl">❄️</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold">Air Handlers</div>
+              <div className="text-xs text-muted-foreground">
+                Guest & crew AHUs · monthly service checklist
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground">›</div>
+          </button>
+        </div>
+
         {groups.map(group => (
           <div key={group.title} className="space-y-2">
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
