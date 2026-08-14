@@ -100,25 +100,11 @@ export function MenuPage() {
       {/* Menu items */}
       <div className="flex-1 px-4 max-w-lg mx-auto w-full space-y-3">
         <MenuItem
-          icon="📋"
-          id="runlog"
-          label="Running Log"
-          href="/runlog/upload"
-          description="Upload and log engine readings"
-        />
-        <MenuItem
-          icon="🔍"
-          id="inspection"
-          label="Engine Room Inspection Log"
-          href="/inspection"
-          description="Walk-around inspection with PDF report"
-        />
-        <MenuItem
           icon="🕒"
           id="watch"
           label="Watch Duties"
           href="/watch"
-          description="Daily checklist & watch calendar"
+          description="Watch calendar, running log & engine room inspections"
         />
         <MenuItem
           icon="🗓️"

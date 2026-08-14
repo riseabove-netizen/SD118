@@ -58,6 +58,18 @@ export function WatchHubPage() {
           href="/ism/anchor-watch"
           description="Shared hourly watch with PDF export to Drive"
         />
+        <Tile
+          icon="📋"
+          label="Running Log"
+          href="/runlog/upload"
+          description="Upload and log engine readings"
+        />
+        <Tile
+          icon="🔍"
+          label="Engine Room Inspection Log"
+          href="/inspection"
+          description="Walk-around inspection with PDF report"
+        />
       </div>
     </MenuLayout>
   )
