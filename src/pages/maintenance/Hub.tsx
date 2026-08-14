@@ -16,6 +16,7 @@ import {
   formatHoursUntil,
   dueTier,
 } from '@/data/maintenance-systems'
+import { CALENDAR_SYSTEMS } from '@/data/calendar-systems'
 import { fetchSystemState } from '@/lib/maintenance-api'
 
 interface SystemState {
@@ -95,11 +96,11 @@ export function MaintenanceHubPage() {
         {/* Calendar-based systems (not hours-based) */}
         <div className="space-y-2">
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-            HVAC · Monthly service
+            Calendar-based service
           </div>
           <button
             onClick={() => setLocation('/maintenance/air-handlers')}
-            className="w-full flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:bg-secondary active:bg-secondary/80 transition-colors text-left min-h-[80px]"
+            className="w-full flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:bg-secondary active:bg-secondary/80 transition-colors text-left min-h-[72px]"
           >
             <div className="text-2xl">❄️</div>
             <div className="flex-1 min-w-0">
@@ -110,6 +111,20 @@ export function MaintenanceHubPage() {
             </div>
             <div className="text-xs text-muted-foreground">›</div>
           </button>
+          {CALENDAR_SYSTEMS.map(s => (
+            <button
+              key={s.id}
+              onClick={() => setLocation(`/maintenance/calendar/${s.id}`)}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border border-border bg-card hover:bg-secondary active:bg-secondary/80 transition-colors text-left min-h-[72px]"
+            >
+              <div className="text-2xl">{s.tileEmoji}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold">{s.label}</div>
+                <div className="text-xs text-muted-foreground">{s.tileBlurb}</div>
+              </div>
+              <div className="text-xs text-muted-foreground">›</div>
+            </button>
+          ))}
         </div>
 
         {groups.map(group => (

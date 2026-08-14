@@ -61,6 +61,7 @@ import { GeneratorDetailPage } from '@/pages/maintenance/GeneratorDetail'
 import { PerformMaintenancePage } from '@/pages/maintenance/Perform'
 import { AirHandlersPage } from '@/pages/maintenance/AirHandlers'
 import { PerformAirHandlersPage } from '@/pages/maintenance/PerformAirHandlers'
+import { CalendarSystemPage } from '@/pages/maintenance/CalendarSystem'
 
 // Operational Guides
 import { GuidesListPage } from '@/pages/guides/GuidesList'
@@ -251,6 +252,9 @@ function AppRoutes() {
       </Route>
       <Route path="/maintenance/air-handlers/:zone">
         <AuthGuard><PerformAirHandlersPage /></AuthGuard>
+      </Route>
+      <Route path="/maintenance/calendar/:systemId">
+        <AuthGuard><CalendarSystemPage /></AuthGuard>
       </Route>
       <Route path="/maintenance/generator/:side">
         <AuthGuard><GeneratorDetailPage /></AuthGuard>
