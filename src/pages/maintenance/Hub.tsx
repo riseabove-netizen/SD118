@@ -225,9 +225,14 @@ function SystemTile({ system, state, onClick }: TileProps) {
         </div>
       </div>
       {milestone && (
-        <span className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded border ${badgeClasses}`}>
-          {formatHoursUntil(milestone.hoursUntil)}
-        </span>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded border ${badgeClasses}`}>
+            {formatHoursUntil(milestone.hoursUntil)}
+          </span>
+          <span className="text-[9px] text-muted-foreground">
+            due at {milestone.dueAtHours} h
+          </span>
+        </div>
       )}
       <svg viewBox="0 0 24 24" className="w-5 h-5 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 18l6-6-6-6" />

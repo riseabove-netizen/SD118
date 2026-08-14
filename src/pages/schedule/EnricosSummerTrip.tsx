@@ -445,6 +445,8 @@ export function EnricosSummerTripPage() {
           // Build the leg that connects this chapter to the next (if any).
           const legs = buildLegs()
           const nextLeg = legs.find(l => l.fromId === trip.id)
+          const isPast = daysUntil(trip.endDate) < 0
+          if (isPast) return null // rendered in the collapsed folder below
           return (
             <React.Fragment key={trip.id}>
               <ChapterCard
@@ -460,6 +462,74 @@ export function EnricosSummerTripPage() {
           )
         })}
       </div>
+
+      <PastTripsFolder
+        chapters={chapters}
+        canEditInline={canEditInline}
+        onChange={next =>
+          setChapters(prev => prev.map(t => (t.id === next.id ? next : t)))
+        }
+      />
     </MenuLayout>
+  )
+}
+
+// Collapsible folder at the bottom of the itinerary listing every past
+// chapter so recent history is one tap away without cluttering the top.
+function PastTripsFolder({
+  chapters,
+  canEditInline,
+  onChange,
+}: {
+  chapters: Trip[]
+  canEditInline: boolean
+  onChange: (next: Trip) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const past = chapters
+    .map((t, i) => ({ trip: t, index: i }))
+    .filter(({ trip }) => daysUntil(trip.endDate) < 0)
+    // Newest completed trip first.
+    .sort((a, b) => b.trip.endDate.localeCompare(a.trip.endDate))
+
+  if (past.length === 0) return null
+
+  return (
+    <div className="mt-6 rounded-2xl border border-border bg-secondary/20">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+      >
+        <div className="flex items-center gap-3">
+          <div className="text-xl">🗂️</div>
+          <div>
+            <div className="text-sm font-semibold">Past trips</div>
+            <div className="text-[11px] text-muted-foreground">
+              {past.length} completed · tap to {open ? 'hide' : 'expand'}
+            </div>
+          </div>
+        </div>
+        <svg
+          viewBox="0 0 24 24"
+          className={`w-5 h-5 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}
+          fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+        >
+          <path d="M9 18l6-6-6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-3">
+          {past.map(({ trip, index }) => (
+            <ChapterCard
+              key={trip.id}
+              index={index}
+              trip={trip}
+              canEditInline={canEditInline}
+              onChange={onChange}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

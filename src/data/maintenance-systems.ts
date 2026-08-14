@@ -322,14 +322,17 @@ export interface KitDueEntry {
 /**
  * For a given system and current hour reading, compute when each kit is
  * next due. Only hour-based kits are returned (daily is excluded — daily
- * is always "due today"). Kits repeat cumulatively at every multiple of
- * their `interval` value.
+ * is always "due today"). Kits repeat cumulatively at the interval value.
  *
- * If lastServiceHours are known for a specific kit, the next cycle is the
- * smallest multiple of the interval that is strictly greater than
- * lastServiceHours. Otherwise the next cycle is the smallest multiple of
- * the interval that is strictly greater than currentHours (i.e. the
- * upcoming scheduled service, even if past services were skipped).
+ * Scheduling rule: the next service is exactly `interval` hours after
+ * the most recent service. If a service was performed early (e.g. the
+ * 250h kit at 3722 h instead of the grid milestone 3750 h), all future
+ * cycles offset to that new baseline (next due at 3972 h, then 4222 h,
+ * etc.) — we do NOT snap back to the fixed 250/500/1000 grid.
+ *
+ * If nothing has ever been logged for this kit, we assume the last
+ * service happened at the nearest grid milestone at or below the
+ * current meter (a reasonable default before backfill).
  */
 export function computeKitSchedule(
   system: MaintenanceSystem,
@@ -344,9 +347,15 @@ export function computeKitSchedule(
     const lastDone = lastServiceHoursByKit[kit.id]
     let dueAt: number
     if (typeof lastDone === 'number' && lastDone > 0) {
-      dueAt = Math.floor(lastDone / step) * step + step
+      // Reset counting from the last real service.
+      dueAt = lastDone + step
+      // If the meter has already run past several cycles without a
+      // fresh log, roll forward to the current cycle so "hoursUntil"
+      // stays meaningful (still keyed off the last-known service).
+      while (dueAt <= currentHours) dueAt += step
     } else {
-      // Nothing recorded — schedule the next milestone after the current meter.
+      // Nothing recorded — assume most recent service happened at the
+      // nearest lower grid multiple, so the next one is one step above.
       dueAt = Math.floor(currentHours / step) * step + step
     }
     entries.push({
