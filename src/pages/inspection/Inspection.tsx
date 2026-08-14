@@ -69,6 +69,21 @@ function makeSections(): SectionDraft[] {
   ]
 }
 
+// Extra systems whose current hours we want captured during an engine
+// room inspection. Each id matches the id in MAINTENANCE_SYSTEMS so the
+// server can sync it into the MaintenanceHours sheet.
+type ExtraHoursSlot = { systemId: string; label: string; hours: string }
+
+function makeExtraHoursSlots(): ExtraHoursSlot[] {
+  return [
+    { systemId: 'main-engine-port',      label: 'Main engine — Port',      hours: '' },
+    { systemId: 'main-engine-starboard', label: 'Main engine — Starboard', hours: '' },
+    { systemId: 'watermaker-top',        label: 'Watermaker — Top',        hours: '' },
+    { systemId: 'watermaker-bottom',     label: 'Watermaker — Bottom',     hours: '' },
+    { systemId: 'hamann',                label: 'Hamann sewage system',    hours: '' },
+  ]
+}
+
 export function InspectionPage() {
   const [, setLocation] = useLocation()
   const [sections, setSections] = useState<SectionDraft[]>(makeSections())
@@ -77,6 +92,7 @@ export function InspectionPage() {
     portHours: '',
     stbdHours: '',
   })
+  const [extraHours, setExtraHours] = useState<ExtraHoursSlot[]>(makeExtraHoursSlots())
   const [dateTime, setDateTime] = useState<string>(nowLocalIsoMinute())
   const [coords, setCoords] = useState<{ lat: string; lon: string; formatted: string }>({
     lat: '',
@@ -178,6 +194,9 @@ export function InspectionPage() {
           formatted: coords.formatted,
         },
         generator,
+        systemHours: extraHours
+          .filter(s => s.hours.trim() !== '')
+          .map(s => ({ systemId: s.systemId, label: s.label, hours: s.hours.trim() })),
         sections: sections.map(s => ({
           title: s.title,
           checks: s.checks.map(c => ({ label: c.label, ok: c.ok === true })),
@@ -233,6 +252,7 @@ export function InspectionPage() {
               setSuccess(null)
               setSections(makeSections())
               setGenerator({ running: '', portHours: '', stbdHours: '' })
+              setExtraHours(makeExtraHoursSlots())
               setDateTime(nowLocalIsoMinute())
               setCoords({ lat: '', lon: '', formatted: '' })
               refreshCoords()
@@ -302,6 +322,9 @@ export function InspectionPage() {
         {/* Generator block */}
         <div className="p-3 rounded-xl border border-border bg-card space-y-3">
           <div className="font-medium">Generator status</div>
+          <div className="text-xs text-muted-foreground">
+            Hours logged here sync straight into Maintenance Logs so the countdown to the next service updates as soon as you submit.
+          </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Which generator is running?</label>
             <select
@@ -337,6 +360,32 @@ export function InspectionPage() {
                 className="w-full h-11 px-3 rounded-lg bg-secondary border border-border"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Other system hour readings */}
+        <div className="p-3 rounded-xl border border-border bg-card space-y-3">
+          <div className="font-medium">Other system hours</div>
+          <div className="text-xs text-muted-foreground">
+            Optional — leave any row blank to skip. Everything you fill in updates the corresponding maintenance tile.
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {extraHours.map((slot, idx) => (
+              <div key={slot.systemId}>
+                <label className="block text-xs text-muted-foreground mb-1">{slot.label}</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={slot.hours}
+                  onChange={e => {
+                    const v = e.target.value
+                    setExtraHours(prev => prev.map((s, i) => (i === idx ? { ...s, hours: v } : s)))
+                  }}
+                  placeholder="hours"
+                  className="w-full h-11 px-3 rounded-lg bg-secondary border border-border"
+                />
+              </div>
+            ))}
           </div>
         </div>
 

@@ -5,6 +5,7 @@
 // maintenance PDFs (Helvetica, red rule lines, boat header).
 
 import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont } from 'pdf-lib'
+import { applyBranding } from './pdfBranding'
 import type { PurchaseItem } from '@/lib/purchase-list-api'
 
 const RED = rgb(0.85, 0.15, 0.15)
@@ -263,6 +264,7 @@ export async function exportPurchaseListPDF(
 
   drawFooter(ctx)
 
+  await applyBranding(pdf)
   const bytes = await pdf.save()
   const stamp = new Date().toISOString().slice(0, 10)
   download(bytes, `purchase-list_${stamp}.pdf`)

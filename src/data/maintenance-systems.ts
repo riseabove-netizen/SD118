@@ -264,26 +264,9 @@ export const MAINTENANCE_SYSTEMS: MaintenanceSystem[] = [
     icon: '❄️',
     kits: [],
   },
-  {
-    id: 'fresh-water-pump-ac',
-    parentId: 'fresh-water-pump',
-    kind: 'fresh-water-pump',
-    side: 'ac',
-    label: 'Fresh-water pump — AC',
-    driveFolderPath: ['Maintenance', 'Fresh Water Pumps', 'AC'],
-    icon: '🚿',
-    kits: [],
-  },
-  {
-    id: 'fresh-water-pump-dc',
-    parentId: 'fresh-water-pump',
-    kind: 'fresh-water-pump',
-    side: 'dc',
-    label: 'Fresh-water pump — DC',
-    driveFolderPath: ['Maintenance', 'Fresh Water Pumps', 'DC'],
-    icon: '🚿',
-    kits: [],
-  },
+  // Fresh-water pumps (AC / DC) now live inside the consolidated
+  // "Fresh Water System" calendar tile alongside the tank, UV lamps and
+  // silver-ion doser, so they're intentionally omitted from this list.
   {
     id: 'grey-black-pump-left',
     parentId: 'grey-black-pump',

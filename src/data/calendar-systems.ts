@@ -95,26 +95,6 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
   },
 
   // ------------------------------------------------------------------
-  // Fresh water tank — yearly service
-  // ------------------------------------------------------------------
-  {
-    id: 'fresh-water-tank',
-    label: 'Fresh Water Tank',
-    tileEmoji: '💧',
-    tileBlurb: 'Yearly test / empty / clean',
-    units: [{ id: 'tank', label: 'Fresh water tank' }],
-    items: [
-      {
-        id: 'test-empty-clean',
-        label: 'Test water, empty tank, clean as necessary',
-        detail: 'Once per year.',
-        interval: { kind: 'yearly' },
-        seedLastDone: '2025-11-15',
-      },
-    ],
-  },
-
-  // ------------------------------------------------------------------
   // Black / Grey water tank — yearly service
   // ------------------------------------------------------------------
   {
@@ -135,14 +115,20 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
   },
 
   // ------------------------------------------------------------------
-  // Fresh water system — pumps, UV lamps, silver-ion dosing
+  // Fresh water system — tank + pumps + UV lamps + silver-ion dosing
+  //
+  // Merged view: what used to be three tiles (Fresh Water System, Fresh
+  // Water Tank, Fresh Water Pumps) now lives here, so the crew has one
+  // place to see every fresh-water job. The soonest interval bubbles up
+  // to the maintenance hub.
   // ------------------------------------------------------------------
   {
     id: 'fresh-water-system',
     label: 'Fresh Water System',
     tileEmoji: '🚰',
-    tileBlurb: 'Pumps · UV lamps · silver-ion doser',
+    tileBlurb: 'Tank · pumps · UV lamps · silver-ion doser',
     units: [
+      { id: 'tank',          label: 'Fresh water tank',        group: 'Tank' },
       { id: 'pump-ac',       label: 'Fresh water pump — AC',   group: 'Pumps' },
       { id: 'pump-dc',       label: 'Fresh water pump — DC',   group: 'Pumps' },
       { id: 'uv-left',       label: 'UV lamp — left',          group: 'UV sterilizer' },
@@ -150,6 +136,13 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
       { id: 'silver-ion',    label: 'Silver-ion dosing pump',  group: 'Silver-ion doser' },
     ],
     items: [
+      {
+        id: 'tank-test-empty-clean',
+        label: 'Test water, empty tank, clean as necessary',
+        detail: 'Applies to the tank only. Once per year.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2025-11-15',
+      },
       {
         id: 'seal-kit',
         label: 'Replace seal kit / service pump',
@@ -186,14 +179,16 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
 // still records exactly what the user picked.
 export function itemAppliesToUnit(system: CalendarSystem, itemId: string, unitId: string): boolean {
   if (system.id !== 'fresh-water-system') return true
+  const isTank = unitId === 'tank'
   const isPump = unitId === 'pump-ac' || unitId === 'pump-dc'
   const isUv   = unitId === 'uv-left' || unitId === 'uv-right'
   const isSilver = unitId === 'silver-ion'
   switch (itemId) {
-    case 'seal-kit':          return isPump
-    case 'motor-replace':     return isPump
-    case 'uv-lamp-replace':   return isUv
-    case 'silver-ion-refill': return isSilver
+    case 'tank-test-empty-clean': return isTank
+    case 'seal-kit':              return isPump
+    case 'motor-replace':         return isPump
+    case 'uv-lamp-replace':       return isUv
+    case 'silver-ion-refill':     return isSilver
     default: return true
   }
 }

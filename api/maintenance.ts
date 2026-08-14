@@ -38,6 +38,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
 import { Readable } from 'stream'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { applyBranding } from '../src/lib/pdfBranding'
 
 // ---------------- env + auth ----------------
 
@@ -391,6 +392,7 @@ async function buildMaintenancePdf(input: PdfInput): Promise<Uint8Array> {
     }
   }
 
+  await applyBranding(pdf)
   return pdf.save()
 }
 

@@ -2,6 +2,23 @@ import React from 'react'
 import { useLocation } from 'wouter'
 import { getCrewName, logout, getRole } from '@/lib/auth'
 import { EditableText, useTextOverrides } from '@/lib/textOverrides'
+import { TRIPS } from '@/data/trips'
+
+// Find the trip whose date range covers today's date so "Today's
+// schedule" can jump straight to the right day. Falls back to the
+// consolidated summer-trip page when nothing matches.
+function findTodaysScheduleHref(): string {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const iso = today.toISOString().slice(0, 10)
+  for (const t of TRIPS) {
+    if (t.startDate <= iso && iso <= t.endDate) {
+      return `/schedule/${t.id}?d=${iso}`
+    }
+  }
+  // No active trip — default to the consolidated summer overview.
+  return '/schedule/enricos-summer-trip'
+}
 
 interface MenuItemProps {
   icon: string
@@ -50,16 +67,34 @@ export function MenuPage() {
   return (
     <div className="min-h-dvh bg-background flex flex-col">
       {/* Header */}
-      <header className="px-4 pt-12 pb-8 text-center">
-        <div className="flex justify-center mb-4">
-          <svg viewBox="0 0 48 48" className="w-12 h-12" fill="none" aria-label="Rise Above">
-            <rect width="48" height="48" rx="10" fill="hsl(0 0% 10%)"/>
-            <path d="M24 9L37 35H11L24 9Z" stroke="hsl(0 72% 51%)" strokeWidth="2.5" fill="none" strokeLinejoin="round"/>
-            <path d="M17 27h14" stroke="hsl(0 72% 51%)" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
+      <header className="px-4 pt-12 pb-6 text-center">
+        <div className="flex justify-center mb-3">
+          <img
+            src="/assets/rise-above-logo.png"
+            alt="Rise Above"
+            className="h-16 sm:h-20 w-auto object-contain"
+          />
         </div>
-        <EditableText id="menu.title" defaultText="Rise Above" as="h1" className="text-2xl font-bold" />
-        <EditableText id="menu.subtitle" defaultText="Engine Log & SMS" as="p" className="text-muted-foreground text-sm mt-1" />
+        <EditableText
+          id="menu.subtitle"
+          defaultText="ISM, Maintenance and daily operations"
+          as="p"
+          className="text-muted-foreground text-sm mt-1"
+        />
+
+        {/* Today's schedule shortcut */}
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={() => setLocation(findTodaysScheduleHref())}
+            className="inline-flex items-center gap-2 px-4 h-10 rounded-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-sm font-semibold transition-colors"
+          >
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <path d="M16 2v4M8 2v4M3 10h18" />
+            </svg>
+            <span>Today&apos;s schedule</span>
+          </button>
+        </div>
       </header>
 
       {/* Menu items */}

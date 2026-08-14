@@ -189,6 +189,17 @@ type Section = {
   comments: string
 }
 
+// Which additional systems can the crew log hours for during an
+// inspection? Each entry has an id that matches MAINTENANCE_SYSTEMS.id
+// on the client. When we get a numeric reading we (a) print it in the
+// PDF and (b) sync it into the MaintenanceHours sheet so the main
+// maintenance module picks it up automatically.
+type SystemHoursEntry = {
+  systemId: string   // e.g. 'main-engine-port'
+  label: string      // e.g. 'Main engine — Port'
+  hours: string      // free-text; parseable as a positive number if present
+}
+
 type InspectionBody = {
   user: string
   timestamp: string
@@ -202,7 +213,76 @@ type InspectionBody = {
     portHours: string
     stbdHours: string
   }
+  // Additional per-system hour readings (main engines, watermakers,
+  // etc.). Optional — old clients that don't send it still work.
+  systemHours?: SystemHoursEntry[]
   sections: Section[]
+}
+
+// The generator hour columns already have their own dedicated slots in
+// the Generator Log tab, so route their systemIds there for consistency.
+const GENERATOR_PORT_SYSTEM_ID = 'generator-port'
+const GENERATOR_STBD_SYSTEM_ID = 'generator-starboard'
+
+const MAINTENANCE_HOURS_HEADERS = ['SystemId', 'Hours', 'UpdatedAt', 'User']
+
+async function upsertMaintenanceHours(
+  sheets: any,
+  spreadsheetId: string,
+  systemId: string,
+  hours: number,
+  user: string,
+  updatedAtIso: string,
+): Promise<void> {
+  // The MaintenanceHours sheet is owned by /api/maintenance; recreate
+  // the header row here defensively so a fresh sheet also works.
+  try {
+    const meta = await sheets.spreadsheets.get({ spreadsheetId })
+    const exists = (meta.data.sheets || []).some((sh: any) => sh.properties?.title === 'MaintenanceHours')
+    if (!exists) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: { requests: [{ addSheet: { properties: { title: 'MaintenanceHours' } } }] },
+      })
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: 'MaintenanceHours!A1',
+        valueInputOption: 'RAW',
+        requestBody: { values: [MAINTENANCE_HOURS_HEADERS] },
+      })
+    }
+  } catch {
+    /* if metadata fetch fails we'll surface below when appending */
+  }
+
+  // Read all rows, find one for this systemId; either update it or
+  // append a new row.
+  const cur = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: 'MaintenanceHours!A:D',
+  })
+  const rows: any[][] = cur.data.values || []
+  const dataRows = rows.slice(1) // skip header
+  const rowIdx = dataRows.findIndex(r => String(r[0] || '').trim() === systemId)
+  const values = [[systemId, hours, updatedAtIso, user]]
+  if (rowIdx === -1) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: 'MaintenanceHours!A:D',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values },
+    })
+  } else {
+    // rowIdx is 0-based within dataRows; sheet rows are 1-based and
+    // header is row 1 → target row is rowIdx + 2.
+    const target = rowIdx + 2
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `MaintenanceHours!A${target}:D${target}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values },
+    })
+  }
 }
 
 function detectImageMime(b64: string): 'image/jpeg' | 'image/png' {
@@ -296,6 +376,16 @@ async function buildPdf(body: InspectionBody, inspectionId: string): Promise<Uin
   drawText(`Running: ${body.generator.running || '—'}`, { size: 11 })
   drawText(`Port gen hours: ${body.generator.portHours || '—'}`, { size: 11 })
   drawText(`STBD gen hours: ${body.generator.stbdHours || '—'}`, { size: 11, gap: 8 })
+
+  // Additional system hour readings (main engines, watermakers, …)
+  const extraHours = (body.systemHours || []).filter(e => e.hours && e.hours.trim())
+  if (extraHours.length > 0) {
+    drawText('Other system hours', { font: bold, size: 13, gap: 4 })
+    for (const entry of extraHours) {
+      drawText(`${entry.label}: ${entry.hours} h`, { size: 11 })
+    }
+    y -= 4
+  }
 
   // Sections
   for (const section of body.sections) {
@@ -425,11 +515,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       requestBody: { values: [genRow] },
     })
 
+    // 4) Sync every hour reading (generators + any extra systems) into
+    //    the MaintenanceHours sheet so the Maintenance Logs page picks
+    //    it up automatically.
+    const nowIso = new Date().toISOString()
+    const user = body.user || 'crew'
+    const hourSyncs: Array<{ systemId: string; hours: number }> = []
+    const portNum = parseFloat(body.generator.portHours || '')
+    const stbdNum = parseFloat(body.generator.stbdHours || '')
+    if (Number.isFinite(portNum) && portNum > 0) hourSyncs.push({ systemId: GENERATOR_PORT_SYSTEM_ID, hours: portNum })
+    if (Number.isFinite(stbdNum) && stbdNum > 0) hourSyncs.push({ systemId: GENERATOR_STBD_SYSTEM_ID, hours: stbdNum })
+    for (const entry of body.systemHours || []) {
+      const n = parseFloat(entry.hours || '')
+      if (Number.isFinite(n) && n > 0 && entry.systemId) {
+        hourSyncs.push({ systemId: entry.systemId, hours: n })
+      }
+    }
+    for (const s of hourSyncs) {
+      try {
+        await upsertMaintenanceHours(sheets, RUNNING_LOG_ID as string, s.systemId, s.hours, user, nowIso)
+      } catch (e) {
+        // Don't fail the whole inspection if the hours sync fails — the
+        // PDF and Generator Log row are the primary record.
+        console.warn('MaintenanceHours sync failed for', s.systemId, e)
+      }
+    }
+
     return res.status(200).json({
       ok: true,
       inspectionId,
       pdfFileId: fileId,
       pdfLink: fileLink,
+      hoursSynced: hourSyncs.length,
     })
   } catch (error: any) {
     console.error('inspection-submit error:', error)
