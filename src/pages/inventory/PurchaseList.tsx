@@ -13,6 +13,7 @@ import {
   type PurchaseItem,
 } from '@/lib/purchase-list-api'
 import { SPARE_LOCATIONS, SPARE_SUB_LOCATIONS } from '@/lib/inventory'
+import { exportPurchaseListPDF } from '@/lib/purchase-list-pdf'
 
 // A small manual add form so items can be typed in without going through
 // the maintenance flow.
@@ -280,6 +281,17 @@ export function PurchaseListPage() {
     reload()
   }
 
+  async function handleExport() {
+    if (selected.size === 0) return
+    const rows = items.filter(it => selected.has(it.Id))
+    if (rows.length === 0) return
+    try {
+      await exportPurchaseListPDF(rows, { preparedBy: getCrewName() || '' })
+    } catch (e) {
+      alert('PDF export failed: ' + (e as Error).message)
+    }
+  }
+
   return (
     <MenuLayout title="Purchase List" showBack backHref="/inventory">
       <div className="space-y-3">
@@ -322,6 +334,12 @@ export function PurchaseListPage() {
             </div>
             <button
               className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-secondary"
+              onClick={handleExport}
+            >
+              Export PDF
+            </button>
+            <button
+              className="text-xs px-3 py-1.5 rounded-md border border-border hover:bg-secondary"
               onClick={handleRemove}
             >
               Remove
@@ -340,6 +358,12 @@ export function PurchaseListPage() {
             >
               Select all open
             </button>
+            {selected.size === 0 && (
+              <>
+                <span>·</span>
+                <span>Select items to export or transfer</span>
+              </>
+            )}
           </div>
         )}
 

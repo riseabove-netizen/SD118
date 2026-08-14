@@ -92,7 +92,7 @@ const GENERATOR_250H_KIT: MaintenanceKit = {
   label: '250h / 6 months',
   shortLabel: '250h',
   checklist: [
-    { id: 'oil-and-filter', label: 'Change engine oil and replace oil filter', detail: 'Deere 4045SFM85 filter element. Hand-tighten only; do not add 3/4–1-1/4 turn after gasket contact.' },
+    { id: 'oil-and-filter', label: 'Change engine oil and replace oil filter', detail: 'Requires 18 L / 19 qt of 15W‑40 engine oil. Deere 4045SFM85 filter element. Hand-tighten only; do not add 3/4–1-1/4 turn after gasket contact.' },
     { id: 'oil-drain-torque', label: 'Torque oil pan drain plug to spec', detail: '70 N·m (52 lb-ft) copper washer, or 50 N·m (37 lb-ft) O-ring.' },
     { id: 'air-cleaner-filter', label: 'Service air-cleaner filter element (4045SFM85)' },
     { id: 'fire-extinguisher', label: 'Service fire extinguisher' },
