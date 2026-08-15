@@ -235,10 +235,13 @@ export function MaintenanceHubPage() {
 
         {groups.map(group => {
           const visible = group.systems.filter(s => {
+            // Systems without hour-based kits (main engines, Hamann,
+            // grey/black pumps, AC) are represented by calendar tiles or
+            // air handlers, so hide them from the hour-based grid. They
+            // remain reachable via "Perform maintenance → Custom repair"
+            // for one-off logging.
+            if (!s.kits.length) return false
             const days = hoursTileDays(s)
-            // Systems with no kits defined never pass a strict filter,
-            // but we still want them shown on the default "All" view.
-            if (!s.kits.length) return filter === 'all'
             return passesFilter(days)
           })
           if (visible.length === 0) return null
