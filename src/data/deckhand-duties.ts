@@ -7,6 +7,12 @@ export interface DeckhandSection {
   description: string
   tone: 'blue' | 'red' | 'orange' | 'amber'
   items: string[]
+  /**
+   * Optional group labels overlaid on the flat items array.
+   * Each entry marks the item index where a new group header should appear.
+   * Item indices continue to be the source of truth for progress and storage.
+   */
+  groups?: { startIndex: number; label: string }[]
 }
 
 export const DECKHAND_DUTIES_SECTIONS: DeckhandSection[] = [
@@ -78,6 +84,39 @@ export const DECKHAND_DUTIES_SECTIONS: DeckhandSection[] = [
       'Check flybridge, upper deck and main deck areas.',
       'Remove fingerprints if necessary.',
       'Remain on standby for guests.',
+    ],
+  },
+  {
+    id: 'beach-setup',
+    title: 'Beach Setup',
+    description: 'Beach picnic ashore — gear & F&B checklist',
+    tone: 'blue',
+    groups: [
+      { startIndex: 0,  label: 'Beach area' },
+      { startIndex: 10, label: 'Food and drinks' },
+    ],
+    items: [
+      // Beach area (0–9)
+      'Chairs',
+      'Awning',
+      'Sand mat',
+      'Tables',
+      'Cooler filled with ice',
+      'Towels',
+      'Sunscreen',
+      'Dry bags',
+      'Tower speaker and extra battery',
+      'Trash bag',
+      // Food and drinks (10–18)
+      'Sodas',
+      'Alcohol',
+      'Cups',
+      'Plates',
+      'Napkins',
+      'Disposable silverware',
+      'Food',
+      'Snacks',
+      'Dessert',
     ],
   },
   {

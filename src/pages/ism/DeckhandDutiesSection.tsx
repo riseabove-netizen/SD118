@@ -237,8 +237,17 @@ export function DeckhandDutiesSectionPage() {
           {section.items.map((item, idx) => {
             const st = state.items[idx]
             const checked = !!st?.checked
+            const groupLabel = section.groups?.find(g => g.startIndex === idx)?.label
             return (
-              <li key={idx}>
+              <React.Fragment key={idx}>
+                {groupLabel && (
+                  <li className={idx === 0 ? '' : 'pt-3'} aria-hidden="false">
+                    <div className={`text-xs font-semibold uppercase tracking-wide ${tone.accent} pb-1`}>
+                      {groupLabel}
+                    </div>
+                  </li>
+                )}
+              <li>
                 <button
                   type="button"
                   onClick={() => toggle(idx)}
@@ -285,6 +294,7 @@ export function DeckhandDutiesSectionPage() {
                   </span>
                 </button>
               </li>
+              </React.Fragment>
             )
           })}
         </ul>

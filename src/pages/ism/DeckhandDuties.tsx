@@ -120,6 +120,14 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
       <line x1="18" y1="10" x2="20" y2="10"/>
     </svg>
   ),
+  'beach-setup': (
+    // umbrella / beach
+    <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v18"/>
+      <path d="M3 11a9 9 0 0 1 18 0z"/>
+      <path d="M12 21a2 2 0 0 0 2-2"/>
+    </svg>
+  ),
   'evening': (
     // moon
     <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
