@@ -61,6 +61,12 @@ export interface MaintenanceSystem {
   // recorded log yet, to seed the "current hours" field. For the
   // generators the user told us they are around 1800h in August 2026.
   initialHoursHint?: number
+  // Optional per-kit last-service hint — used only when the server has
+  // no recorded log for that kit yet. Lets us seed pre-app history so
+  // the schedule resets from the real last service instead of the fixed
+  // grid multiple. Keys are kit ids (e.g. "500h"), values are the hour
+  // reading at the time of that service.
+  initialLastServiceHoursByKit?: Record<string, number>
 }
 
 // ---------------- Generator kits (John Deere 4045SFM85) ----------------
@@ -141,6 +147,39 @@ const GENERATOR_KITS: MaintenanceKit[] = [
   GENERATOR_2000H_KIT,
 ]
 
+// ---------------- Watermaker kits ----------------
+//
+// Two hour-based service points on each watermaker. Cumulative, so they
+// keep repeating (500, 1000, 1500 h ...). Pre-filter swaps and the
+// periodic membrane cleaning-fluid flush aren't tied to engine hours;
+// those live in the calendar-systems file and share the same "Top" /
+// "Bottom" units.
+
+const WATERMAKER_500H_KIT: MaintenanceKit = {
+  id: '500h',
+  interval: 500,
+  label: '500h oil change',
+  shortLabel: '500h',
+  checklist: [
+    { id: 'oil-change', label: 'Change high-pressure pump oil', detail: 'Drain old oil, replace with manufacturer-spec oil, check for leaks.' },
+  ],
+}
+
+const WATERMAKER_1000H_KIT: MaintenanceKit = {
+  id: '1000h',
+  interval: 1000,
+  label: '1000h membrane replacement',
+  shortLabel: '1000h',
+  checklist: [
+    { id: 'replace-membrane', label: 'Replace RO membrane element', detail: 'Note serial + install date; verify product-water quality after start-up.' },
+  ],
+}
+
+const WATERMAKER_KITS: MaintenanceKit[] = [
+  WATERMAKER_500H_KIT,
+  WATERMAKER_1000H_KIT,
+]
+
 // ---------------- System catalog ----------------
 
 export const MAINTENANCE_SYSTEMS: MaintenanceSystem[] = [
@@ -194,7 +233,11 @@ export const MAINTENANCE_SYSTEMS: MaintenanceSystem[] = [
     label: 'Watermaker — Top',
     driveFolderPath: ['Maintenance', 'Watermaker', 'Top'],
     icon: '💧',
-    kits: [],
+    kits: WATERMAKER_KITS,
+    initialHoursHint: 877,
+    // Previous oil change was performed at 569 h. Reset schedule from
+    // there so the next 500h kit is due at 1069 h.
+    initialLastServiceHoursByKit: { '500h': 569 },
   },
   {
     id: 'watermaker-bottom',
@@ -204,7 +247,11 @@ export const MAINTENANCE_SYSTEMS: MaintenanceSystem[] = [
     label: 'Watermaker — Bottom',
     driveFolderPath: ['Maintenance', 'Watermaker', 'Bottom'],
     icon: '💧',
-    kits: [],
+    kits: WATERMAKER_KITS,
+    initialHoursHint: 825,
+    // Previous oil change was performed at 569 h. Reset schedule from
+    // there so the next 500h kit is due at 1069 h.
+    initialLastServiceHoursByKit: { '500h': 569 },
   },
   {
     id: 'hamann',

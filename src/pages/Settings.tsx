@@ -62,7 +62,7 @@ export function SettingsPage() {
         </div>
 
         <p className="text-xs text-muted-foreground text-center">
-          Rise Above Engine Log v2.0
+          Rise Above Operations v2.0
         </p>
       </div>
     </MenuLayout>

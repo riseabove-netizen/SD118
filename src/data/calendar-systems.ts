@@ -115,6 +115,33 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
   },
 
   // ------------------------------------------------------------------
+  // Hydraulic power pack — yearly oil + oil-filter service
+  // ------------------------------------------------------------------
+  {
+    id: 'hydraulic-power-pack',
+    label: 'Hydraulic Power Pack',
+    tileEmoji: '🛢️',
+    tileBlurb: 'Yearly oil change + oil filter replacement',
+    units: [{ id: 'pack', label: 'Hydraulic power pack' }],
+    items: [
+      {
+        id: 'oil-change',
+        label: 'Change hydraulic oil',
+        detail: 'Drain reservoir, refill with manufacturer-spec hydraulic oil, check for leaks.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2026-08-01',
+      },
+      {
+        id: 'oil-filter',
+        label: 'Replace oil filter',
+        detail: 'Replace hydraulic oil filter element.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2026-08-01',
+      },
+    ],
+  },
+
+  // ------------------------------------------------------------------
   // Fresh water system — tank + pumps + UV lamps + silver-ion dosing
   //
   // Merged view: what used to be three tiles (Fresh Water System, Fresh

@@ -1,7 +1,7 @@
 {
   "name": "M/Y Rise Above",
   "short_name": "Rise Above",
-  "description": "M/Y Rise Above Engine Log and ISM",
+  "description": "M/Y Rise Above Operations",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
