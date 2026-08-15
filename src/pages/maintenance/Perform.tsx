@@ -138,7 +138,12 @@ export function PerformMaintenancePage() {
           crewName={crewName}
           onBack={() => setStep('pick')}
           onDone={eventId => {
-            setLocation(`/maintenance/generator/${system.side || ''}`.replace(/\/$/, '') || `/maintenance/system/${system.id}`)
+            void eventId
+            if (system.kind === 'generator' && system.side) {
+              setLocation(`/maintenance/generator/${system.side}`)
+            } else {
+              setLocation(`/maintenance/system/${system.id}`)
+            }
           }}
         />
       ) : (

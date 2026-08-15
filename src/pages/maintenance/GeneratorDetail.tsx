@@ -20,9 +20,18 @@ import {
 import { fetchSystemState, updateHours, MaintenanceEvent } from '@/lib/maintenance-api'
 
 export function GeneratorDetailPage() {
-  const params = useParams<{ side: string }>()
-  const side = params.side === 'starboard' ? 'starboard' : 'port'
-  const system = MAINTENANCE_SYSTEMS.find(s => s.kind === 'generator' && s.side === side)
+  // Two supported URL shapes:
+  //   /maintenance/generator/:side       → look up by kind=generator + side
+  //   /maintenance/system/:systemId      → look up by explicit system id
+  //                                        (works for watermakers, main
+  //                                        engines, and every future
+  //                                        hour-based system)
+  const params = useParams<{ side?: string; systemId?: string }>()
+  const system = params.systemId
+    ? MAINTENANCE_SYSTEMS.find(s => s.id === params.systemId)
+    : MAINTENANCE_SYSTEMS.find(
+        s => s.kind === 'generator' && s.side === (params.side === 'starboard' ? 'starboard' : 'port'),
+      )
   const [, setLocation] = useLocation()
   const admin = isAdmin()
 
@@ -65,7 +74,7 @@ export function GeneratorDetailPage() {
     return (
       <MenuLayout title="Not found" showBack backHref="/maintenance">
         <p className="text-sm text-muted-foreground">
-          Unknown generator side: {params.side}
+          Unknown maintenance system: {params.systemId || params.side}
         </p>
       </MenuLayout>
     )

@@ -259,6 +259,9 @@ function AppRoutes() {
       <Route path="/maintenance/generator/:side">
         <AuthGuard><GeneratorDetailPage /></AuthGuard>
       </Route>
+      <Route path="/maintenance/system/:systemId">
+        <AuthGuard><GeneratorDetailPage /></AuthGuard>
+      </Route>
 
       {/* Operational Guides */}
       <Route path="/guides">
