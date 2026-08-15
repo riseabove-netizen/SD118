@@ -77,59 +77,35 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
     waypoints: {},
   },
 
-  // Chapter 3 — Sardinia (Costa Smeralda, Maddalena archipelago, west coast)
+  // Chapter 3 — Sardinia → Ponza (Costa Smeralda · Cala Brandinchi · Cala Luna · Ponza)
   'sardinia-2026': {
     stops: [
       { name: 'Porto Cervo',        coord: { lat: 41.130, lon: 9.540 } },
-      { name: 'La Maddalena',       coord: { lat: 41.220, lon: 9.405 } },
-      { name: 'Alghero',            coord: { lat: 40.560, lon: 8.315 } },
-      { name: 'Porto Cervo',        coord: { lat: 41.130, lon: 9.540 } },
+      { name: 'Cala di Volpe',      coord: { lat: 41.090, lon: 9.555 } },
+      { name: 'Cala Brandinchi',    coord: { lat: 40.740, lon: 9.700 } },
+      { name: 'Cala Luna',          coord: { lat: 40.230, lon: 9.630 } },
+      { name: 'Ponza',              coord: { lat: 40.900, lon: 12.965 } },
     ],
     waypoints: {
-      // Porto Cervo → La Maddalena: short hop north, all water
-      // La Maddalena → Alghero: must go AROUND Sardinia's NW tip (Capo Caccia), not over land
-      '1-2': [
-        { lat: 41.250, lon: 9.200 }, // west of Maddalena
-        { lat: 41.250, lon: 8.150 }, // north of Capo Caccia, in open water
-        { lat: 40.700, lon: 8.150 }, // approaching Alghero from NW
-      ],
-      // Alghero → Porto Cervo: reverse, same routing
-      '2-3': [
-        { lat: 40.700, lon: 8.150 },
-        { lat: 41.250, lon: 8.150 },
-        { lat: 41.250, lon: 9.200 },
-      ],
+      // Cala Luna → Ponza: open Tyrrhenian crossing east then NE
+      '3-4': [{ lat: 40.400, lon: 11.000 }, { lat: 40.700, lon: 12.500 }],
     },
   },
 
-  // Chapter 4 — Ponza & Pontine Islands
-  'ponza-2026': {
-    stops: [
-      { name: 'Porto Cervo',  coord: { lat: 41.130, lon: 9.540 } },
-      { name: 'Ponza',        coord: { lat: 40.900, lon: 12.965 } },
-      { name: 'Palmarola',    coord: { lat: 40.925, lon: 12.860 } },
-      { name: 'Ventotene',    coord: { lat: 40.795, lon: 13.428 } },
-    ],
-    waypoints: {
-      // Porto Cervo → Ponza: cross Tyrrhenian, stay north of Sardinia coast then open water
-      '0-1': [{ lat: 41.200, lon: 11.000 }, { lat: 41.100, lon: 12.500 }],
-    },
-  },
-
-  // Chapter 5a — Naples · Family Chapter (Aug 20–23, big family party 22nd evening)
+  // Chapter 5a — Naples · Family Chapter (Aug 19–23, Nonna aboard, big family party 21st)
   'naples-family-2026': {
     stops: [
       { name: 'Ponza',      coord: { lat: 40.900, lon: 12.965 } },
-      { name: 'Ischia',     coord: { lat: 40.735, lon: 13.890 } },
-      { name: 'Napoli',     coord: { lat: 40.833, lon: 14.245 } },
+      { name: 'Napoli · Mergellina', coord: { lat: 40.833, lon: 14.245 } },
+      { name: 'Capri / Ischia',      coord: { lat: 40.553, lon: 14.243 } },
+      { name: 'Napoli · Mergellina', coord: { lat: 40.833, lon: 14.245 } },
     ],
     waypoints: {
-      // Ponza → Ischia: open water south
-      '0-1': [{ lat: 40.800, lon: 13.500 }],
+      '0-1': [{ lat: 40.900, lon: 13.500 }],
     },
   },
 
-  // Chapter 5b–7 — Naples · Friends: Capri / Amalfi → Aeolian Islands → Catania (Aug 22–28)
+  // Chapter 5b–7 — Naples · Friends: Capri / Amalfi → Aeolian Islands → Catania (Aug 24–28)
   'naples-friends-2026': {
     stops: [
       { name: 'Napoli',     coord: { lat: 40.833, lon: 14.245 } },

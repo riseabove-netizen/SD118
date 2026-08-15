@@ -17,7 +17,6 @@ const CHAPTER_IDS = [
   'menorca-corsica-2026',
   'crew-alghero-2026',
   'sardinia-2026',
-  'ponza-2026',
   'naples-family-2026',
   'naples-friends-2026',
   'malta-2026',
