@@ -115,6 +115,36 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
   },
 
   // ------------------------------------------------------------------
+  // Strainer baskets — weekly cleaning, monthly zinc anode check
+  // ------------------------------------------------------------------
+  {
+    id: 'strainer-baskets',
+    label: 'Strainer Baskets',
+    tileEmoji: '🕸️',
+    tileBlurb: 'Weekly basket clean · monthly zinc anode check',
+    units: [
+      { id: 'main-port',      label: 'Main Port',      group: 'Main engines' },
+      { id: 'main-starboard', label: 'Main Starboard', group: 'Main engines' },
+      { id: 'aux-port',       label: 'Aux Port',       group: 'Auxiliaries' },
+      { id: 'aux-starboard',  label: 'Aux Starboard',  group: 'Auxiliaries' },
+    ],
+    items: [
+      {
+        id: 'clean-basket',
+        label: 'Remove basket and clean',
+        detail: 'Weekly. Rinse debris, inspect basket for damage.',
+        interval: { kind: 'weekly' },
+      },
+      {
+        id: 'check-anode',
+        label: 'Check anode and replace if necessary',
+        detail: 'Monthly. Replace if more than ~50% consumed.',
+        interval: { kind: 'monthly' },
+      },
+    ],
+  },
+
+  // ------------------------------------------------------------------
   // Tender — yearly/100h engine service, monthly bilge/corrosion,
   // water filter, and biennial/200h pump wear ring
   // ------------------------------------------------------------------
