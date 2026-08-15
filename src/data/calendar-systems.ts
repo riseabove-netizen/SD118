@@ -115,6 +115,131 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
   },
 
   // ------------------------------------------------------------------
+  // Tender — yearly/100h engine service, monthly bilge/corrosion,
+  // water filter, and biennial/200h pump wear ring
+  // ------------------------------------------------------------------
+  {
+    id: 'tender',
+    label: 'Tender',
+    tileEmoji: '🛥️',
+    tileBlurb: 'Yearly/100h engine service · monthly bilge · wear ring',
+    units: [{ id: 'tender', label: 'Tender' }],
+    items: [
+      {
+        id: 'oil-change',
+        label: 'Change engine oil',
+        detail: 'Yearly or every 100 hours.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2026-05-15',
+      },
+      {
+        id: 'oil-filter',
+        label: 'Replace oil filter',
+        detail: 'Yearly or every 100 hours, with oil change.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2026-05-15',
+      },
+      {
+        id: 'fuel-filter',
+        label: 'Replace fuel filter',
+        detail: 'Yearly or every 100 hours.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2026-05-15',
+      },
+      {
+        id: 'anodes',
+        label: 'Inspect and replace anodes',
+        detail: 'Yearly or every 100 hours.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2026-05-15',
+      },
+      {
+        id: 'bilge-clean',
+        label: 'Clean and dry bilges',
+        detail: 'Monthly.',
+        interval: { kind: 'monthly' },
+      },
+      {
+        id: 'engine-corrosion-t9',
+        label: 'Clean corrosion and spray T9 on engine block and mounts',
+        detail: 'Monthly.',
+        interval: { kind: 'monthly' },
+      },
+      {
+        id: 'water-filter-clean',
+        label: 'Clean water filter',
+        detail: 'Tender only. Monthly.',
+        interval: { kind: 'monthly' },
+      },
+      {
+        id: 'pump-wear-ring',
+        label: 'Replace pump wear ring',
+        detail: 'Every 2 years or 200 hours.',
+        interval: { kind: 'months', every: 24 },
+      },
+    ],
+  },
+
+  // ------------------------------------------------------------------
+  // Jetski — same schedule as tender minus the raw-water filter
+  // ------------------------------------------------------------------
+  {
+    id: 'jetski',
+    label: 'Jetski',
+    tileEmoji: '🛶',
+    tileBlurb: 'Yearly/100h engine service · monthly bilge · wear ring',
+    units: [{ id: 'jetski', label: 'Jetski' }],
+    items: [
+      {
+        id: 'oil-change',
+        label: 'Change engine oil',
+        detail: 'Yearly or every 100 hours.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2026-05-15',
+      },
+      {
+        id: 'oil-filter',
+        label: 'Replace oil filter',
+        detail: 'Yearly or every 100 hours, with oil change.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2026-05-15',
+      },
+      {
+        id: 'fuel-filter',
+        label: 'Replace fuel filter',
+        detail: 'Yearly or every 100 hours.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2026-05-15',
+      },
+      {
+        id: 'anodes',
+        label: 'Inspect and replace anodes',
+        detail: 'Yearly or every 100 hours.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2026-05-15',
+      },
+      {
+        id: 'bilge-clean',
+        label: 'Clean and dry bilges',
+        detail: 'Monthly.',
+        interval: { kind: 'monthly' },
+      },
+      {
+        id: 'engine-corrosion-t9',
+        label: 'Clean corrosion and spray T9 on engine block and mounts',
+        detail: 'Monthly.',
+        interval: { kind: 'monthly' },
+      },
+      {
+        id: 'pump-wear-ring',
+        label: 'Replace pump wear ring',
+        detail: 'Every 2 years or 200 hours.',
+        interval: { kind: 'months', every: 24 },
+      },
+    ],
+  },
+
+  // ------------------------------------------------------------------
   // Hydraulic power pack — yearly oil + oil-filter service
   // ------------------------------------------------------------------
   {
