@@ -52,7 +52,7 @@ function StatusBadge({ status }: { status: RowStatus }) {
     'ok':       'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   }[status.state]
   const label = {
-    'never':    'never serviced',
+    'never':    'due now',
     'overdue':  `overdue ${Math.abs(status.daysUntilDue)}d`,
     'due-soon': status.daysUntilDue === 0 ? 'due today' : `due in ${status.daysUntilDue}d`,
     'ok':       `${status.daysUntilDue}d left`,

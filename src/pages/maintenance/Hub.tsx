@@ -124,8 +124,8 @@ export function MaintenanceHubPage() {
   // "days-until-due" number so we can apply the filter uniformly.
   function passesFilter(daysUntilDue: number): boolean {
     if (filter === 'all') return true
-    if (!Number.isFinite(daysUntilDue)) return false
-    if (filter === 'now') return daysUntilDue <= 0
+    if (daysUntilDue === Infinity) return false // pure as-needed — no clock
+    if (filter === 'now') return daysUntilDue <= 0 // -Infinity counts as “due now”
     if (filter === 'week') return daysUntilDue <= 7
     if (filter === 'twoWeeks') return daysUntilDue <= 14
     return true
@@ -409,7 +409,9 @@ function soonestDueDate(s: CalendarSystem, events: Awaited<ReturnType<typeof fet
 }
 
 function formatDaysUntil(days: number): string {
-  if (!Number.isFinite(days)) return 'as needed'
+  // -Infinity is our sentinel for “never serviced” → treat as due right now.
+  if (days === -Infinity) return 'due now'
+  if (days === Infinity) return 'as needed'
   if (days < -365) return 'overdue'
   if (days < 0) return `overdue ${Math.abs(Math.round(days))}d`
   if (days === 0) return 'due today'
@@ -419,11 +421,12 @@ function formatDaysUntil(days: number): string {
 }
 
 function daysTier(days: number): 'green' | 'amber' | 'red' | null {
-  if (!Number.isFinite(days)) return null
+  // Never serviced → loud red.
+  if (days === -Infinity) return 'red'
+  if (days === Infinity) return null // pure as-needed, no scheduled clock
   if (days <= 0) return 'red'
   if (days <= 7) return 'amber'
-  if (days <= 30) return 'green'
-  return null
+  return 'green'
 }
 
 function CalendarSummaryTile({
@@ -445,7 +448,10 @@ function CalendarSummaryTile({
     ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
     : 'bg-secondary text-muted-foreground border-border'
 
-  const showBadge = Number.isFinite(daysUntilDue)
+  // Show the badge whenever we have any schedule info — including the
+  // “never serviced” sentinel (-Infinity). Only pure as-needed items
+  // (Infinity) get no badge.
+  const showBadge = daysUntilDue !== Infinity
 
   return (
     <button

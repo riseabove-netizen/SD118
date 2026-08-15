@@ -39,7 +39,7 @@ function StatusBadge({ status }: { status: CellStatus }) {
     'as-needed': 'bg-secondary text-muted-foreground border-border',
   }[status.state]
   const label = {
-    'never':     'never',
+    'never':     'due now',
     'overdue':   `overdue ${Math.abs(status.daysUntilDue)}d`,
     'due-soon':  status.daysUntilDue === 0 ? 'due today' : `due in ${status.daysUntilDue}d`,
     'ok':        `${status.daysUntilDue}d left`,
