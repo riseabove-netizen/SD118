@@ -80,19 +80,30 @@ export function PerformMaintenancePage() {
   const [location, setLocation] = useLocation()
   const crewName = getCrewName() || ''
 
-  // Query param -> initial systemId
+  // Query param -> initial systemId + optional ?mode=custom to jump
+  // straight into the free-form repair form (used by the "Log custom
+  // repair" button on each system detail page).
   const initialSystemId = useMemo(() => {
     const q = new URLSearchParams(location.split('?')[1] || '')
     return q.get('systemId') || ''
   }, [location])
+  const initialCustom = useMemo(() => {
+    const q = new URLSearchParams(location.split('?')[1] || '')
+    return q.get('mode') === 'custom'
+  }, [location])
 
   const [step, setStep] = useState<'pick' | 'perform'>(initialSystemId ? 'perform' : 'pick')
   const [systemId, setSystemId] = useState<string>(initialSystemId)
-  const [selectedKits, setSelectedKits] = useState<string[]>([])
+  const [selectedKits, setSelectedKits] = useState<string[]>(initialCustom ? ['custom'] : [])
+  const [customTitle, setCustomTitle] = useState<string>('')
   const [currentHours, setCurrentHours] = useState<number | null>(null)
 
   const system = useMemo(() => MAINTENANCE_SYSTEMS.find(s => s.id === systemId), [systemId])
   const activeSystems = MAINTENANCE_SYSTEMS.filter(s => s.kits.length > 0)
+  // Custom repairs can target ANY system — including ones with no kits
+  // (Hamann, main engines, watermakers, etc.) — so we expose the full list.
+  const allSystems = MAINTENANCE_SYSTEMS
+  const isCustom = selectedKits.length === 1 && selectedKits[0] === 'custom'
 
   // Fetch current hours when a system is picked, so the "hours at service"
   // field pre-fills. Only active systems (with kits) actually go to the
@@ -119,6 +130,7 @@ export function PerformMaintenancePage() {
       {step === 'pick' ? (
         <PickStep
           activeSystems={activeSystems}
+          allSystems={allSystems}
           systemId={systemId}
           setSystemId={setSystemId}
           selectedKits={selectedKits}
@@ -134,6 +146,9 @@ export function PerformMaintenancePage() {
           system={system}
           selectedKits={selectedKits}
           setSelectedKits={setSelectedKits}
+          isCustom={isCustom}
+          customTitle={customTitle}
+          setCustomTitle={setCustomTitle}
           currentHours={currentHours}
           crewName={crewName}
           onBack={() => setStep('pick')}
@@ -157,6 +172,7 @@ export function PerformMaintenancePage() {
 
 interface PickProps {
   activeSystems: MaintenanceSystem[]
+  allSystems: MaintenanceSystem[]
   systemId: string
   setSystemId(id: string): void
   selectedKits: string[]
@@ -164,8 +180,12 @@ interface PickProps {
   onContinue(): void
 }
 
-function PickStep({ activeSystems, systemId, setSystemId, selectedKits, setSelectedKits, onContinue }: PickProps) {
-  const system = activeSystems.find(s => s.id === systemId)
+function PickStep({ activeSystems, allSystems, systemId, setSystemId, selectedKits, setSelectedKits, onContinue }: PickProps) {
+  const isCustom = selectedKits.length === 1 && selectedKits[0] === 'custom'
+  // In custom mode any system is pickable. Otherwise only ones with
+  // predefined kits show up (so the checkbox row makes sense).
+  const pickable = isCustom ? allSystems : activeSystems
+  const system = pickable.find(s => s.id === systemId)
 
   return (
     <div className="space-y-5">
@@ -174,7 +194,7 @@ function PickStep({ activeSystems, systemId, setSystemId, selectedKits, setSelec
           1. Select system
         </div>
         <div className="space-y-2">
-          {activeSystems.map(s => (
+          {pickable.map(s => (
             <label
               key={s.id}
               className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
@@ -185,7 +205,7 @@ function PickStep({ activeSystems, systemId, setSystemId, selectedKits, setSelec
                 type="radio"
                 className="accent-red-600"
                 checked={systemId === s.id}
-                onChange={() => { setSystemId(s.id); setSelectedKits([]) }}
+                onChange={() => { setSystemId(s.id); if (!isCustom) setSelectedKits([]) }}
               />
               <span className="text-lg">{s.icon}</span>
               <span className="text-sm font-medium flex-1">{s.label}</span>
@@ -197,7 +217,7 @@ function PickStep({ activeSystems, systemId, setSystemId, selectedKits, setSelec
         </p>
       </div>
 
-      {system && (
+      {system && !isCustom && (
         <div>
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
             2. Which kit(s)?
@@ -232,12 +252,36 @@ function PickStep({ activeSystems, systemId, setSystemId, selectedKits, setSelec
         </div>
       )}
 
+      {system && isCustom && (
+        <p className="text-[11px] text-muted-foreground">
+          Custom repair mode — you’ll enter a title and description on the next screen.
+        </p>
+      )}
+
       <button
         onClick={onContinue}
         disabled={!systemId || selectedKits.length === 0}
         className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-semibold text-sm"
       >
         Continue
+      </button>
+
+      {/* Custom / repair mode toggle. Available for any system — lets the
+          user log one-off repairs or non-scheduled maintenance without a
+          predefined checklist. */}
+      <button
+        type="button"
+        onClick={() => {
+          if (isCustom) setSelectedKits([])
+          else setSelectedKits(['custom'])
+        }}
+        className={`w-full py-2.5 rounded-xl border text-sm font-medium ${
+          isCustom
+            ? 'border-red-500 bg-red-500/10 text-red-300'
+            : 'border-border bg-card hover:bg-secondary text-foreground'
+        }`}
+      >
+        {isCustom ? '✓ Custom / one-off repair (tap to cancel)' : '🔧 Custom / one-off repair'}
       </button>
     </div>
   )
@@ -249,17 +293,20 @@ interface PerformProps {
   system: MaintenanceSystem
   selectedKits: string[]
   setSelectedKits(k: string[]): void
+  isCustom: boolean
+  customTitle: string
+  setCustomTitle(v: string): void
   currentHours: number | null
   crewName: string
   onBack(): void
   onDone(eventId: string): void
 }
 
-function PerformStep({ system, selectedKits, setSelectedKits, currentHours, crewName, onBack, onDone }: PerformProps) {
+function PerformStep({ system, selectedKits, setSelectedKits, isCustom, customTitle, setCustomTitle, currentHours, crewName, onBack, onDone }: PerformProps) {
   const kits = system.kits.filter(k => selectedKits.includes(k.id))
   const unified: UnifiedChecklistItem[] = useMemo(
-    () => unionChecklists(system, selectedKits),
-    [system.id, selectedKits.join(',')]
+    () => (isCustom ? [] : unionChecklists(system, selectedKits)),
+    [system.id, selectedKits.join(','), isCustom]
   )
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
   const [itemNotes, setItemNotes] = useState<Record<string, string>>({})
@@ -310,6 +357,7 @@ function PerformStep({ system, selectedKits, setSelectedKits, currentHours, crew
   async function submit() {
     if (!hoursAtService) { setErrorMsg('Hours at service is required.'); return }
     if (!technician.trim()) { setErrorMsg('Technician name is required.'); return }
+    if (isCustom && !customTitle.trim()) { setErrorMsg('Please give this repair a short title.'); return }
     setSubmitting(true)
     setErrorMsg(null)
     try {
@@ -323,12 +371,14 @@ function PerformStep({ system, selectedKits, setSelectedKits, currentHours, crew
         systemId: system.id,
         systemLabel: system.label,
         driveFolderPath: system.driveFolderPath,
-        kitIds: selectedKits,
-        kitLabels: kits.map(k => k.label),
+        kitIds: isCustom ? ['custom'] : selectedKits,
+        kitLabels: isCustom ? [`Custom repair: ${customTitle.trim()}`] : kits.map(k => k.label),
         hoursAtService: Number(hoursAtService),
         technician: technician.trim(),
-        notes: notes.trim(),
-        checklist,
+        notes: isCustom
+          ? (customTitle.trim() + (notes.trim() ? `\n\n${notes.trim()}` : ''))
+          : notes.trim(),
+        checklist: isCustom ? [] : checklist,
         inventory: inventoryPicked.map(i => ({ name: i.name, qty: i.qty, partNumber: i.partNumber })),
         photos: photos.map(p => ({ base64: p.base64, label: p.label })),
         attachedPdfBase64: attachedPdf?.base64 || null,
@@ -378,7 +428,9 @@ function PerformStep({ system, selectedKits, setSelectedKits, currentHours, crew
             </div>
             <div className="text-sm font-semibold">{system.label}</div>
             <div className="text-xs text-muted-foreground">
-              {kits.map(k => k.label).join(' + ') || '—'}
+              {isCustom
+                ? 'Custom / one-off repair'
+                : kits.map(k => k.label).join(' + ') || '—'}
             </div>
           </div>
           <button
@@ -389,6 +441,28 @@ function PerformStep({ system, selectedKits, setSelectedKits, currentHours, crew
           </button>
         </div>
       </div>
+
+      {/* Custom repair title (only in custom mode) */}
+      {isCustom && (
+        <div className="rounded-xl border border-red-500/40 bg-red-500/5 p-4 space-y-3">
+          <label className="text-xs block">
+            <span className="block text-muted-foreground mb-1 uppercase tracking-wider">
+              Repair title *
+            </span>
+            <input
+              type="text"
+              value={customTitle}
+              onChange={e => setCustomTitle(e.target.value)}
+              placeholder="e.g. Replaced impeller on raw-water pump"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              maxLength={120}
+            />
+            <span className="block text-[10px] text-muted-foreground mt-1">
+              Short summary. Full details go in Notes below.
+            </span>
+          </label>
+        </div>
+      )}
 
       {/* Meta fields */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -414,18 +488,23 @@ function PerformStep({ system, selectedKits, setSelectedKits, currentHours, crew
           </label>
         </div>
         <label className="text-xs block">
-          <span className="block text-muted-foreground mb-1">Notes (optional)</span>
+          <span className="block text-muted-foreground mb-1">
+            {isCustom ? 'Description' : 'Notes (optional)'}
+          </span>
           <textarea
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            rows={3}
+            rows={isCustom ? 5 : 3}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-            placeholder="Anything the next tech should know…"
+            placeholder={isCustom
+              ? 'What was wrong, what you did, parts used, follow-ups…'
+              : 'Anything the next tech should know…'}
           />
         </label>
       </div>
 
-      {/* Checklist */}
+      {/* Checklist — hidden in custom mode */}
+      {!isCustom && (
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
         <div className="text-sm font-semibold">Checklist ({unified.length})</div>
         <div className="space-y-2">
@@ -469,6 +548,7 @@ function PerformStep({ system, selectedKits, setSelectedKits, currentHours, crew
           })}
         </div>
       </div>
+      )}
 
       {/* Inventory picker */}
       <InventoryPicker picked={inventoryPicked} setPicked={setInventoryPicked} />

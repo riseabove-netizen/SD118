@@ -111,6 +111,12 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
         interval: { kind: 'yearly' },
         seedLastDone: '2025-11-15',
       },
+      {
+        id: 'seal-kits',
+        label: 'Replace seal kits as necessary',
+        detail: 'On-condition. Log each replacement to keep a service history.',
+        interval: { kind: 'as-needed' },
+      },
     ],
   },
 

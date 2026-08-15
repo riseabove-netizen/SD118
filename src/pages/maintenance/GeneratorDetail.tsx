@@ -125,12 +125,20 @@ export function GeneratorDetailPage() {
                 </div>
               )}
             </div>
-            <button
-              onClick={() => setLocation(`/maintenance/perform?systemId=${system.id}`)}
-              className="text-xs px-3 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white font-semibold"
-            >
-              Perform maintenance
-            </button>
+            <div className="flex flex-col gap-1.5">
+              <button
+                onClick={() => setLocation(`/maintenance/perform?systemId=${system.id}`)}
+                className="text-xs px-3 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white font-semibold"
+              >
+                Perform maintenance
+              </button>
+              <button
+                onClick={() => setLocation(`/maintenance/perform?systemId=${system.id}&mode=custom`)}
+                className="text-xs px-3 py-2 rounded-md border border-border bg-card hover:bg-secondary text-foreground font-medium"
+              >
+                🔧 Log custom repair
+              </button>
+            </div>
           </div>
           {admin && (
             <div className="flex items-center gap-2">
