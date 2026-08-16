@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { Button } from '@/components/ui/button'
@@ -306,12 +306,38 @@ export function ReviewPage() {
   const set = (key: string, val: string) =>
     setValues(prev => ({ ...prev, [key]: val }))
 
-  // Show a field only when empty. Filled fields are surfaced in a compact
-  // "captured" chip strip at the top of each section so the crew can still
-  // spot-check and tap-to-edit.
-  const isEmpty = (k: string) => !values[k] || String(values[k]).trim() === ''
+  // Snapshot which non-engine keys were pre-filled at page load. Only those keys
+  // are collapsed into chips. Keys blank at load stay as inputs forever, even
+  // after the user types into them — otherwise a field would flip to a chip mid-typing.
+  // Latitude & longitude are excluded from chip logic: user wants them always as fields.
+  const CHIPPABLE_KEYS = [
+    'date','time','entry_type',
+    'fuel_daily','fuel_aft','fuel_fwd',
+    'gen_running','gen_port_hours','gen_stbd_hours',
+    'cog','sog',
+    'wind','sea_conditions',
+  ]
+  const [filledOnLoad, setFilledOnLoad] = useState<Set<string>>(new Set())
+  const filledSnapshotRef = useRef(false)
+  useEffect(() => {
+    if (filledSnapshotRef.current) return
+    // wait until values object has arrived (populated from OCR or empty init)
+    if (values && Object.keys(values).length > 0) {
+      const s = new Set<string>()
+      for (const k of CHIPPABLE_KEYS) {
+        const v = values[k]
+        if (v !== undefined && v !== null && String(v).trim() !== '') s.add(k)
+      }
+      setFilledOnLoad(s)
+      filledSnapshotRef.current = true
+    }
+  }, [values])
 
+  // A field is "chipped" only if it was filled at page load AND the user hasn't
+  // clicked its chip to edit. Blank-at-load fields render as inputs unconditionally.
   const [editKey, setEditKey] = useState<string | null>(null)
+  const isChipped = (k: string) => filledOnLoad.has(k) && editKey !== k
+  const showInput = (k: string) => !isChipped(k)
 
   const FILLED_LABELS: Record<string, string> = {
     date: 'Date', time: 'Time', entry_type: 'Type',
@@ -641,16 +667,13 @@ export function ReviewPage() {
         {/* Date / Time */}
         {(() => {
           const keys = ['date','time','entry_type']
-          const missing = keys.filter(isEmpty).filter(k => editKey !== k || !isEmpty(k))
-          const showEdit = (k: string) => editKey === k || isEmpty(k)
-          const anyRender = keys.some(showEdit) || keys.some(k => !isEmpty(k))
-          if (!anyRender) return null
+          const showEdit = showInput
           return (
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-border pb-2">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Date / Time</h3>
               <div className="flex flex-wrap gap-1.5">
-                {keys.filter(k => !isEmpty(k) && editKey !== k).map(k => <FilledChip key={k} k={k} />)}
+                {keys.filter(k => isChipped(k)).map(k => <FilledChip key={k} k={k} />)}
               </div>
             </div>
             {(showEdit('date') || showEdit('time')) && (
@@ -658,13 +681,13 @@ export function ReviewPage() {
                 {showEdit('date') && (
                   <div className="space-y-1">
                     <Label htmlFor="date">Date</Label>
-                    <Input id="date" type="date" value={values.date || ''} onChange={e => set('date', e.target.value)} onBlur={() => setEditKey(null)} />
+                    <Input id="date" type="date" value={values.date || ''} onChange={e => set('date', e.target.value)} />
                   </div>
                 )}
                 {showEdit('time') && (
                   <div className="space-y-1">
                     <Label htmlFor="time">Time</Label>
-                    <Input id="time" type="time" value={values.time || ''} onChange={e => set('time', e.target.value)} onBlur={() => setEditKey(null)} />
+                    <Input id="time" type="time" value={values.time || ''} onChange={e => set('time', e.target.value)} />
                   </div>
                 )}
               </div>
@@ -676,7 +699,7 @@ export function ReviewPage() {
                   id="entry_type"
                   value={values.entry_type || ''}
                   onChange={e => set('entry_type', e.target.value)}
-                  onBlur={() => setEditKey(null)}
+                 
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   {ENTRY_TYPES.map(o => (
@@ -689,50 +712,42 @@ export function ReviewPage() {
           )
         })()}
 
-        {/* Fuel Tanks */}
-        {(() => {
-          const keys = ['fuel_daily','fuel_aft','fuel_fwd']
-          const showEdit = (k: string) => editKey === k || isEmpty(k)
-          const filled = keys.filter(k => !isEmpty(k) && editKey !== k)
-          return (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-border pb-2">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Fuel Tanks</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {filled.map(k => <FilledChip key={k} k={k} />)}
-                </div>
-              </div>
-              {keys.some(showEdit) && (
-                <div className="grid grid-cols-3 gap-3">
-                  {showEdit('fuel_daily') && (
-                    <div className="space-y-1">
-                      <Label htmlFor="fuel_daily">Daily [L]</Label>
-                      <Input id="fuel_daily" type="text" inputMode="decimal" value={values.fuel_daily || ''} onChange={e => set('fuel_daily', e.target.value)} onBlur={() => setEditKey(null)} placeholder="L" />
-                    </div>
-                  )}
-                  {showEdit('fuel_aft') && (
-                    <div className="space-y-1">
-                      <Label htmlFor="fuel_aft">Aft Main [L]</Label>
-                      <Input id="fuel_aft" type="text" inputMode="decimal" value={values.fuel_aft || ''} onChange={e => set('fuel_aft', e.target.value)} onBlur={() => setEditKey(null)} placeholder="L" />
-                    </div>
-                  )}
-                  {showEdit('fuel_fwd') && (
-                    <div className="space-y-1">
-                      <Label htmlFor="fuel_fwd">FWD Main [L]</Label>
-                      <Input id="fuel_fwd" type="text" inputMode="decimal" value={values.fuel_fwd || ''} onChange={e => set('fuel_fwd', e.target.value)} onBlur={() => setEditKey(null)} placeholder="L" />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })()}
+        {/* Fuel Tanks — always render as a table with three columns */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider border-b border-border pb-2">
+            Fuel Tanks [L]
+          </h3>
+          <div className="overflow-hidden rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Daily</th>
+                  <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Aft Main</th>
+                  <th className="px-3 py-2 text-left font-semibold text-muted-foreground">FWD Main</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="p-2">
+                    <Input id="fuel_daily" type="text" inputMode="decimal" value={values.fuel_daily || ''} onChange={e => set('fuel_daily', e.target.value)} placeholder="L" className="h-9" />
+                  </td>
+                  <td className="p-2">
+                    <Input id="fuel_aft" type="text" inputMode="decimal" value={values.fuel_aft || ''} onChange={e => set('fuel_aft', e.target.value)} placeholder="L" className="h-9" />
+                  </td>
+                  <td className="p-2">
+                    <Input id="fuel_fwd" type="text" inputMode="decimal" value={values.fuel_fwd || ''} onChange={e => set('fuel_fwd', e.target.value)} placeholder="L" className="h-9" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
 
         {/* Generators */}
         {(() => {
           const keys = ['gen_running','gen_port_hours','gen_stbd_hours']
-          const showEdit = (k: string) => editKey === k || isEmpty(k)
-          const filled = keys.filter(k => !isEmpty(k) && editKey !== k)
+          const showEdit = showInput
+          const filled = keys.filter(isChipped)
           return (
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-border pb-2">
@@ -748,7 +763,7 @@ export function ReviewPage() {
                     id="gen_running"
                     value={values.gen_running || ''}
                     onChange={e => set('gen_running', e.target.value)}
-                    onBlur={() => setEditKey(null)}
+                   
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {GEN_OPTIONS.map(o => (
@@ -762,13 +777,13 @@ export function ReviewPage() {
                   {showEdit('gen_port_hours') && (
                     <div className="space-y-1">
                       <Label htmlFor="gen_port_hours">Port Gen Hours</Label>
-                      <Input id="gen_port_hours" type="text" inputMode="decimal" value={values.gen_port_hours || ''} onChange={e => set('gen_port_hours', e.target.value)} onBlur={() => setEditKey(null)} placeholder="hrs" />
+                      <Input id="gen_port_hours" type="text" inputMode="decimal" value={values.gen_port_hours || ''} onChange={e => set('gen_port_hours', e.target.value)} placeholder="hrs" />
                     </div>
                   )}
                   {showEdit('gen_stbd_hours') && (
                     <div className="space-y-1">
                       <Label htmlFor="gen_stbd_hours">STBD Gen Hours</Label>
-                      <Input id="gen_stbd_hours" type="text" inputMode="decimal" value={values.gen_stbd_hours || ''} onChange={e => set('gen_stbd_hours', e.target.value)} onBlur={() => setEditKey(null)} placeholder="hrs" />
+                      <Input id="gen_stbd_hours" type="text" inputMode="decimal" value={values.gen_stbd_hours || ''} onChange={e => set('gen_stbd_hours', e.target.value)} placeholder="hrs" />
                     </div>
                   )}
                 </div>
@@ -777,54 +792,41 @@ export function ReviewPage() {
           )
         })()}
 
-        {/* Position & Navigation */}
-        {(() => {
-          const keys = ['latitude','longitude','cog','sog']
-          const showEdit = (k: string) => editKey === k || isEmpty(k)
-          const filled = keys.filter(k => !isEmpty(k) && editKey !== k)
-          return (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-border pb-2">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Position & Navigation</h3>
-                <div className="flex flex-wrap gap-1.5">
-                  {filled.map(k => <FilledChip key={k} k={k} />)}
-                </div>
-              </div>
-              {(showEdit('latitude') || showEdit('longitude')) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {showEdit('latitude') && (
-                    <div className="space-y-1">
-                      <Label htmlFor="latitude">Latitude</Label>
-                      <Input id="latitude" type="text" inputMode="decimal" value={values.latitude || ''} onChange={e => set('latitude', e.target.value)} onBlur={() => setEditKey(null)} placeholder="from nav screen" />
-                    </div>
-                  )}
-                  {showEdit('longitude') && (
-                    <div className="space-y-1">
-                      <Label htmlFor="longitude">Longitude</Label>
-                      <Input id="longitude" type="text" inputMode="decimal" value={values.longitude || ''} onChange={e => set('longitude', e.target.value)} onBlur={() => setEditKey(null)} placeholder="from nav screen" />
-                    </div>
-                  )}
+        {/* Position & Navigation — latitude/longitude always as fields; COG/SOG chip when pre-filled */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between border-b border-border pb-2">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Position & Navigation</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {['cog','sog'].filter(isChipped).map(k => <FilledChip key={k} k={k} />)}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="latitude">Latitude</Label>
+              <Input id="latitude" type="text" inputMode="decimal" value={values.latitude || ''} onChange={e => set('latitude', e.target.value)} placeholder="from nav screen" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="longitude">Longitude</Label>
+              <Input id="longitude" type="text" inputMode="decimal" value={values.longitude || ''} onChange={e => set('longitude', e.target.value)} placeholder="from nav screen" />
+            </div>
+          </div>
+          {(showInput('cog') || showInput('sog')) && (
+            <div className="grid grid-cols-2 gap-3">
+              {showInput('cog') && (
+                <div className="space-y-1">
+                  <Label htmlFor="cog">COG [°]</Label>
+                  <Input id="cog" type="text" inputMode="decimal" value={values.cog || ''} onChange={e => set('cog', e.target.value)} placeholder="—" />
                 </div>
               )}
-              {(showEdit('cog') || showEdit('sog')) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {showEdit('cog') && (
-                    <div className="space-y-1">
-                      <Label htmlFor="cog">COG [°]</Label>
-                      <Input id="cog" type="text" inputMode="decimal" value={values.cog || ''} onChange={e => set('cog', e.target.value)} onBlur={() => setEditKey(null)} placeholder="—" />
-                    </div>
-                  )}
-                  {showEdit('sog') && (
-                    <div className="space-y-1">
-                      <Label htmlFor="sog">SOG [kn]</Label>
-                      <Input id="sog" type="text" inputMode="decimal" value={values.sog || ''} onChange={e => set('sog', e.target.value)} onBlur={() => setEditKey(null)} placeholder="—" />
-                    </div>
-                  )}
+              {showInput('sog') && (
+                <div className="space-y-1">
+                  <Label htmlFor="sog">SOG [kn]</Label>
+                  <Input id="sog" type="text" inputMode="decimal" value={values.sog || ''} onChange={e => set('sog', e.target.value)} placeholder="—" />
                 </div>
               )}
             </div>
-          )
-        })()}
+          )}
+        </div>
 
         {/* Engines — single editable comparison table (Port | STBD | Avg) */}
         <div className="space-y-3">
@@ -837,8 +839,8 @@ export function ReviewPage() {
         {/* Conditions */}
         {(() => {
           const keys = ['wind','sea_conditions']
-          const showEdit = (k: string) => editKey === k || isEmpty(k)
-          const filled = keys.filter(k => !isEmpty(k) && editKey !== k)
+          const showEdit = showInput
+          const filled = keys.filter(isChipped)
           return (
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-border pb-2">
@@ -850,13 +852,13 @@ export function ReviewPage() {
               {showEdit('wind') && (
                 <div className="space-y-1">
                   <Label htmlFor="wind">Wind</Label>
-                  <Input id="wind" type="text" value={values.wind || ''} onChange={e => set('wind', e.target.value)} onBlur={() => setEditKey(null)} placeholder="SW 5kts" />
+                  <Input id="wind" type="text" value={values.wind || ''} onChange={e => set('wind', e.target.value)} placeholder="SW 5kts" />
                 </div>
               )}
               {showEdit('sea_conditions') && (
                 <div className="space-y-1">
                   <Label htmlFor="sea_conditions">Sea Conditions</Label>
-                  <Input id="sea_conditions" type="text" value={values.sea_conditions || ''} onChange={e => set('sea_conditions', e.target.value)} onBlur={() => setEditKey(null)} placeholder="following seas 0.6m, short period" />
+                  <Input id="sea_conditions" type="text" value={values.sea_conditions || ''} onChange={e => set('sea_conditions', e.target.value)} placeholder="following seas 0.6m, short period" />
                 </div>
               )}
             </div>
