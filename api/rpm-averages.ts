@@ -58,12 +58,19 @@ type Band = {
 }
 
 const FIELDS: { key: string; portAvg: number; portSig: number; stbdAvg: number; stbdSig: number }[] = [
-  { key: 'fuel_rate',       portAvg: 3,  portSig: 4,  stbdAvg: 5,  stbdSig: 6 },
-  { key: 'coolant_temp',    portAvg: 7,  portSig: 8,  stbdAvg: 9,  stbdSig: 10 },
-  { key: 'trans_oil_temp',  portAvg: 11, portSig: 12, stbdAvg: 13, stbdSig: 14 },
-  { key: 'oil_press',       portAvg: 15, portSig: 16, stbdAvg: 17, stbdSig: 18 },
-  { key: 'oil_temp',        portAvg: 19, portSig: 20, stbdAvg: 21, stbdSig: 22 },
-  { key: 'trans_oil_press', portAvg: 23, portSig: 24, stbdAvg: 25, stbdSig: 26 },
+  { key: 'fuel_rate',           portAvg: 3,  portSig: 4,  stbdAvg: 5,  stbdSig: 6 },
+  { key: 'coolant_temp',        portAvg: 7,  portSig: 8,  stbdAvg: 9,  stbdSig: 10 },
+  { key: 'trans_oil_temp',      portAvg: 11, portSig: 12, stbdAvg: 13, stbdSig: 14 },
+  { key: 'oil_press',           portAvg: 15, portSig: 16, stbdAvg: 17, stbdSig: 18 },
+  { key: 'oil_temp',            portAvg: 19, portSig: 20, stbdAvg: 21, stbdSig: 22 },
+  { key: 'trans_oil_press',     portAvg: 23, portSig: 24, stbdAvg: 25, stbdSig: 26 },
+  { key: 'fuel_temp',           portAvg: 27, portSig: 28, stbdAvg: 29, stbdSig: 30 },
+  { key: 'fuel_pressure',       portAvg: 31, portSig: 32, stbdAvg: 33, stbdSig: 34 },
+  { key: 'engine_load',         portAvg: 35, portSig: 36, stbdAvg: 37, stbdSig: 38 },
+  { key: 'battery_voltage',     portAvg: 39, portSig: 40, stbdAvg: 41, stbdSig: 42 },
+  { key: 'exhaust_temp_l',      portAvg: 43, portSig: 44, stbdAvg: 45, stbdSig: 46 },
+  { key: 'exhaust_temp_r',      portAvg: 47, portSig: 48, stbdAvg: 49, stbdSig: 50 },
+  { key: 'inlet_manifold_temp', portAvg: 51, portSig: 52, stbdAvg: 53, stbdSig: 54 },
 ]
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -79,7 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sheets = google.sheets({ version: 'v4', auth })
     const r = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: `${TAB}!A1:AA200`,
+      range: `${TAB}!A1:BC200`,
     })
     const rows = (r.data.values || []) as unknown[][]
     const bands: Band[] = []

@@ -9,6 +9,7 @@ import { extractFromImages, writeRow } from '@/lib/api'
 import { compressImageToJpegBase64 } from '@/lib/imageCompress'
 import { useMutation } from '@tanstack/react-query'
 import { formatDate, formatTime } from '@/lib/utils'
+import { RpmComparison } from '@/components/RpmComparison'
 
 // Shared suffix list used by both ENGINE_FIELDS (UI) and MERGE_TARGETS (re-upload).
 const ENGINE_FIELDS_LIST = [
@@ -196,12 +197,7 @@ export function ReviewPage() {
     mutationFn: () => writeRow(values),
     onSuccess: () => {
       sessionStorage.removeItem('extractedData')
-      try {
-        sessionStorage.setItem('lastRunlog', JSON.stringify(values))
-      } catch {
-        // ignore quota errors
-      }
-      setLocation('/runlog/analysis')
+      setLocation('/runlog/success')
     },
   })
 
@@ -808,6 +804,8 @@ export function ReviewPage() {
             className="min-h-[100px]"
           />
         </div>
+
+        <RpmComparison values={values} />
 
         {mutation.isError && (
           <p className="text-sm text-destructive">

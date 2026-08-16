@@ -14,7 +14,6 @@ import { SettingsPage } from '@/pages/Settings'
 import { UploadPage } from '@/pages/runlog/Upload'
 import { ReviewPage } from '@/pages/runlog/Review'
 import { SuccessPage } from '@/pages/runlog/Success'
-import { AnalysisPage } from '@/pages/runlog/Analysis'
 
 // ISM
 import { IsmIndexPage } from '@/pages/ism/Index'
@@ -121,9 +120,6 @@ function AppRoutes() {
       </Route>
       <Route path="/runlog/review">
         <AuthGuard><ReviewPage /></AuthGuard>
-      </Route>
-      <Route path="/runlog/analysis">
-        <AuthGuard><AnalysisPage /></AuthGuard>
       </Route>
       <Route path="/runlog/success">
         <AuthGuard><SuccessPage /></AuthGuard>
