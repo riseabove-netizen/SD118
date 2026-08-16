@@ -314,7 +314,6 @@ export function ReviewPage() {
     'date','time','entry_type',
     'fuel_daily','fuel_aft','fuel_fwd',
     'gen_running','gen_port_hours','gen_stbd_hours',
-    'cog','sog',
     'wind','sea_conditions',
   ]
   const [filledOnLoad, setFilledOnLoad] = useState<Set<string>>(new Set())
@@ -792,14 +791,11 @@ export function ReviewPage() {
           )
         })()}
 
-        {/* Position & Navigation — latitude/longitude always as fields; COG/SOG chip when pre-filled */}
+        {/* Position & Navigation — all four fields always render as inputs */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between border-b border-border pb-2">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Position & Navigation</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {['cog','sog'].filter(isChipped).map(k => <FilledChip key={k} k={k} />)}
-            </div>
-          </div>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider border-b border-border pb-2">
+            Position & Navigation
+          </h3>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="latitude">Latitude</Label>
@@ -810,22 +806,16 @@ export function ReviewPage() {
               <Input id="longitude" type="text" inputMode="decimal" value={values.longitude || ''} onChange={e => set('longitude', e.target.value)} placeholder="from nav screen" />
             </div>
           </div>
-          {(showInput('cog') || showInput('sog')) && (
-            <div className="grid grid-cols-2 gap-3">
-              {showInput('cog') && (
-                <div className="space-y-1">
-                  <Label htmlFor="cog">COG [°]</Label>
-                  <Input id="cog" type="text" inputMode="decimal" value={values.cog || ''} onChange={e => set('cog', e.target.value)} placeholder="—" />
-                </div>
-              )}
-              {showInput('sog') && (
-                <div className="space-y-1">
-                  <Label htmlFor="sog">SOG [kn]</Label>
-                  <Input id="sog" type="text" inputMode="decimal" value={values.sog || ''} onChange={e => set('sog', e.target.value)} placeholder="—" />
-                </div>
-              )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="cog">COG [°]</Label>
+              <Input id="cog" type="text" inputMode="decimal" value={values.cog || ''} onChange={e => set('cog', e.target.value)} placeholder="—" />
             </div>
-          )}
+            <div className="space-y-1">
+              <Label htmlFor="sog">SOG [kn]</Label>
+              <Input id="sog" type="text" inputMode="decimal" value={values.sog || ''} onChange={e => set('sog', e.target.value)} placeholder="—" />
+            </div>
+          </div>
         </div>
 
         {/* Engines — single editable comparison table (Port | STBD | Avg) */}
