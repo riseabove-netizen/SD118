@@ -196,7 +196,12 @@ export function ReviewPage() {
     mutationFn: () => writeRow(values),
     onSuccess: () => {
       sessionStorage.removeItem('extractedData')
-      setLocation('/runlog/success')
+      try {
+        sessionStorage.setItem('lastRunlog', JSON.stringify(values))
+      } catch {
+        // ignore quota errors
+      }
+      setLocation('/runlog/analysis')
     },
   })
 

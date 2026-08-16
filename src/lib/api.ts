@@ -46,6 +46,17 @@ export async function writeRow(values: Record<string, unknown>): Promise<{ ok: b
   })
 }
 
+export interface RpmBand {
+  rpm: number
+  sog: number | null
+  economy: number | null
+  port: Record<string, { avg: number | null; sigma: number | null }>
+  stbd: Record<string, { avg: number | null; sigma: number | null }>
+}
+export async function getRpmAverages(): Promise<{ ok: boolean; bands: RpmBand[] }> {
+  return request('/api/rpm-averages', { method: 'GET' })
+}
+
 export interface IsmSavePayload {
   formId: string
   formName: string
