@@ -599,6 +599,88 @@ async function withSheetsRetry<T>(fn: () => Promise<T>, label: string): Promise<
   throw lastErr
 }
 
+// Return state for EVERY system in a single Sheets call. The Maintenance
+// Logs hub calls this instead of firing N parallel op=system requests,
+// which used to burst past the Sheets read-quota and null-out random
+// tiles ("200h left" fallback).
+async function handleAllSystems(_req: VercelRequest, res: VercelResponse) {
+  const auth = getAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  await ensureSheet(sheets, 'MaintenanceLog', LOG_HEADERS)
+  await ensureSheet(sheets, 'MaintenanceHours', HOURS_HEADERS)
+
+  const batch = await withSheetsRetry(
+    () => sheets.spreadsheets.values.batchGet({
+      spreadsheetId: INVENTORY_ID,
+      ranges: ['MaintenanceHours!A:D', 'MaintenanceLog!A:Z'],
+    }),
+    'allSystems',
+  )
+  const [hoursValues, logValues] = batch.data.valueRanges || []
+
+  // Hours map
+  const hoursRows = hoursValues?.values || []
+  const hoursBySystem: Record<string, { currentHours: number | null; hoursUpdatedAt: string }> = {}
+  for (const r of hoursRows.slice(1)) {
+    const sid = String(r[0] || '').trim()
+    if (!sid) continue
+    hoursBySystem[sid] = {
+      currentHours: Number(r[1] || 0) || 0,
+      hoursUpdatedAt: String(r[2] || ''),
+    }
+  }
+
+  // Group log rows by systemId, computing lastServiceHoursByKit and event count.
+  const logRows = logValues?.values || []
+  const headers = logRows[0] || LOG_HEADERS
+  const idxSystem = headers.indexOf('SystemId')
+  const idxKits   = headers.indexOf('KitIds')
+  const idxHours  = headers.indexOf('HoursAtService')
+  const idxTs     = headers.indexOf('Timestamp')
+
+  const bySystem: Record<string, { lastServiceHoursByKit: Record<string, number>; eventsCount: number; lastEventAt: string }> = {}
+
+  for (const r of logRows.slice(1)) {
+    const sid = String(r[idxSystem] || '').trim()
+    if (!sid) continue
+    const entry = bySystem[sid] || (bySystem[sid] = { lastServiceHoursByKit: {}, eventsCount: 0, lastEventAt: '' })
+    entry.eventsCount += 1
+    const ts = String(r[idxTs] || '')
+    if (ts > entry.lastEventAt) entry.lastEventAt = ts
+    const kits = String(r[idxKits] || '').split(',').map(s => s.trim()).filter(Boolean)
+    const h = Number(r[idxHours] || 0)
+    if (Number.isFinite(h) && h > 0) {
+      for (const k of kits) {
+        const prev = entry.lastServiceHoursByKit[k]
+        if (prev == null || h > prev) entry.lastServiceHoursByKit[k] = h
+      }
+    }
+  }
+
+  // Union of all systemIds seen (hours or log).
+  const allIds = new Set<string>([...Object.keys(hoursBySystem), ...Object.keys(bySystem)])
+  const systems: Record<string, {
+    currentHours: number | null
+    hoursUpdatedAt: string
+    lastServiceHoursByKit: Record<string, number>
+    eventsCount: number
+  }> = {}
+  for (const sid of allIds) {
+    const h = hoursBySystem[sid] || { currentHours: null, hoursUpdatedAt: '' }
+    const s = bySystem[sid] || { lastServiceHoursByKit: {}, eventsCount: 0 }
+    systems[sid] = {
+      currentHours: h.currentHours,
+      hoursUpdatedAt: h.hoursUpdatedAt,
+      lastServiceHoursByKit: s.lastServiceHoursByKit,
+      eventsCount: s.eventsCount,
+    }
+  }
+
+  // Cache aggressively at the edge: crew hits the hub over and over.
+  res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=15, stale-while-revalidate=60')
+  return res.status(200).json({ systems })
+}
+
 async function handleSystemState(req: VercelRequest, res: VercelResponse) {
   const systemId = String(req.query.systemId || '').trim()
   if (!systemId) return res.status(400).json({ error: 'systemId required' })
@@ -887,6 +969,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (op === 'system') {
       if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' })
       return await handleSystemState(req, res)
+    }
+    if (op === 'allSystems') {
+      if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' })
+      return await handleAllSystems(req, res)
     }
     if (op === 'hours') {
       if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })

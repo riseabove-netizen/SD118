@@ -25,7 +25,7 @@ import {
   itemAppliesToUnit,
 } from '@/data/calendar-systems'
 import { AIR_HANDLERS } from '@/data/air-handlers'
-import { fetchSystemState } from '@/lib/maintenance-api'
+import { fetchAllSystemsState } from '@/lib/maintenance-api'
 import {
   fetchCalendarServiceEvents,
   buildStatusMap,
@@ -65,19 +65,32 @@ export function MaintenanceHubPage() {
       const calResults: Record<string, Awaited<ReturnType<typeof fetchCalendarServiceEvents>>> = {}
       let ahResults: Awaited<ReturnType<typeof fetchAirHandlerEvents>> = []
 
-      await Promise.all([
-        ...active.map(async s => {
-          try {
-            const state = await fetchSystemState(s.id)
-            hoursResults[s.id] = {
-              currentHours: state.currentHours,
-              lastServiceHoursByKit: state.lastServiceHoursByKit || {},
-              eventsCount: state.events?.length || 0,
-            }
-          } catch {
+      // Single aggregated call instead of N parallel op=system requests.
+      const allP = fetchAllSystemsState()
+        .then(all => {
+          for (const s of active) {
+            const st = all.systems[s.id]
+            hoursResults[s.id] = st
+              ? {
+                  currentHours: st.currentHours,
+                  lastServiceHoursByKit: st.lastServiceHoursByKit || {},
+                  eventsCount: st.eventsCount || 0,
+                }
+              // System never had a service logged; leave currentHours
+              // null so SystemTile falls back to the catalog hint.
+              : { currentHours: null, lastServiceHoursByKit: {}, eventsCount: 0 }
+          }
+        })
+        .catch(() => {
+          // Leave hoursResults empty; SystemTile falls back to the
+          // per-system initialHoursHint from the catalog.
+          for (const s of active) {
             hoursResults[s.id] = { currentHours: null, lastServiceHoursByKit: {}, eventsCount: 0 }
           }
-        }),
+        })
+
+      await Promise.all([
+        allP,
         ...CALENDAR_SYSTEMS.map(async s => {
           try {
             calResults[s.id] = await fetchCalendarServiceEvents(s.id)

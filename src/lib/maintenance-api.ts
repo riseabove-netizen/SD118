@@ -35,10 +35,83 @@ export interface MaintenanceSystemState {
   events: MaintenanceEvent[]
 }
 
+// ---- localStorage cache (stale-while-revalidate) ----
+// The Sheets read-quota (300 req/min/user) is easily saturated when the
+// hub or a detail page revalidates. Cache the last good response per
+// system so navigation returns instantly and transient upstream failures
+// don't wipe the UI back to catalog hints.
+const CACHE_KEY_PREFIX = 'maint:sysState:'
+const CACHE_TTL_MS = 60_000 // treat cached data as fresh for 60s
+
+interface CachedState { at: number; data: MaintenanceSystemState }
+
+function readCache(systemId: string): CachedState | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY_PREFIX + systemId)
+    if (!raw) return null
+    const v = JSON.parse(raw) as CachedState
+    if (!v || typeof v.at !== 'number' || !v.data) return null
+    return v
+  } catch {
+    return null
+  }
+}
+
+function writeCache(systemId: string, data: MaintenanceSystemState) {
+  try {
+    localStorage.setItem(CACHE_KEY_PREFIX + systemId, JSON.stringify({ at: Date.now(), data }))
+  } catch {
+    /* quota / private mode - ignore */
+  }
+}
+
+export function readCachedSystemState(systemId: string): MaintenanceSystemState | null {
+  return readCache(systemId)?.data ?? null
+}
+
 export async function fetchSystemState(systemId: string): Promise<MaintenanceSystemState> {
   const r = await authFetch(`/api/maintenance?op=system&systemId=${encodeURIComponent(systemId)}`)
   if (!r.ok) throw new Error(`fetchSystemState ${r.status}`)
-  return r.json()
+  const data = await r.json() as MaintenanceSystemState
+  writeCache(systemId, data)
+  return data
+}
+
+// One aggregated call for the Maintenance hub. Serializes the whole hub
+// into a single Sheets read on the server side, avoiding the parallel
+// per-tile burst that saturated the read quota.
+export interface AllSystemsState {
+  systems: Record<string, {
+    currentHours: number | null
+    hoursUpdatedAt: string
+    lastServiceHoursByKit: Record<string, number>
+    eventsCount: number
+  }>
+}
+
+export async function fetchAllSystemsState(): Promise<AllSystemsState> {
+  const r = await authFetch('/api/maintenance?op=allSystems')
+  if (!r.ok) throw new Error(`fetchAllSystemsState ${r.status}`)
+  const data = await r.json() as AllSystemsState
+  // Warm the per-system cache with what we can — detail pages will show
+  // hours + last-service-by-kit instantly on first click even if the
+  // detail-page fetch happens to fail.
+  try {
+    for (const [sid, s] of Object.entries(data.systems || {})) {
+      const prev = readCache(sid)?.data
+      const merged: MaintenanceSystemState = {
+        systemId: sid,
+        currentHours: s.currentHours,
+        hoursUpdatedAt: s.hoursUpdatedAt,
+        lastServiceHoursByKit: s.lastServiceHoursByKit,
+        // Preserve the last-known events list; op=allSystems does not
+        // ship events to keep the payload small.
+        events: prev?.events || [],
+      }
+      writeCache(sid, merged)
+    }
+  } catch { /* ignore cache warm failures */ }
+  return data
 }
 
 export async function updateHours(systemId: string, hours: number, user?: string): Promise<{ ok: boolean; updatedAt: string }> {

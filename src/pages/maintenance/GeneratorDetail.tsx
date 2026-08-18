@@ -17,7 +17,7 @@ import {
   formatHoursUntil,
   dueTier,
 } from '@/data/maintenance-systems'
-import { fetchSystemState, updateHours, MaintenanceEvent } from '@/lib/maintenance-api'
+import { fetchSystemState, updateHours, readCachedSystemState, MaintenanceEvent } from '@/lib/maintenance-api'
 import { ZincRodsGuide, isZincRodItem } from '@/components/ZincRodsGuide'
 import { EQUIPMENT_DATA } from '@/data/equipment-data'
 
@@ -37,14 +37,17 @@ export function GeneratorDetailPage() {
   const [, setLocation] = useLocation()
   const admin = isAdmin()
 
-  const [currentHours, setCurrentHours] = useState<number | null>(null)
-  const [hoursUpdatedAt, setHoursUpdatedAt] = useState<string>('')
-  const [lastByKit, setLastByKit] = useState<Record<string, number>>({})
-  const [events, setEvents] = useState<MaintenanceEvent[]>([])
-  const [loading, setLoading] = useState(true)
+  // Seed synchronously from localStorage so navigating back to a system
+  // shows its real hours/history instantly instead of flashing the hint.
+  const seed = system ? readCachedSystemState(system.id) : null
+  const [currentHours, setCurrentHours] = useState<number | null>(seed?.currentHours ?? null)
+  const [hoursUpdatedAt, setHoursUpdatedAt] = useState<string>(seed?.hoursUpdatedAt ?? '')
+  const [lastByKit, setLastByKit] = useState<Record<string, number>>(seed?.lastServiceHoursByKit ?? {})
+  const [events, setEvents] = useState<MaintenanceEvent[]>(seed?.events ?? [])
+  const [loading, setLoading] = useState(!seed)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [everLoaded, setEverLoaded] = useState(false)
-  const [hoursDraft, setHoursDraft] = useState<string>('')
+  const [everLoaded, setEverLoaded] = useState(!!seed)
+  const [hoursDraft, setHoursDraft] = useState<string>(seed?.currentHours != null ? String(seed.currentHours) : '')
   const [savingHours, setSavingHours] = useState(false)
   const [hoursMsg, setHoursMsg] = useState<string | null>(null)
   const [zincGuideOpen, setZincGuideOpen] = useState(false)
@@ -53,7 +56,8 @@ export function GeneratorDetailPage() {
     if (!system) return
     let cancelled = false
     async function load(attempt = 0) {
-      setLoading(true)
+      // Only show the big spinner when we have nothing at all to render.
+      if (!seed) setLoading(true)
       setLoadError(null)
       try {
         const state = await fetchSystemState(system!.id)
@@ -63,7 +67,10 @@ export function GeneratorDetailPage() {
         setHoursUpdatedAt(state.hoursUpdatedAt || '')
         setLastByKit(state.lastServiceHoursByKit || {})
         setEvents(state.events || [])
-        setHoursDraft(String(hours))
+        // Only reset the hours-input draft while the user hasn't started
+        // editing it. Otherwise a background refresh would overwrite what
+        // they're typing.
+        setHoursDraft(prev => (prev === '' || prev === String(currentHours ?? '')) ? String(hours) : prev)
         setEverLoaded(true)
       } catch (err: any) {
         // Sheets read quota (429/500 from upstream) can fail transiently.
@@ -76,11 +83,15 @@ export function GeneratorDetailPage() {
           if (!cancelled) return load(attempt + 1)
         }
         if (cancelled) return
-        setLoadError('Could not reach the maintenance log. Showing last known values — pull to refresh.')
-        // Only seed from the catalog hint on the very first attempt.
+        // Preserve whatever we already have on screen; only fall back to
+        // the catalog hint if we truly have nothing (no cache, no prior
+        // successful load).
         if (!everLoaded) {
           setCurrentHours(system!.initialHoursHint ?? 0)
           setHoursDraft(String(system!.initialHoursHint ?? 0))
+          setLoadError('Could not reach the maintenance log. Showing catalog estimate — try again in a minute.')
+        } else {
+          setLoadError('Could not refresh from the log. Showing last known values.')
         }
       } finally {
         if (!cancelled) setLoading(false)
