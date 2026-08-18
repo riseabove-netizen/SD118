@@ -147,6 +147,125 @@ const GENERATOR_KITS: MaintenanceKit[] = [
   GENERATOR_2000H_KIT,
 ]
 
+// ---------------- Main engine kits (Cat C32 ACERT — SEBU8775-12) ----------------
+//
+// Source: Caterpillar Maintenance Interval Schedule SEBU8775-12
+// (SMCS 1000, 4450, 7500). Intervals repeat cumulatively at multiples of
+// the interval hours. "When Required", "Initial 500 Hours" (break-in),
+// "Every Year", "Every 10 Years" and Overhaul items don't map cleanly to
+// a repeating hour bucket — they're captured as detail notes on the
+// closest recurring kit or handled outside this catalog.
+
+const MAIN_ENGINE_DAILY_KIT: MaintenanceKit = {
+  id: 'daily',
+  interval: 'daily',
+  label: 'Daily prestart',
+  shortLabel: 'Daily',
+  checklist: [
+    { id: 'coolant-level', label: 'Check coolant level' },
+    { id: 'air-cleaner-indicator', label: 'Inspect engine air cleaner service indicator' },
+    { id: 'oil-level', label: 'Check engine oil level' },
+    { id: 'fuel-primary-drain', label: 'Drain fuel-system primary filter / water separator' },
+    { id: 'walkaround', label: 'Walk-around inspection', detail: 'Check for leaks, loose hardware, unusual wear.' },
+  ],
+}
+
+const MAIN_ENGINE_50H_KIT: MaintenanceKit = {
+  id: '50h',
+  interval: 50,
+  label: '50h',
+  shortLabel: '50h',
+  checklist: [
+    { id: 'aftercooler-drain', label: 'Inspect / clean aftercooler condensate drain valve' },
+    { id: 'sea-strainer', label: 'Clean / inspect sea water strainer' },
+    { id: 'zincs', label: 'Inspect / replace zinc rods' },
+  ],
+}
+
+const MAIN_ENGINE_250H_KIT: MaintenanceKit = {
+  id: '250h',
+  interval: 250,
+  label: '250h / 1 year',
+  shortLabel: '250h',
+  checklist: [
+    { id: 'aux-water-pump-rubber', label: 'Inspect / replace auxiliary water pump (rubber impeller)' },
+    { id: 'battery-electrolyte', label: 'Check battery electrolyte level' },
+    { id: 'belts', label: 'Inspect / replace drive belts' },
+    { id: 'coolant-sample-l1', label: 'Obtain coolant sample (Level 1)' },
+    { id: 'sca-test-add', label: 'Test / add Supplemental Coolant Additive (SCA)' },
+    { id: 'air-cleaner-element', label: 'Inspect / clean / replace air-cleaner element (single element)' },
+    { id: 'oil-sample', label: 'Obtain engine oil sample' },
+    { id: 'oil-and-filter', label: 'Change engine oil and filter', detail: 'Use Cat DEO or equivalent per SEBU8775-12. Note filter part numbers before install.' },
+    { id: 'fuel-tank-drain', label: 'Drain fuel-tank water and sediment' },
+    { id: 'hoses-clamps', label: 'Inspect / replace hoses and clamps' },
+    { id: 'coolant-sample-l2-year', label: 'Every year: obtain coolant sample (Level 2)' },
+  ],
+}
+
+const MAIN_ENGINE_500H_KIT: MaintenanceKit = {
+  id: '500h',
+  interval: 500,
+  label: '500h',
+  shortLabel: '500h',
+  checklist: [
+    { id: 'crankcase-breather', label: 'Clean engine crankcase breather' },
+    { id: 'fuel-primary-element', label: 'Replace fuel system primary filter (water separator) element' },
+    { id: 'fuel-secondary', label: 'Replace fuel system secondary filter' },
+  ],
+}
+
+const MAIN_ENGINE_1000H_KIT: MaintenanceKit = {
+  id: '1000h',
+  interval: 1000,
+  label: '1000h / 2 years',
+  shortLabel: '1000h',
+  checklist: [
+    { id: 'ccv-filters', label: 'Replace Closed Crankcase Ventilation (CCV) filters' },
+    { id: 'air-cleaner-replace', label: 'Replace engine air cleaner element (single element)' },
+    { id: 'turbo-inspect', label: 'Inspect turbocharger' },
+    { id: 'aftercooler-core-clean', label: 'Clean / test aftercooler core (every 1000h or 2 years)' },
+  ],
+}
+
+const MAIN_ENGINE_3000H_KIT: MaintenanceKit = {
+  id: '3000h',
+  interval: 3000,
+  label: '3000h',
+  shortLabel: '3000h',
+  checklist: [
+    { id: 'aux-water-pump-bronze', label: 'Inspect / replace auxiliary water pump (bronze impeller)' },
+    { id: 'coolant-temp-regulator', label: 'Replace coolant temperature regulator (thermostat)' },
+    { id: 'crank-vibration-damper', label: 'Inspect crankshaft vibration damper' },
+    { id: 'engine-mounts', label: 'Inspect engine mounts' },
+    { id: 'speed-timing-sensor', label: 'Clean / inspect engine speed / timing sensor' },
+    { id: 'valve-lash', label: 'Check engine valve lash' },
+    { id: 'valve-rotators', label: 'Inspect engine valve rotators' },
+    { id: 'fuel-injector-check', label: 'Check fuel injectors' },
+    { id: 'heat-exchanger-inspect', label: 'Inspect heat exchanger' },
+    { id: 'starting-motor', label: 'Inspect starting motor' },
+  ],
+}
+
+const MAIN_ENGINE_5000H_KIT: MaintenanceKit = {
+  id: '5000h',
+  interval: 5000,
+  label: '5000h',
+  shortLabel: '5000h',
+  checklist: [
+    { id: 'water-pump-inspect', label: 'Inspect water pump' },
+  ],
+}
+
+const MAIN_ENGINE_KITS: MaintenanceKit[] = [
+  MAIN_ENGINE_DAILY_KIT,
+  MAIN_ENGINE_50H_KIT,
+  MAIN_ENGINE_250H_KIT,
+  MAIN_ENGINE_500H_KIT,
+  MAIN_ENGINE_1000H_KIT,
+  MAIN_ENGINE_3000H_KIT,
+  MAIN_ENGINE_5000H_KIT,
+]
+
 // ---------------- Watermaker kits ----------------
 //
 // Two hour-based service points on each watermaker. Cumulative, so they
@@ -213,7 +332,7 @@ export const MAINTENANCE_SYSTEMS: MaintenanceSystem[] = [
     label: 'Main engine — Port',
     driveFolderPath: ['Maintenance', 'Main Engine', 'Port'],
     icon: '🛠️',
-    kits: [],
+    kits: MAIN_ENGINE_KITS,
   },
   {
     id: 'main-engine-starboard',
@@ -223,7 +342,7 @@ export const MAINTENANCE_SYSTEMS: MaintenanceSystem[] = [
     label: 'Main engine — Starboard',
     driveFolderPath: ['Maintenance', 'Main Engine', 'Starboard'],
     icon: '🛠️',
-    kits: [],
+    kits: MAIN_ENGINE_KITS,
   },
   {
     id: 'watermaker-top',
