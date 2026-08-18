@@ -548,10 +548,13 @@ async function handleList(_req: VercelRequest, res: VercelResponse) {
   const auth = getAuth()
   const sheets = google.sheets({ version: 'v4', auth })
   await ensureSheet(sheets, 'MaintenanceLog', LOG_HEADERS)
-  const resp = await sheets.spreadsheets.values.get({
-    spreadsheetId: INVENTORY_ID,
-    range: 'MaintenanceLog!A:Z',
-  })
+  const resp = await withSheetsRetry(
+    () => sheets.spreadsheets.values.get({
+      spreadsheetId: INVENTORY_ID,
+      range: 'MaintenanceLog!A:Z',
+    }),
+    'list',
+  )
   const rows = resp.data.values || []
   if (rows.length < 2) return res.status(200).json({ events: [] })
   const headers = rows[0]
@@ -569,6 +572,33 @@ async function handleList(_req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({ events })
 }
 
+// Retry any Sheets read that fails with a Google 429 / read-quota error.
+// Sheets "Read requests per minute per user" is 300; a single crew member
+// bouncing between pages can burst past that, so we back off and retry
+// with jitter instead of surfacing a 500 to the client.
+async function withSheetsRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  const delays = [400, 900, 1800, 3500] // ms
+  let lastErr: any
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      return await fn()
+    } catch (e: any) {
+      lastErr = e
+      const code = e?.code || e?.response?.status
+      const msg = String(e?.message || '')
+      const isQuota =
+        code === 429 ||
+        /quota|rate.?limit|read requests/i.test(msg)
+      if (!isQuota || attempt === delays.length) throw e
+      const jitter = Math.floor(Math.random() * 250)
+      const wait = delays[attempt] + jitter
+      console.warn(`[maintenance] ${label} quota hit (attempt ${attempt + 1}); retrying in ${wait}ms`)
+      await new Promise(r => setTimeout(r, wait))
+    }
+  }
+  throw lastErr
+}
+
 async function handleSystemState(req: VercelRequest, res: VercelResponse) {
   const systemId = String(req.query.systemId || '').trim()
   if (!systemId) return res.status(400).json({ error: 'systemId required' })
@@ -577,22 +607,25 @@ async function handleSystemState(req: VercelRequest, res: VercelResponse) {
   await ensureSheet(sheets, 'MaintenanceLog', LOG_HEADERS)
   await ensureSheet(sheets, 'MaintenanceHours', HOURS_HEADERS)
 
+  // Batch the two reads into a single Sheets API call to halve the
+  // per-minute read-quota footprint per page load.
+  const batch = await withSheetsRetry(
+    () => sheets.spreadsheets.values.batchGet({
+      spreadsheetId: INVENTORY_ID,
+      ranges: ['MaintenanceHours!A:D', 'MaintenanceLog!A:Z'],
+    }),
+    `system(${systemId})`,
+  )
+  const [hoursValues, logValues] = batch.data.valueRanges || []
+
   // Current hours
-  const hoursResp = await sheets.spreadsheets.values.get({
-    spreadsheetId: INVENTORY_ID,
-    range: 'MaintenanceHours!A:D',
-  })
-  const hoursRows = hoursResp.data.values || []
+  const hoursRows = hoursValues?.values || []
   const hoursRow = hoursRows.slice(1).find((r: any[]) => String(r[0] || '').trim() === systemId)
   const currentHours = hoursRow ? Number(hoursRow[1] || 0) : null
   const hoursUpdatedAt = hoursRow ? String(hoursRow[2] || '') : ''
 
   // Past services for this system
-  const logResp = await sheets.spreadsheets.values.get({
-    spreadsheetId: INVENTORY_ID,
-    range: 'MaintenanceLog!A:Z',
-  })
-  const logRows = logResp.data.values || []
+  const logRows = logValues?.values || []
   const headers = logRows[0] || LOG_HEADERS
   const idxSystem = headers.indexOf('SystemId')
   const events = logRows.slice(1)

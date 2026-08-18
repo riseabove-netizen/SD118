@@ -42,6 +42,8 @@ export function GeneratorDetailPage() {
   const [lastByKit, setLastByKit] = useState<Record<string, number>>({})
   const [events, setEvents] = useState<MaintenanceEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [everLoaded, setEverLoaded] = useState(false)
   const [hoursDraft, setHoursDraft] = useState<string>('')
   const [savingHours, setSavingHours] = useState(false)
   const [hoursMsg, setHoursMsg] = useState<string | null>(null)
@@ -50,8 +52,9 @@ export function GeneratorDetailPage() {
   useEffect(() => {
     if (!system) return
     let cancelled = false
-    async function load() {
+    async function load(attempt = 0) {
       setLoading(true)
+      setLoadError(null)
       try {
         const state = await fetchSystemState(system!.id)
         if (cancelled) return
@@ -61,10 +64,24 @@ export function GeneratorDetailPage() {
         setLastByKit(state.lastServiceHoursByKit || {})
         setEvents(state.events || [])
         setHoursDraft(String(hours))
-      } catch {
-        // Fall back to the hint value from the catalog.
-        setCurrentHours(system!.initialHoursHint ?? 0)
-        setHoursDraft(String(system!.initialHoursHint ?? 0))
+        setEverLoaded(true)
+      } catch (err: any) {
+        // Sheets read quota (429/500 from upstream) can fail transiently.
+        // Retry a few times before falling back so we don't wipe out the
+        // page with stale hint values.
+        if (attempt < 3 && !cancelled) {
+          const wait = 500 * Math.pow(2, attempt) + Math.random() * 250
+          setLoadError('Refreshing…')
+          await new Promise(r => setTimeout(r, wait))
+          if (!cancelled) return load(attempt + 1)
+        }
+        if (cancelled) return
+        setLoadError('Could not reach the maintenance log. Showing last known values — pull to refresh.')
+        // Only seed from the catalog hint on the very first attempt.
+        if (!everLoaded) {
+          setCurrentHours(system!.initialHoursHint ?? 0)
+          setHoursDraft(String(system!.initialHoursHint ?? 0))
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -114,6 +131,11 @@ export function GeneratorDetailPage() {
   return (
     <MenuLayout title={system.label} showBack backHref="/maintenance">
       <div className="space-y-5">
+        {loadError && !loading && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-200 text-xs px-3 py-2">
+            {loadError}
+          </div>
+        )}
         {/* Equipment data card */}
         {equip && (
           <div className="rounded-xl border border-border bg-card p-4 space-y-3">
