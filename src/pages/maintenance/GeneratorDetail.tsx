@@ -19,6 +19,7 @@ import {
 } from '@/data/maintenance-systems'
 import { fetchSystemState, updateHours, MaintenanceEvent } from '@/lib/maintenance-api'
 import { ZincRodsGuide, isZincRodItem } from '@/components/ZincRodsGuide'
+import { EQUIPMENT_DATA } from '@/data/equipment-data'
 
 export function GeneratorDetailPage() {
   // Two supported URL shapes:
@@ -108,9 +109,49 @@ export function GeneratorDetailPage() {
     }
   }
 
+  const equip = EQUIPMENT_DATA[system.id]
+
   return (
     <MenuLayout title={system.label} showBack backHref="/maintenance">
       <div className="space-y-5">
+        {/* Equipment data card */}
+        {equip && (
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold">Equipment data</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {equip.title}
+              </div>
+            </div>
+            <div className="rounded-md border border-border/60 overflow-hidden">
+              <table className="w-full text-xs">
+                <tbody>
+                  {equip.rows.map((r, i) => (
+                    <tr key={r.label} className={i % 2 === 0 ? 'bg-background/30' : ''}>
+                      <td className="px-3 py-1.5 text-muted-foreground border-b border-border/40 w-1/2">{r.label}</td>
+                      <td className="px-3 py-1.5 font-mono text-foreground border-b border-border/40">{r.value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {equip.manualUrl && (
+              <a
+                href={equip.manualUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-red-400 hover:underline"
+              >
+                📖 View service manual
+                {equip.manualLabel && (
+                  <span className="text-muted-foreground"> — {equip.manualLabel}</span>
+                )}
+                <span aria-hidden>↗</span>
+              </a>
+            )}
+          </div>
+        )}
+
         {/* Current hours card */}
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <div className="flex items-end justify-between gap-3">
