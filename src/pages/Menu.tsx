@@ -148,6 +148,15 @@ export function MenuPage() {
           href="/settings"
           description="Name, preferences"
         />
+        {role === 'admin' && (
+          <MenuItem
+            icon="📣"
+            id="admin-notify"
+            label="Send Notification"
+            href="/admin/notify"
+            description="Push schedule updates to selected crew &amp; guests"
+          />
+        )}
       </div>
 
       {/* Footer */}

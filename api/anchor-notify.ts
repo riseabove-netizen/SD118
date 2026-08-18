@@ -17,6 +17,40 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
 import webpush from 'web-push'
+import crypto from 'crypto'
+
+// ---------- auth helpers (inlined; must match api/trips.ts + api/auth.ts) ----------
+const _HMAC_SECRET = process.env.HMAC_SECRET || process.env.APP_SECRET || 'fallback-secret'
+function _hmac(payload: string): string {
+  return crypto.createHmac('sha256', _HMAC_SECRET).update(payload).digest('hex')
+}
+function verifyToken(token: string | undefined | null): { ok: boolean; role?: 'admin' | 'viewer' | 'crew' } {
+  if (!token || typeof token !== 'string') return { ok: false }
+  const dot = token.indexOf('.')
+  if (dot < 0) return { ok: false }
+  const b64 = token.slice(0, dot)
+  const sig = token.slice(dot + 1)
+  let payload = ''
+  try { payload = Buffer.from(b64, 'base64').toString('utf-8') } catch { return { ok: false } }
+  const expected = _hmac(payload)
+  if (sig.length !== expected.length) return { ok: false }
+  try {
+    const sigBuf = new Uint8Array(Buffer.from(sig, 'hex'))
+    const expBuf = new Uint8Array(Buffer.from(expected, 'hex'))
+    if (!crypto.timingSafeEqual(sigBuf, expBuf)) return { ok: false }
+  } catch { return { ok: false } }
+  const parts = payload.split(':')
+  if (parts.length < 3 || parts[0] !== 'auth') return { ok: false }
+  const role = parts[1]
+  if (role === 'admin' || role === 'viewer' || role === 'crew') return { ok: true, role }
+  return { ok: false }
+}
+function getBearer(req: VercelRequest): string | null {
+  const h = req.headers['authorization'] || req.headers['Authorization' as any]
+  if (!h || typeof h !== 'string') return null
+  const m = h.match(/^Bearer\s+(.+)$/i)
+  return m ? m[1].trim() : null
+}
 
 export const config = { api: { bodyParser: { sizeLimit: '1mb' } }, maxDuration: 30 }
 
@@ -348,6 +382,111 @@ async function handleUsers(_req: VercelRequest, res: VercelResponse) {
 
 // ---------- dispatcher ----------
 
+// ---------- broadcast op (ADMIN ONLY) ----------
+// POST /api/anchor-notify?op=broadcast
+//   Authorization: Bearer <admin-token>
+//   body: { title, body, url?, tag?, recipients: string[]  // names from PushSubs; [] or ['*'] = everyone }
+// Sends a web-push to every subscription whose Name matches (case-insensitive) any recipient.
+// Also appends a row to the BroadcastLog tab for audit.
+async function handleBroadcast(req: VercelRequest, res: VercelResponse) {
+  const auth = verifyToken(getBearer(req))
+  if (!auth.ok || auth.role !== 'admin') {
+    return res.status(403).json({ error: 'admin only' })
+  }
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
+    return res.status(500).json({ error: 'VAPID keys not configured' })
+  }
+  const body = (req.body || {}) as {
+    title?: string
+    body?: string
+    url?: string
+    tag?: string
+    recipients?: string[]
+    from?: string
+  }
+  const title = (body.title || '').trim()
+  const message = (body.body || '').trim()
+  if (!title) return res.status(400).json({ error: 'title required' })
+  if (!message) return res.status(400).json({ error: 'body required' })
+
+  const rawRecipients = Array.isArray(body.recipients) ? body.recipients : []
+  const wantAll = rawRecipients.length === 0 || rawRecipients.includes('*')
+  const wanted = new Set(rawRecipients.map(r => (r || '').trim().toLowerCase()).filter(Boolean))
+
+  const sheets = getSheets()
+  await ensureSheet(sheets, 'PushSubs', ['Endpoint', 'Name', 'P256dh', 'Auth', 'CreatedAt', 'UpdatedAt'])
+  const resp = await sheets.spreadsheets.values.get({ spreadsheetId: INVENTORY_ID, range: 'PushSubs!A:F' })
+  const rows = (resp.data.values || []).slice(1)
+  const subs = rows
+    .map((r: any[]) => ({ endpoint: r[0] || '', name: (r[1] || '').trim(), p256dh: r[2] || '', auth: r[3] || '' }))
+    .filter(s => s.endpoint && s.p256dh && s.auth)
+    .filter(s => wantAll || wanted.has(s.name.toLowerCase()))
+
+  if (subs.length === 0) {
+    return res.status(200).json({ ok: true, sent: 0, failed: 0, matched: 0, note: 'no matching subscriptions' })
+  }
+
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE)
+  const url = (body.url || '/schedule').trim()
+  const tag = (body.tag || 'admin-broadcast').trim()
+  const payload = JSON.stringify({
+    title,
+    body: message,
+    url,
+    tag,
+    requireInteraction: false,
+  })
+
+  let sent = 0, failed = 0
+  const perName: Record<string, { sent: number; failed: number }> = {}
+  for (const sub of subs) {
+    const bucket = perName[sub.name] || (perName[sub.name] = { sent: 0, failed: 0 })
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        payload,
+        { TTL: 60 * 60 * 24 },
+      )
+      sent++
+      bucket.sent++
+    } catch (e: any) {
+      failed++
+      bucket.failed++
+      if (e?.statusCode === 404 || e?.statusCode === 410) {
+        try { await removeSub(sheets, sub.endpoint) } catch {}
+      }
+    }
+  }
+
+  // Audit log
+  try {
+    await ensureSheet(sheets, 'BroadcastLog', ['SentAt', 'From', 'Title', 'Body', 'Url', 'Recipients', 'Matched', 'Sent', 'Failed'])
+    const recipientsStr = wantAll ? '*' : rawRecipients.join(', ')
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: INVENTORY_ID,
+      range: 'BroadcastLog!A:I',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[
+          new Date().toISOString(),
+          (body.from || 'admin').slice(0, 60),
+          title.slice(0, 200),
+          message.slice(0, 1000),
+          url,
+          recipientsStr,
+          String(subs.length),
+          String(sent),
+          String(failed),
+        ]],
+      },
+    })
+  } catch (e) {
+    console.error('BroadcastLog append failed', e)
+  }
+
+  return res.status(200).json({ ok: true, matched: subs.length, sent, failed, perName })
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!INVENTORY_ID) return res.status(500).json({ error: 'INVENTORY_SPREADSHEET_ID not set' })
   const op = String(req.query.op || '').trim()
@@ -370,7 +509,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'GET or POST' })
       return await handleCron(req, res)
     }
-    return res.status(400).json({ error: 'op required: schedule | subscribe | users | cron' })
+    if (op === 'broadcast') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+      return await handleBroadcast(req, res)
+    }
+    return res.status(400).json({ error: 'op required: schedule | subscribe | users | cron | broadcast' })
   } catch (e: any) {
     console.error('anchor-notify error', e)
     return res.status(500).json({ error: 'internal', detail: e?.message || String(e) })

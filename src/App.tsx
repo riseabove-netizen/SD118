@@ -9,6 +9,7 @@ import { LoginPage } from '@/pages/Login'
 import { SetNamePage } from '@/pages/SetName'
 import { MenuPage } from '@/pages/Menu'
 import { SettingsPage } from '@/pages/Settings'
+import { AdminBroadcastPage } from '@/pages/AdminBroadcast'
 
 // Running Log
 import { UploadPage } from '@/pages/runlog/Upload'
@@ -112,6 +113,9 @@ function AppRoutes() {
       </Route>
       <Route path="/settings">
         <AuthGuard><SettingsPage /></AuthGuard>
+      </Route>
+      <Route path="/admin/notify">
+        <AuthGuard><AdminBroadcastPage /></AuthGuard>
       </Route>
 
       {/* Running Log */}
