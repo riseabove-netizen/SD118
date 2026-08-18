@@ -210,7 +210,7 @@ export function GeneratorDetailPage() {
                     )}
                   </div>
                   <ul className="text-xs text-muted-foreground pl-4 list-disc space-y-0.5">
-                    {kit.checklist.slice(0, 4).map(it => (
+                    {kit.checklist.map(it => (
                       <li key={it.id}>
                         {it.label}
                         {it.detail && /oil/i.test(it.label) && (
@@ -220,9 +220,6 @@ export function GeneratorDetailPage() {
                         )}
                       </li>
                     ))}
-                    {kit.checklist.length > 4 && (
-                      <li className="text-muted-foreground/60">+ {kit.checklist.length - 4} more</li>
-                    )}
                   </ul>
                 </div>
               )
