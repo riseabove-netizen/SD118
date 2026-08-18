@@ -313,7 +313,7 @@ export function ReviewPage() {
   const CHIPPABLE_KEYS = [
     'date','time','entry_type',
     'fuel_daily','fuel_aft','fuel_fwd',
-    'gen_running','gen_port_hours','gen_stbd_hours',
+    'gen_running',
     'wind','sea_conditions',
   ]
   const [filledOnLoad, setFilledOnLoad] = useState<Set<string>>(new Set())
@@ -341,7 +341,7 @@ export function ReviewPage() {
   const FILLED_LABELS: Record<string, string> = {
     date: 'Date', time: 'Time', entry_type: 'Type',
     fuel_daily: 'Daily', fuel_aft: 'Aft', fuel_fwd: 'FWD',
-    gen_running: 'Gen', gen_port_hours: 'Port Gen hrs', gen_stbd_hours: 'STBD Gen hrs',
+    gen_running: 'Gen',
     latitude: 'Lat', longitude: 'Lon', cog: 'COG', sog: 'SOG',
     wind: 'Wind', sea_conditions: 'Sea',
   }
@@ -744,7 +744,7 @@ export function ReviewPage() {
 
         {/* Generators */}
         {(() => {
-          const keys = ['gen_running','gen_port_hours','gen_stbd_hours']
+          const keys = ['gen_running']
           const showEdit = showInput
           const filled = keys.filter(isChipped)
           return (
@@ -771,22 +771,7 @@ export function ReviewPage() {
                   </select>
                 </div>
               )}
-              {(showEdit('gen_port_hours') || showEdit('gen_stbd_hours')) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {showEdit('gen_port_hours') && (
-                    <div className="space-y-1">
-                      <Label htmlFor="gen_port_hours">Port Gen Hours</Label>
-                      <Input id="gen_port_hours" type="text" inputMode="decimal" value={values.gen_port_hours || ''} onChange={e => set('gen_port_hours', e.target.value)} placeholder="hrs" />
-                    </div>
-                  )}
-                  {showEdit('gen_stbd_hours') && (
-                    <div className="space-y-1">
-                      <Label htmlFor="gen_stbd_hours">STBD Gen Hours</Label>
-                      <Input id="gen_stbd_hours" type="text" inputMode="decimal" value={values.gen_stbd_hours || ''} onChange={e => set('gen_stbd_hours', e.target.value)} placeholder="hrs" />
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Generator hours moved to Engine Room Inspection form (removed 2026-08-18). */}
             </div>
           )
         })()}

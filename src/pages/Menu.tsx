@@ -70,7 +70,7 @@ export function MenuPage() {
       <header className="px-4 pt-12 pb-6 text-center">
         <div className="flex justify-center mb-3">
           <img
-            src="/assets/rise-above-logo.png"
+            src="/assets/boat-profile-white.jpg"
             alt="Rise Above"
             className="h-16 sm:h-20 w-auto object-contain"
           />

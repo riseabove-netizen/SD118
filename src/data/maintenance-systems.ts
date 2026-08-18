@@ -333,6 +333,9 @@ export const MAINTENANCE_SYSTEMS: MaintenanceSystem[] = [
     driveFolderPath: ['Maintenance', 'Main Engine', 'Port'],
     icon: '🛠️',
     kits: MAIN_ENGINE_KITS,
+    // Seeded from SD Running Log row 147 (2026/08/18 16:26): Port 1730.5h.
+    // Live hours are pulled from the running log going forward.
+    initialHoursHint: 1731,
   },
   {
     id: 'main-engine-starboard',
@@ -343,6 +346,8 @@ export const MAINTENANCE_SYSTEMS: MaintenanceSystem[] = [
     driveFolderPath: ['Maintenance', 'Main Engine', 'Starboard'],
     icon: '🛠️',
     kits: MAIN_ENGINE_KITS,
+    // Seeded from SD Running Log row 147 (2026/08/18 16:26): STBD 1733.7h.
+    initialHoursHint: 1734,
   },
   {
     id: 'watermaker-top',
