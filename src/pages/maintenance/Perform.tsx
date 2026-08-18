@@ -22,6 +22,7 @@ import {
   UnifiedChecklistItem,
 } from '@/data/maintenance-systems'
 import { fetchSystemState, submitMaintenanceLog, fileToBase64 } from '@/lib/maintenance-api'
+import { ZincRodsGuide, isZincRodItem } from '@/components/ZincRodsGuide'
 
 // ---------------- inventory search ----------------
 
@@ -319,6 +320,7 @@ function PerformStep({ system, selectedKits, setSelectedKits, isCustom, customTi
   const [submitting, setSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [zincGuideOpen, setZincGuideOpen] = useState(false)
 
   useEffect(() => {
     if (hoursAtService === '' && currentHours != null) {
@@ -511,6 +513,7 @@ function PerformStep({ system, selectedKits, setSelectedKits, isCustom, customTi
           {unified.map(item => {
             const key = `${item.kitId}:${item.id}`
             const checked = checkedIds.has(key)
+            const isZinc = system.kind === 'main-engine' && (isZincRodItem(item.id) || isZincRodItem(item.label))
             return (
               <div key={key} className="rounded-md border border-border/60 p-2">
                 <label className="flex items-start gap-3 cursor-pointer">
@@ -528,6 +531,15 @@ function PerformStep({ system, selectedKits, setSelectedKits, isCustom, customTi
                       <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-red-500/40 text-red-300">
                         {item.kitShortLabel}
                       </span>
+                      {isZinc && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZincGuideOpen(true) }}
+                          className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-red-500/60 text-red-300 hover:bg-red-500/10"
+                        >
+                          📍 Show locations (10)
+                        </button>
+                      )}
                     </div>
                     {item.detail && (
                       <div className="text-[11px] text-muted-foreground mt-0.5">{item.detail}</div>
@@ -617,6 +629,8 @@ function PerformStep({ system, selectedKits, setSelectedKits, isCustom, customTi
       >
         {submitting ? 'Saving…' : 'Save maintenance record'}
       </button>
+
+      <ZincRodsGuide open={zincGuideOpen} onClose={() => setZincGuideOpen(false)} />
     </div>
   )
 }

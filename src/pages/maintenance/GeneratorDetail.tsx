@@ -18,6 +18,7 @@ import {
   dueTier,
 } from '@/data/maintenance-systems'
 import { fetchSystemState, updateHours, MaintenanceEvent } from '@/lib/maintenance-api'
+import { ZincRodsGuide, isZincRodItem } from '@/components/ZincRodsGuide'
 
 export function GeneratorDetailPage() {
   // Two supported URL shapes:
@@ -43,6 +44,7 @@ export function GeneratorDetailPage() {
   const [hoursDraft, setHoursDraft] = useState<string>('')
   const [savingHours, setSavingHours] = useState(false)
   const [hoursMsg, setHoursMsg] = useState<string | null>(null)
+  const [zincGuideOpen, setZincGuideOpen] = useState(false)
 
   useEffect(() => {
     if (!system) return
@@ -210,16 +212,30 @@ export function GeneratorDetailPage() {
                     )}
                   </div>
                   <ul className="text-xs text-muted-foreground pl-4 list-disc space-y-0.5">
-                    {kit.checklist.map(it => (
-                      <li key={it.id}>
-                        {it.label}
-                        {it.detail && /oil/i.test(it.label) && (
-                          <div className="text-[11px] text-amber-400/90 mt-0.5">
-                            ⚠ {it.detail}
-                          </div>
-                        )}
-                      </li>
-                    ))}
+                    {kit.checklist.map(it => {
+                      const zinc = system.kind === 'main-engine' && (isZincRodItem(it.id) || isZincRodItem(it.label))
+                      return (
+                        <li key={it.id}>
+                          <span className="inline-flex items-center gap-2 flex-wrap">
+                            <span>{it.label}</span>
+                            {zinc && (
+                              <button
+                                type="button"
+                                onClick={() => setZincGuideOpen(true)}
+                                className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-red-500/50 text-red-300 hover:bg-red-500/10"
+                              >
+                                📍 Show locations (10 rods)
+                              </button>
+                            )}
+                          </span>
+                          {it.detail && /oil/i.test(it.label) && (
+                            <div className="text-[11px] text-amber-400/90 mt-0.5">
+                              ⚠ {it.detail}
+                            </div>
+                          )}
+                        </li>
+                      )
+                    })}
                   </ul>
                 </div>
               )
@@ -260,6 +276,7 @@ export function GeneratorDetailPage() {
           )}
         </div>
       </div>
+      <ZincRodsGuide open={zincGuideOpen} onClose={() => setZincGuideOpen(false)} />
     </MenuLayout>
   )
 }
