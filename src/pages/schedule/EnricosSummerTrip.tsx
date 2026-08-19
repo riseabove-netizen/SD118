@@ -27,7 +27,6 @@ const CHAPTER_IDS = [
   'albania-2026',
   'montenegro-2026',
   'dubrovnik-2026',
-  'hvar-split-2026',
 ]
 
 function formatRange(startIso: string, endIso: string): string {

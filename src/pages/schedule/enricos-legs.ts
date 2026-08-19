@@ -37,7 +37,6 @@ export const CHAPTER_ANCHORS: ChapterAnchor[] = [
   { id: 'albania-2026',               label: 'Sarandë, Albania',        coord: { lat: 39.875, lon: 20.005 } },
   { id: 'montenegro-2026',            label: 'Kotor Bay, Montenegro',   coord: { lat: 42.430, lon: 18.770 } },
   { id: 'dubrovnik-2026',             label: 'Dubrovnik, Croatia',      coord: { lat: 42.660, lon: 18.080 } },
-  { id: 'hvar-split-2026',            label: 'Hvar / Split',            coord: { lat: 43.170, lon: 16.440 } },
 ]
 
 // Per-leg speed override (knots). Defaults to CRUISE_KNOTS.
