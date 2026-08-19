@@ -1,1 +1,77 @@
-// Small dismissible toast rendered in fixed position at the top of the\n// screen. Never pushes page content down, so it can't cause the jerky\n// layout shift the crew saw when data was refreshing.\n//\n// Variants:\n//   info    — muted grey (transient background refresh)\n//   warn    — amber (upstream failed, showing cached values)\n//   error   — red (hard failure, no data)\n//   success — green\n\nimport React, { useEffect, useState } from 'react'\n\nexport type TransientBannerVariant = 'info' | 'warn' | 'error' | 'success'\n\ninterface Props {\n  message: string | null\n  variant?: TransientBannerVariant\n  /** Auto-dismiss after N ms. 0 or undefined = no auto-dismiss. */\n  autoDismissMs?: number\n  onDismiss?: () => void\n}\n\nexport function TransientBanner({ message, variant = 'info', autoDismissMs, onDismiss }: Props) {\n  const [dismissed, setDismissed] = useState(false)\n\n  // Reset dismissal when the message changes so subsequent errors show.\n  useEffect(() => { setDismissed(false) }, [message])\n\n  useEffect(() => {\n    if (!message || dismissed || !autoDismissMs) return\n    const t = setTimeout(() => {\n      setDismissed(true)\n      onDismiss?.()\n    }, autoDismissMs)\n    return () => clearTimeout(t)\n  }, [message, dismissed, autoDismissMs, onDismiss])\n\n  if (!message || dismissed) return null\n\n  const cls = variantClasses(variant)\n\n  return (\n    <div\n      role=\"status\"\n      aria-live=\"polite\"\n      className=\"fixed top-3 left-1/2 -translate-x-1/2 z-50 max-w-[92vw] w-fit pointer-events-none\"\n    >\n      <div className={`pointer-events-auto flex items-start gap-2 rounded-md border shadow-lg px-3 py-2 text-xs ${cls}`}>\n        <span className=\"leading-snug\">{message}</span>\n        <button\n          type=\"button\"\n          onClick={() => { setDismissed(true); onDismiss?.() }}\n          aria-label=\"Dismiss\"\n          className=\"-mt-0.5 -mr-1 h-5 w-5 grid place-items-center rounded hover:bg-black/20 text-current/70 hover:text-current\"\n        >\n          <svg viewBox=\"0 0 24 24\" className=\"w-3.5 h-3.5\" fill=\"none\" stroke=\"currentColor\" strokeWidth=\"2\" strokeLinecap=\"round\" strokeLinejoin=\"round\">\n            <path d=\"M18 6L6 18M6 6l12 12\" />\n          </svg>\n        </button>\n      </div>\n    </div>\n  )\n}\n\nfunction variantClasses(v: TransientBannerVariant): string {\n  switch (v) {\n    case 'warn':\n      return 'bg-amber-500/15 border-amber-500/40 text-amber-100 backdrop-blur'\n    case 'error':\n      return 'bg-red-500/20 border-red-500/50 text-red-100 backdrop-blur'\n    case 'success':\n      return 'bg-emerald-500/15 border-emerald-500/40 text-emerald-100 backdrop-blur'\n    case 'info':\n    default:\n      return 'bg-neutral-900/85 border-border text-foreground/90 backdrop-blur'\n  }\n}\n
+// Small dismissible toast rendered in fixed position at the top of the
+// screen. Never pushes page content down, so it can't cause the jerky
+// layout shift the crew saw when data was refreshing.
+//
+// Variants:
+//   info    — muted grey (transient background refresh)
+//   warn    — amber (upstream failed, showing cached values)
+//   error   — red (hard failure, no data)
+//   success — green
+
+import React, { useEffect, useState } from 'react'
+
+export type TransientBannerVariant = 'info' | 'warn' | 'error' | 'success'
+
+interface Props {
+  message: string | null
+  variant?: TransientBannerVariant
+  /** Auto-dismiss after N ms. 0 or undefined = no auto-dismiss. */
+  autoDismissMs?: number
+  onDismiss?: () => void
+}
+
+export function TransientBanner({ message, variant = 'info', autoDismissMs, onDismiss }: Props) {
+  const [dismissed, setDismissed] = useState(false)
+
+  // Reset dismissal when the message changes so subsequent errors show.
+  useEffect(() => { setDismissed(false) }, [message])
+
+  useEffect(() => {
+    if (!message || dismissed || !autoDismissMs) return
+    const t = setTimeout(() => {
+      setDismissed(true)
+      onDismiss?.()
+    }, autoDismissMs)
+    return () => clearTimeout(t)
+  }, [message, dismissed, autoDismissMs, onDismiss])
+
+  if (!message || dismissed) return null
+
+  const cls = variantClasses(variant)
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed top-3 left-1/2 -translate-x-1/2 z-50 max-w-[92vw] w-fit pointer-events-none"
+    >
+      <div className={`pointer-events-auto flex items-start gap-2 rounded-md border shadow-lg px-3 py-2 text-xs ${cls}`}>
+        <span className="leading-snug">{message}</span>
+        <button
+          type="button"
+          onClick={() => { setDismissed(true); onDismiss?.() }}
+          aria-label="Dismiss"
+          className="-mt-0.5 -mr-1 h-5 w-5 grid place-items-center rounded hover:bg-black/20 text-current/70 hover:text-current"
+        >
+          <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function variantClasses(v: TransientBannerVariant): string {
+  switch (v) {
+    case 'warn':
+      return 'bg-amber-500/15 border-amber-500/40 text-amber-100 backdrop-blur'
+    case 'error':
+      return 'bg-red-500/20 border-red-500/50 text-red-100 backdrop-blur'
+    case 'success':
+      return 'bg-emerald-500/15 border-emerald-500/40 text-emerald-100 backdrop-blur'
+    case 'info':
+    default:
+      return 'bg-neutral-900/85 border-border text-foreground/90 backdrop-blur'
+  }
+}
