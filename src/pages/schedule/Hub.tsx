@@ -70,6 +70,21 @@ export function ScheduleHubPage() {
   return (
     <MenuLayout title="Schedule" showBack backHref="/menu">
       <div className="space-y-3">
+        {/* Calendar view — same look as the watch calendar */}
+        <button
+          onClick={() => setLocation('/schedule/calendar')}
+          className="w-full flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left hover:bg-secondary/60 transition-colors"
+        >
+          <span className="text-2xl">🗓️</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold">Schedule Calendar</div>
+            <div className="text-xs text-muted-foreground">Month view · anchor vs dock · planning windows</div>
+          </div>
+          <svg viewBox="0 0 24 24" className="w-5 h-5 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+
         {/* Featured: consolidated summer-trip page */}
         <button
           onClick={() => setLocation('/schedule/enricos-summer-trip')}

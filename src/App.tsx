@@ -50,6 +50,7 @@ import { BulkAddPage } from '@/pages/inventory/BulkAdd'
 import { ScheduleHubPage } from '@/pages/schedule/Hub'
 import { TripDetailPage } from '@/pages/schedule/TripDetail'
 import { EnricosSummerTripPage } from '@/pages/schedule/EnricosSummerTrip'
+import { ScheduleCalendarPage } from '@/pages/schedule/Calendar'
 
 // Watch Duties
 import { WatchHubPage } from '@/pages/watch/Hub'
@@ -230,6 +231,7 @@ function AppRoutes() {
 
       {/* Schedule — PUBLIC (anyone with link can view). Editing requires login (gated in-page). */}
       <Route path="/schedule" component={ScheduleHubPage} />
+      <Route path="/schedule/calendar" component={ScheduleCalendarPage} />
       <Route path="/schedule/enricos-summer-trip" component={EnricosSummerTripPage} />
       <Route path="/schedule/:id" component={TripDetailPage} />
 
