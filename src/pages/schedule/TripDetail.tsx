@@ -88,7 +88,8 @@ const DayCard = React.forwardRef<HTMLDivElement, {
   return (
     <div
       ref={ref}
-      className={`rounded-2xl border bg-card overflow-hidden ${isToday ? 'border-primary ring-2 ring-primary/40 shadow-[0_0_0_4px_rgba(220,38,38,0.08)]' : 'border-border'}`}
+      id={day.isoDate ? `day-${day.isoDate}` : undefined}
+      className={`rounded-2xl border bg-card overflow-hidden scroll-mt-24 ${isToday ? 'border-primary ring-2 ring-primary/40 shadow-[0_0_0_4px_rgba(220,38,38,0.08)]' : 'border-border'}`}
     >
       <div className={`px-4 py-3 border-b ${isToday ? 'bg-gradient-to-r from-primary/25 to-card border-primary/30' : 'bg-gradient-to-r from-secondary to-card border-border'}`}>
         <div className="flex items-baseline gap-2">
@@ -534,6 +535,29 @@ export function TripDetailPage() {
     if (editMode) return
     if (didScrollToToday.current) return
     if (!trip) return
+
+    // 1) If URL has a #day-YYYY-MM-DD hash, scroll that day into view (takes
+    //    priority over today-highlighting). Used by admin notifications to
+    //    deep-link a specific day of the trip.
+    const hash = typeof window !== 'undefined' ? window.location.hash : ''
+    const hashMatch = hash.match(/^#day-(\d{4}-\d{2}-\d{2})$/)
+    if (hashMatch) {
+      const targetIso = hashMatch[1]
+      const hasTarget = trip.days.some(d => d.isoDate === targetIso)
+      if (hasTarget) {
+        const handle = requestAnimationFrame(() => {
+          const node = document.getElementById(`day-${targetIso}`)
+          if (!node) { didScrollToToday.current = true; return }
+          const header = document.querySelector('header.sticky') as HTMLElement | null
+          const headerH = header ? header.getBoundingClientRect().height : 0
+          const rect = node.getBoundingClientRect()
+          const top = window.scrollY + rect.top - headerH - 12
+          window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+          didScrollToToday.current = true
+        })
+        return () => cancelAnimationFrame(handle)
+      }
+    }
 
     const todayIso = todayIsoLocal()
     const isActive = todayIso >= trip.startDate && todayIso <= trip.endDate
