@@ -25,13 +25,14 @@ import {
   itemAppliesToUnit,
 } from '@/data/calendar-systems'
 import { AIR_HANDLERS } from '@/data/air-handlers'
-import { fetchAllSystemsState } from '@/lib/maintenance-api'
+import { fetchAllSystemsState, readCachedSystemState } from '@/lib/maintenance-api'
 import {
   fetchCalendarServiceEvents,
   buildStatusMap,
   daysSinceIso,
 } from '@/lib/calendar-service-api'
 import { fetchAirHandlerEvents, lastServiceByUnit, daysSince } from '@/lib/air-handlers-api'
+import { TransientBanner } from '@/components/TransientBanner'
 
 interface SystemState {
   currentHours: number | null
@@ -48,9 +49,28 @@ type Filter = 'all' | 'now' | 'week' | 'twoWeeks'
 // color / filter bucketing, not for the numeric display.
 const AVG_HOURS_PER_DAY = 4
 
+// Seed the Hub synchronously from localStorage entries the detail pages
+// (or a previous hub visit) may have already written. Prevents an
+// empty-tile flash on hub reload while the aggregated fetch is in flight.
+function seedHubFromCache(): Record<string, SystemState> {
+  const out: Record<string, SystemState> = {}
+  for (const s of MAINTENANCE_SYSTEMS) {
+    if (!s.kits.length) continue
+    const c = readCachedSystemState(s.id)
+    if (c) {
+      out[s.id] = {
+        currentHours: c.currentHours,
+        lastServiceHoursByKit: c.lastServiceHoursByKit || {},
+        eventsCount: c.events?.length || 0,
+      }
+    }
+  }
+  return out
+}
+
 export function MaintenanceHubPage() {
   const [, setLocation] = useLocation()
-  const [byId, setById] = useState<Record<string, SystemState>>({})
+  const [byId, setById] = useState<Record<string, SystemState>>(() => seedHubFromCache())
   const [calEvents, setCalEvents] = useState<Record<string, Awaited<ReturnType<typeof fetchCalendarServiceEvents>>>>({})
   const [ahEvents, setAhEvents] = useState<Awaited<ReturnType<typeof fetchAirHandlerEvents>>>([])
   const [loading, setLoading] = useState(true)
@@ -108,7 +128,9 @@ export function MaintenanceHubPage() {
       ])
 
       if (cancelled) return
-      setById(hoursResults)
+      // Merge fresh values onto whatever the cache seeded so a partial
+      // failure never wipes tiles back to "no hours logged".
+      setById(prev => ({ ...prev, ...hoursResults }))
       setCalEvents(calResults)
       setAhEvents(ahResults)
       setLoading(false)
@@ -210,9 +232,10 @@ export function MaintenanceHubPage() {
           <FilterChip label="≤ 2 weeks"     active={filter === 'twoWeeks'}  onClick={() => setFilter('twoWeeks')} />
         </div>
 
-        {loading && (
-          <div className="text-xs text-muted-foreground">Loading current hours…</div>
-        )}
+        <TransientBanner
+          message={loading ? 'Refreshing current hours…' : null}
+          variant="info"
+        />
 
         {/* Calendar-based systems (not hours-based) */}
         <div className="space-y-2">

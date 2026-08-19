@@ -572,6 +572,63 @@ async function handleList(_req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({ events })
 }
 
+// ---- warm-invocation cache ------------------------------------------------
+// Vercel keeps this module in memory across warm invocations (typically
+// 5–15 min). Cache the parsed sheet payloads so back-to-back crew hits
+// on the same lambda don't each incur a Sheets read. Cold starts and
+// redeploys reset it, which is fine — Sheets is the source of truth.
+//
+// TTL is short (60s) so that when a crew member records a new service
+// or updates hours, everyone else sees it within a minute even without
+// an explicit cache-bust.
+const SHEETS_MEM_TTL_MS = 60_000
+interface MemEntry<T> { at: number; data: T }
+const memCache = new Map<string, MemEntry<unknown>>()
+
+function memGet<T>(key: string): T | null {
+  const e = memCache.get(key) as MemEntry<T> | undefined
+  if (!e) return null
+  if (Date.now() - e.at > SHEETS_MEM_TTL_MS) {
+    memCache.delete(key)
+    return null
+  }
+  return e.data
+}
+function memPut<T>(key: string, data: T): void {
+  memCache.set(key, { at: Date.now(), data })
+}
+function memInvalidate(prefix: string): void {
+  for (const k of Array.from(memCache.keys())) {
+    if (k.startsWith(prefix)) memCache.delete(k)
+  }
+}
+
+// Fetch both MaintenanceHours and MaintenanceLog once per warm interval.
+interface SheetsSnapshot {
+  hoursRows: any[][]
+  logRows: any[][]
+  fetchedAt: string
+}
+async function getSheetsSnapshot(sheets: any): Promise<SheetsSnapshot> {
+  const cached = memGet<SheetsSnapshot>('snapshot')
+  if (cached) return cached
+  const batch = await withSheetsRetry(
+    () => sheets.spreadsheets.values.batchGet({
+      spreadsheetId: INVENTORY_ID,
+      ranges: ['MaintenanceHours!A:D', 'MaintenanceLog!A:Z'],
+    }),
+    'snapshot',
+  )
+  const [hoursValues, logValues] = batch.data.valueRanges || []
+  const snap: SheetsSnapshot = {
+    hoursRows: hoursValues?.values || [],
+    logRows: logValues?.values || [],
+    fetchedAt: new Date().toISOString(),
+  }
+  memPut('snapshot', snap)
+  return snap
+}
+
 // Retry any Sheets read that fails with a Google 429 / read-quota error.
 // Sheets "Read requests per minute per user" is 300; a single crew member
 // bouncing between pages can burst past that, so we back off and retry
@@ -609,17 +666,9 @@ async function handleAllSystems(_req: VercelRequest, res: VercelResponse) {
   await ensureSheet(sheets, 'MaintenanceLog', LOG_HEADERS)
   await ensureSheet(sheets, 'MaintenanceHours', HOURS_HEADERS)
 
-  const batch = await withSheetsRetry(
-    () => sheets.spreadsheets.values.batchGet({
-      spreadsheetId: INVENTORY_ID,
-      ranges: ['MaintenanceHours!A:D', 'MaintenanceLog!A:Z'],
-    }),
-    'allSystems',
-  )
-  const [hoursValues, logValues] = batch.data.valueRanges || []
-
-  // Hours map
-  const hoursRows = hoursValues?.values || []
+  const snap = await getSheetsSnapshot(sheets)
+  const hoursRows = snap.hoursRows
+  const logValues = { values: snap.logRows } as any
   const hoursBySystem: Record<string, { currentHours: number | null; hoursUpdatedAt: string }> = {}
   for (const r of hoursRows.slice(1)) {
     const sid = String(r[0] || '').trim()
@@ -631,7 +680,7 @@ async function handleAllSystems(_req: VercelRequest, res: VercelResponse) {
   }
 
   // Group log rows by systemId, computing lastServiceHoursByKit and event count.
-  const logRows = logValues?.values || []
+  const logRows = snap.logRows
   const headers = logRows[0] || LOG_HEADERS
   const idxSystem = headers.indexOf('SystemId')
   const idxKits   = headers.indexOf('KitIds')
@@ -678,7 +727,7 @@ async function handleAllSystems(_req: VercelRequest, res: VercelResponse) {
 
   // Cache aggressively at the edge: crew hits the hub over and over.
   res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=15, stale-while-revalidate=60')
-  return res.status(200).json({ systems })
+  return res.status(200).json({ systems, fetchedAt: snap.fetchedAt })
 }
 
 async function handleSystemState(req: VercelRequest, res: VercelResponse) {
@@ -689,25 +738,18 @@ async function handleSystemState(req: VercelRequest, res: VercelResponse) {
   await ensureSheet(sheets, 'MaintenanceLog', LOG_HEADERS)
   await ensureSheet(sheets, 'MaintenanceHours', HOURS_HEADERS)
 
-  // Batch the two reads into a single Sheets API call to halve the
-  // per-minute read-quota footprint per page load.
-  const batch = await withSheetsRetry(
-    () => sheets.spreadsheets.values.batchGet({
-      spreadsheetId: INVENTORY_ID,
-      ranges: ['MaintenanceHours!A:D', 'MaintenanceLog!A:Z'],
-    }),
-    `system(${systemId})`,
-  )
-  const [hoursValues, logValues] = batch.data.valueRanges || []
+  // Reuse the warm-invocation snapshot when we can. Falls back to a
+  // fresh Sheets batchGet on cache miss / TTL expiry.
+  const snap = await getSheetsSnapshot(sheets)
 
   // Current hours
-  const hoursRows = hoursValues?.values || []
+  const hoursRows = snap.hoursRows
   const hoursRow = hoursRows.slice(1).find((r: any[]) => String(r[0] || '').trim() === systemId)
   const currentHours = hoursRow ? Number(hoursRow[1] || 0) : null
   const hoursUpdatedAt = hoursRow ? String(hoursRow[2] || '') : ''
 
   // Past services for this system
-  const logRows = logValues?.values || []
+  const logRows = snap.logRows
   const headers = logRows[0] || LOG_HEADERS
   const idxSystem = headers.indexOf('SystemId')
   const events = logRows.slice(1)
@@ -736,6 +778,8 @@ async function handleSystemState(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  // Same short edge cache as op=allSystems.
+  res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=15, stale-while-revalidate=60')
   return res.status(200).json({
     systemId,
     currentHours,
@@ -787,6 +831,8 @@ async function handleUpdateHours(req: VercelRequest, res: VercelResponse) {
       requestBody: { values: [newRow] },
     })
   }
+  // Bust the warm-invocation cache so the next read reflects this write.
+  memInvalidate('snapshot')
   return res.status(200).json({ ok: true, systemId, hours, updatedAt: now })
 }
 
@@ -938,6 +984,8 @@ async function handleLog(req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  // A new service was logged — wipe the warm cache so everyone sees it.
+  memInvalidate('snapshot')
   return res.status(200).json({
     ok: true,
     eventId,

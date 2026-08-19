@@ -20,6 +20,7 @@ import {
 import { fetchSystemState, updateHours, readCachedSystemState, MaintenanceEvent } from '@/lib/maintenance-api'
 import { ZincRodsGuide, isZincRodItem } from '@/components/ZincRodsGuide'
 import { EQUIPMENT_DATA } from '@/data/equipment-data'
+import { TransientBanner } from '@/components/TransientBanner'
 
 export function GeneratorDetailPage() {
   // Two supported URL shapes:
@@ -142,11 +143,11 @@ export function GeneratorDetailPage() {
   return (
     <MenuLayout title={system.label} showBack backHref="/maintenance">
       <div className="space-y-5">
-        {loadError && !loading && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-200 text-xs px-3 py-2">
-            {loadError}
-          </div>
-        )}
+        <TransientBanner
+          message={loadError}
+          variant={everLoaded ? 'warn' : 'error'}
+          onDismiss={() => setLoadError(null)}
+        />
         {/* Equipment data card */}
         {equip && (
           <div className="rounded-xl border border-border bg-card p-4 space-y-3">
