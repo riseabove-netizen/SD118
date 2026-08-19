@@ -112,6 +112,12 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
         seedLastDone: '2025-11-15',
       },
       {
+        id: 'vent-filter-replace',
+        label: 'Replace black water tank vent filter',
+        detail: 'Yearly. Replace the charcoal / odor vent filter on the black water tank vent line.',
+        interval: { kind: 'yearly' },
+      },
+      {
         id: 'seal-kits',
         label: 'Replace seal kits as necessary',
         detail: 'On-condition. Log each replacement to keep a service history.',
