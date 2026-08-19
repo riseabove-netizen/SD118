@@ -24,6 +24,15 @@ type ReceiptRead = {
   notes: string | null
 }
 
+type PlaidMatch = {
+  txn_id: string
+  date: string
+  merchant: string
+  amount_usd: number
+  currency: string
+  category: string
+} | null
+
 type Photo = {
   id: string
   base64: string        // no data: prefix
@@ -35,6 +44,7 @@ type Photo = {
   driveThumbUrl?: string
   // After OCR:
   read?: ReceiptRead
+  plaidMatch?: PlaidMatch
   // Editable form fields (populated from `read`, user can adjust)
   date: string          // YYYY-MM-DD
   merchant: string
@@ -246,33 +256,52 @@ export function ExpenseIntakePage() {
       if (!data?.ok) throw new Error(data?.error || 'Read failed')
       const reads: ReceiptRead[] = data.receipts || []
 
-      // Apply per-photo; fetch USD FX if only EUR
+      // Match every read receipt against Plaid cache in one batch
+      let matches: PlaidMatch[] = new Array(photos.length).fill(null)
+      try {
+        const queries = photos.map((p, i) => {
+          const r = reads[i]
+          return {
+            account,
+            date: r?.date || p.date,
+            eur: r?.eur ?? null,
+            usd: r?.usd ?? null,
+            merchant: r?.merchant ?? p.merchant ?? null,
+          }
+        })
+        const matchResp = await fetch('/api/expense-plaid-match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ queries }),
+        })
+        const matchData = await matchResp.json()
+        if (matchData?.ok && Array.isArray(matchData.matches)) matches = matchData.matches
+      } catch (matchErr: any) {
+        console.warn('Plaid match failed:', matchErr?.message)
+      }
+
+      // Apply per-photo; blank USD when there is no Plaid match (no ECB fallback)
       const next: Photo[] = []
       for (let i = 0; i < photos.length; i++) {
         const p = photos[i]
         const r = reads[i]
-        if (!r) { next.push({ ...p, reading: false }); continue }
-        // Auto-classify (before user picks guest trip = defaults to not guest)
+        const m = matches[i]
+        if (!r) { next.push({ ...p, reading: false, plaidMatch: m }); continue }
         const cls = autoClassify(r.category_hint, false)
-        let usd = r.usd
-        // Convert EUR→USD if needed
-        if ((usd == null) && r.eur != null && r.eur > 0) {
-          try {
-            const fxDate = r.date || p.date
-            const fxUrl = `/api/expense-fx?amount=${encodeURIComponent(String(r.eur))}&from=EUR&to=USD&date=${encodeURIComponent(fxDate)}`
-            const fxResp = await fetch(fxUrl)
-            const fx = await fxResp.json()
-            if (fx?.ok && Number.isFinite(fx.converted)) usd = fx.converted
-          } catch {}
-        }
+        // USD source of truth: Plaid match if any, else if receipt is already
+        // printed in USD use that, else blank (per user rule).
+        let usd: number | null = null
+        if (m && Number.isFinite(m.amount_usd)) usd = m.amount_usd
+        else if (r.usd != null) usd = r.usd
         next.push({
           ...p,
           reading: false,
           read: r,
+          plaidMatch: m,
           merchant: r.merchant || p.merchant,
           date: r.date || p.date,
           eur: r.eur != null ? String(r.eur) : p.eur,
-          usd: usd != null ? String(usd) : p.usd,
+          usd: usd != null ? String(usd) : '',
           project: cls?.project || p.project,
           expenseType: cls?.expenseType || p.expenseType,
           category: cls?.category || p.category,
@@ -487,8 +516,11 @@ export function ExpenseIntakePage() {
                     {p.reading && <div className="text-muted-foreground text-xs">Reading…</div>}
                     {p.read && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        {p.read.currency_hint === 'EUR' && p.read.eur != null && 'Priced in EUR — USD auto-converted at ECB rate'}
-                        {p.read.currency_hint === 'USD' && p.read.usd != null && 'Priced in USD'}
+                        {p.plaidMatch
+                          ? <span className="text-green-400">✓ Matched {p.plaidMatch.merchant} ${p.plaidMatch.amount_usd.toFixed(2)} on {p.plaidMatch.date}</span>
+                          : p.read.currency_hint === 'USD' && p.read.usd != null
+                            ? 'Priced in USD (no Plaid match)'
+                            : <span className="text-amber-400">No Plaid match — fill USD manually or reconcile later</span>}
                       </div>
                     )}
                     {p.submitted && <div className="text-green-400 text-xs">✓ Submitted (row {p.submittedRow})</div>}
