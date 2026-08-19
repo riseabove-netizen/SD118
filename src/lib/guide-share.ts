@@ -57,86 +57,58 @@ export interface PrintGuideArgs {
   markdown: string
 }
 
+// Detect iOS / iPadOS — including iPadOS Safari that masquerades as macOS.
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  if (/iPad|iPhone|iPod/.test(ua)) return true
+  // iPadOS 13+ reports "MacIntel" — detect via touch points on "Mac".
+  return navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1
+}
+
 export function printGuideAsPdf(g: PrintGuideArgs) {
   const html = buildPrintableHtml(g)
 
-  // Create a hidden iframe, write the document, then print it.
-  // Using an iframe (rather than window.open) avoids popup blockers
-  // and keeps the print dialog scoped to the guide content only.
-  const iframe = document.createElement('iframe')
-  iframe.setAttribute('aria-hidden', 'true')
-  iframe.style.position = 'fixed'
-  iframe.style.right = '0'
-  iframe.style.bottom = '0'
-  iframe.style.width = '0'
-  iframe.style.height = '0'
-  iframe.style.border = '0'
-  document.body.appendChild(iframe)
+  // Strategy:
+  //   1) Open a real top-level tab with the printable HTML. This works
+  //      on iOS Safari, macOS Safari, Chrome, Firefox. Hidden iframes'
+  //      .print() is blocked by iOS Safari entirely, which is why the
+  //      previous version silently did nothing on the crew's phones.
+  //   2) Once images have loaded, call window.print() from inside that
+  //      tab. If print() is blocked, the guide is still visible and the
+  //      user can use the browser's own Share → "Save as PDF" / "Print".
+  //   3) If popup blocking prevents the tab from opening (common when
+  //      the call didn't originate from a user gesture, or from an
+  //      installed PWA on iOS), fall back to a full-page navigation via
+  //      a blob URL — no popup needed.
 
-  const doc = iframe.contentDocument || iframe.contentWindow?.document
-  if (!doc) {
-    document.body.removeChild(iframe)
-    // Fallback: open in new window
-    const w = window.open('', '_blank')
-    if (w) {
-      w.document.write(html)
-      w.document.close()
-      w.focus()
-      setTimeout(() => w.print(), 600)
-    }
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+
+  // Some browsers require a synchronous window.open() from the user
+  // gesture. We call it immediately and let the new tab load the blob.
+  const w = window.open(url, '_blank')
+  const revoke = () => setTimeout(() => URL.revokeObjectURL(url), 60_000)
+
+  if (w) {
+    // iOS Safari will NOT honor window.print() called from the parent
+    // frame after navigation completes — the printable HTML itself
+    // includes a small script that fires print() after images load and
+    // also exposes a "Save as PDF" button as a manual fallback.
+    revoke()
     return
   }
 
-  doc.open()
-  doc.write(html)
-  doc.close()
-
-  // Wait for images to load before triggering print so they appear in the PDF
-  const win = iframe.contentWindow
-  if (!win) return
-
-  const triggerPrint = () => {
-    try {
-      win.focus()
-      win.print()
-    } catch {
-      /* ignore */
-    }
-    // Remove the iframe a moment after the print dialog closes
-    setTimeout(() => {
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe)
-    }, 1000)
+  // Popup was blocked — navigate the current tab instead. The user can
+  // hit "back" once the PDF is saved. Not as nice, but it always works.
+  if (isIOS()) {
+    // On iOS, opening a blob: URL in the same tab is reliable; on other
+    // platforms we do the same for consistency.
+    window.location.href = url
+  } else {
+    window.location.href = url
   }
-
-  const imgs = Array.from(doc.images)
-  if (imgs.length === 0) {
-    setTimeout(triggerPrint, 200)
-    return
-  }
-  let pending = imgs.length
-  let done = false
-  const finish = () => {
-    if (done) return
-    pending -= 1
-    if (pending <= 0) {
-      done = true
-      setTimeout(triggerPrint, 150)
-    }
-  }
-  imgs.forEach(img => {
-    if (img.complete) finish()
-    else {
-      img.addEventListener('load', finish)
-      img.addEventListener('error', finish)
-    }
-  })
-  // Safety timeout — print anyway after 8s even if some images stall
-  setTimeout(() => {
-    if (!done) {
-      done = true
-      triggerPrint()
-    }
-  }, 8000)
+  revoke()
 }
 
 function buildPrintableHtml(g: PrintGuideArgs): string {
@@ -244,13 +216,44 @@ function buildPrintableHtml(g: PrintGuideArgs): string {
     color: #777;
     font-size: 8.5pt;
   }
+  .toolbar {
+    position: sticky;
+    top: 0;
+    background: #b91c1c;
+    color: #fff;
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin: -8px -8px 14px -8px;
+    font-size: 12pt;
+    z-index: 10;
+  }
+  .toolbar .btn {
+    background: #fff;
+    color: #b91c1c;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-weight: 700;
+    font-size: 11pt;
+    cursor: pointer;
+  }
+  .toolbar .hint { font-size: 9.5pt; opacity: 0.9; }
   @media print {
     a { color: #111; text-decoration: none; }
-    .no-print { display: none; }
+    .no-print, .toolbar { display: none !important; }
+    body { padding: 0 !important; }
   }
+  body { padding: 8px; }
 </style>
 </head>
 <body>
+  <div class="toolbar no-print">
+    <button type="button" class="btn" onclick="window.print()">Save as PDF</button>
+    <span class="hint">Then choose “Save to Files” or “Print → Save as PDF”</span>
+  </div>
   <div class="header">
     <div class="vessel">M/Y Rise Above · Operational Guide</div>
     <h1>${safeTitle}</h1>
@@ -263,6 +266,34 @@ function buildPrintableHtml(g: PrintGuideArgs): string {
   </div>
   <article>${bodyHtml}</article>
   <div class="footer">Generated from the Rise Above Operations app · ${escapeHtml(new Date().toLocaleString())}</div>
+<script>
+(function () {
+  // Give images a chance to load before triggering print on desktops.
+  // Skip on iOS Safari (window.print inside a fresh blob tab is unreliable
+  // there); the user taps the red "Save as PDF" button instead.
+  var ua = navigator.userAgent || '';
+  var isIos = /iPad|iPhone|iPod/.test(ua) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (isIos) return;
+  var imgs = Array.from(document.images);
+  var pending = imgs.length;
+  var done = false;
+  function go() {
+    if (done) return;
+    done = true;
+    setTimeout(function () { try { window.print(); } catch (e) {} }, 200);
+  }
+  if (pending === 0) { go(); return; }
+  imgs.forEach(function (img) {
+    if (img.complete) { pending--; if (pending <= 0) go(); }
+    else {
+      img.addEventListener('load', function () { pending--; if (pending <= 0) go(); });
+      img.addEventListener('error', function () { pending--; if (pending <= 0) go(); });
+    }
+  });
+  setTimeout(go, 8000);
+})();
+</script>
 </body>
 </html>`
 }
