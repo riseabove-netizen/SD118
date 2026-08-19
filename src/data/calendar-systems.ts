@@ -359,6 +359,34 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
       },
     ],
   },
+
+  // ------------------------------------------------------------------
+  // Watermakers — as-needed pre-filter replacement
+  //
+  // Hour-based service (500h oil change, 1000h membrane) already lives
+  // on the hours-based watermaker system pages. Pre-filter swaps aren't
+  // tied to hours — they're changed when product-water flow drops or
+  // pressure creeps up — so they belong here as an as-needed item on
+  // the same Top / Bottom units.
+  // ------------------------------------------------------------------
+  {
+    id: 'watermakers',
+    label: 'Watermakers',
+    tileEmoji: '💧',
+    tileBlurb: 'Top & bottom units · as-needed pre-filter swaps',
+    units: [
+      { id: 'top',    label: 'Top watermaker' },
+      { id: 'bottom', label: 'Bottom watermaker' },
+    ],
+    items: [
+      {
+        id: 'replace-pre-filters',
+        label: 'Replace pre-filters',
+        detail: 'Swap the sediment / carbon pre-filter elements when flow drops or feed pressure creeps up.',
+        interval: { kind: 'as-needed' },
+      },
+    ],
+  },
 ]
 
 // Which items apply to which unit? Some items only apply to certain
