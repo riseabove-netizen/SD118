@@ -1,0 +1,848 @@
+{
+  "majorDimension": "ROWS",
+  "range": "Definitions!A1:E300",
+  "values": [
+    [
+      "",
+      "Categories",
+      "and subcategories",
+      "Show to user",
+      "Chrissy Corresponding category"
+    ],
+    [
+      "Operating",
+      "Purchase expenses",
+      "Flights"
+    ],
+    [
+      "Operating",
+      "Purchase expenses",
+      "Hotel"
+    ],
+    [
+      "Operating",
+      "Purchase expenses",
+      "Meals"
+    ],
+    [
+      "Operating",
+      "Purchase expenses",
+      "Uber"
+    ],
+    [
+      "Operating",
+      "Purchase expenses",
+      "Miscellaneous"
+    ],
+    [
+      "Operating",
+      "Administrative",
+      "Bank service charges",
+      "",
+      "Bank service charges"
+    ],
+    [
+      "Operating",
+      "Administrative",
+      "Filing fees",
+      "",
+      "Filing fees"
+    ],
+    [
+      "Operating",
+      "Administrative",
+      "Legal fees",
+      "",
+      "Legal fees"
+    ],
+    [
+      "Operating",
+      "Administrative",
+      "license Fees",
+      "",
+      "license Fees"
+    ],
+    [
+      "Operating",
+      "Capex",
+      "Water Toys"
+    ],
+    [
+      "Operating",
+      "Crew expenses",
+      "Flights",
+      "",
+      "Airfare"
+    ],
+    [
+      "Operating",
+      "Crew expenses",
+      "Health insurance",
+      "",
+      "Health Insurance"
+    ],
+    [
+      "Operating",
+      "Crew expenses",
+      "Hotel",
+      "",
+      "Hotel"
+    ],
+    [
+      "Operating",
+      "Crew expenses",
+      "Training",
+      "",
+      "Training"
+    ],
+    [
+      "Operating",
+      "Crew expenses",
+      "Transportation",
+      "",
+      "Transportation"
+    ],
+    [
+      "Operating",
+      "Delivery expenses",
+      "Crew flights",
+      "",
+      "Airfare"
+    ],
+    [
+      "Operating",
+      "Delivery expenses",
+      "Crew meals",
+      "",
+      "Crew Meals"
+    ],
+    [
+      "Operating",
+      "Delivery expenses",
+      "Dockage",
+      "",
+      "Dockage"
+    ],
+    [
+      "Operating",
+      "Delivery expenses",
+      "Fuel",
+      "",
+      "Yacht Fuel"
+    ],
+    [
+      "Operating",
+      "Delivery expenses",
+      "Other"
+    ],
+    [
+      "Operating",
+      "Delivery expenses",
+      "Provisions"
+    ],
+    [
+      "Operating",
+      "Delivery expenses",
+      "Transportation",
+      "",
+      "Transportation"
+    ],
+    [
+      "Operating",
+      "Delivery expenses",
+      "Uniforms",
+      "",
+      "Uniforms"
+    ],
+    [
+      "Operating",
+      "Guest trip",
+      "Crew meals",
+      "",
+      "Meals and Entertainment"
+    ],
+    [
+      "Operating",
+      "Guest trip",
+      "Cabs",
+      "yes"
+    ],
+    [
+      "Operating",
+      "Guest trip",
+      "Dockage",
+      "",
+      "Dockage"
+    ],
+    [
+      "Operating",
+      "Guest trip",
+      "Dry cleaning",
+      "",
+      "Dry Cleaning"
+    ],
+    [
+      "Operating",
+      "Guest trip",
+      "Fuel",
+      "yes",
+      "Yacht Fuel"
+    ],
+    [
+      "Operating",
+      "Guest trip",
+      "Other"
+    ],
+    [
+      "Operating",
+      "Guest trip",
+      "Provisions / Guest meals",
+      "yes",
+      "Meals and Entertainment"
+    ],
+    [
+      "Operating",
+      "Maintenance",
+      "Bottom cleaning",
+      "",
+      "Yacht Repairs and Maintenance"
+    ],
+    [
+      "Operating",
+      "Maintenance",
+      "Other",
+      "",
+      "Yacht Repairs and Maintenance"
+    ],
+    [
+      "Operating",
+      "Maintenance",
+      "Preventative maintenance",
+      "",
+      "Yacht Repairs and Maintenance"
+    ],
+    [
+      "Operating",
+      "Maintenance",
+      "Spares",
+      "",
+      "Yacht Repairs and Maintenance"
+    ],
+    [
+      "Operating",
+      "Maintenance",
+      "Toy maintenance",
+      "yes",
+      "Tender"
+    ],
+    [
+      "Operating",
+      "Maintenance",
+      "Yard yearlies",
+      "",
+      "Yard Storage Fees"
+    ],
+    [
+      "Operating",
+      "Miscellaneous",
+      "Added to Boat cash"
+    ],
+    [
+      "Operating",
+      "Miscellaneous",
+      "Miscellaneous"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Automobile expense",
+      "yes",
+      "Automobile expense"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Automobile Fuel",
+      "yes",
+      "Automobile Fuel"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Boat provisions",
+      "yes",
+      "Crew Meals"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Crew Meals"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Dues and subscriptions",
+      "",
+      "Dues and subscriptions"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Exterior supplies",
+      "yes",
+      "Yacht Supplies"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Interior supplies",
+      "yes",
+      "Yacht Supplies"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Liquor / Soft drinks",
+      "yes"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Medicine / Pharmacy",
+      "yes"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Other"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Satellite internet",
+      "",
+      "Computer and Internet Expenses"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Streaming services",
+      "",
+      "Cable"
+    ],
+    [
+      "Operating",
+      "Recurrent",
+      "Seatow yearly"
+    ],
+    [
+      "Operating",
+      "Repairs",
+      "Other",
+      "",
+      "Yacht Supplies"
+    ],
+    [
+      "Operating",
+      "Repairs",
+      "Tender repairs",
+      "yes",
+      "Tender"
+    ],
+    [
+      "Operating",
+      "Repairs",
+      "Water Toys",
+      "yes"
+    ],
+    [
+      "Operating",
+      "Repairs",
+      "Tools / Hardware",
+      "yes",
+      "Yacht Repairs and Maintenance"
+    ],
+    [
+      "Operating",
+      "Repairs",
+      "Vessel repairs",
+      "",
+      "Yacht Repairs and Maintenance"
+    ],
+    [
+      "Purchase cost",
+      "Outfitting cost",
+      "Exterior supplies"
+    ],
+    [
+      "Purchase cost",
+      "Outfitting cost",
+      "Sanitizing"
+    ],
+    [
+      "Purchase cost",
+      "Outfitting cost",
+      "Interior supplies"
+    ],
+    [
+      "Purchase cost",
+      "Outfitting cost",
+      "Engine room supplies"
+    ],
+    [
+      "Purchase cost",
+      "Outfitting cost",
+      "Dayworkers"
+    ],
+    [
+      "Purchase cost",
+      "Outfitting cost",
+      "Spares"
+    ],
+    [
+      "Purchase cost",
+      "Outfitting cost",
+      "Polish & Ceramic"
+    ],
+    [
+      "Purchase cost",
+      "Outfitting cost",
+      "Change of Ownership items"
+    ],
+    [
+      "Purchase cost",
+      "Outfitting cost",
+      "Water toys"
+    ],
+    [
+      "Purchase cost",
+      "Purchase cost",
+      "Supplies for repairs"
+    ],
+    [
+      "Purchase cost",
+      "Purchase cost",
+      "Fuel for initial delivery"
+    ],
+    [
+      "Purchase cost",
+      "Purchase cost",
+      "Change of ownership"
+    ],
+    [
+      "Purchase cost",
+      "Purchase cost",
+      "Owner Customizations"
+    ],
+    [
+      "Purchase cost",
+      "Purchase cost",
+      "Coffee Machine"
+    ],
+    [
+      "Purchase cost",
+      "Outfitting cost",
+      "Tools"
+    ],
+    [
+      "Purchase cost",
+      "Outfitting cost",
+      "Crew Uniforms"
+    ],
+    [
+      "Purchase cost",
+      "Purchase cost",
+      "Change of flag"
+    ],
+    [
+      "Purchase cost",
+      "Crew Salaries",
+      "First mate"
+    ],
+    [
+      "Purchase cost",
+      "Crew Salaries",
+      "Deckhand"
+    ],
+    [
+      "Purchase cost",
+      "Crew Salaries",
+      "Chief Stew"
+    ],
+    [
+      "Purchase cost",
+      "Crew Salaries",
+      "Second Stew"
+    ],
+    [
+      "Purchase cost",
+      "Crew Salaries",
+      "Deck Stew"
+    ],
+    [
+      "Purchase cost",
+      "Crew Salaries",
+      "Chef"
+    ],
+    [
+      "Purchase cost",
+      "Vessel Improvements",
+      "Dumbwaiter Refit"
+    ],
+    [
+      "Purchase cost",
+      "Vessel Improvements",
+      "Crew mattresses"
+    ],
+    [
+      "Purchase cost",
+      "Vessel Improvements",
+      "Crew table"
+    ],
+    [
+      "Purchase cost",
+      "Vessel Improvements",
+      "Power converter"
+    ],
+    [
+      "Purchase cost",
+      "Vessel Improvements",
+      "Dayhead & Aft deck island"
+    ],
+    [
+      "Purchase cost",
+      "Vessel Improvements",
+      "Spot zero"
+    ],
+    [
+      "Purchase cost",
+      "Vessel Improvements",
+      "Marble polish"
+    ],
+    [
+      "Purchase cost",
+      "Vessel Improvements",
+      "Misc vessel setup cost"
+    ],
+    [
+      "Operating",
+      "Crew Salaries",
+      "First mate"
+    ],
+    [
+      "Operating",
+      "Crew Salaries",
+      "Deckhand"
+    ],
+    [
+      "Operating",
+      "Crew Salaries",
+      "Chief Stew"
+    ],
+    [
+      "Operating",
+      "Crew Salaries",
+      "Second Stew"
+    ],
+    [
+      "Operating",
+      "Crew Salaries",
+      "Deck Stew"
+    ],
+    [
+      "Operating",
+      "Crew Salaries",
+      "Chef"
+    ],
+    [
+      "Purchase cost",
+      "Bureaucratic costs",
+      "TPA fees"
+    ],
+    [
+      "Purchase cost",
+      "Bureaucratic costs",
+      "Yard Misc fees"
+    ],
+    [
+      "Purchase cost",
+      "Purchase expenses",
+      "Flights"
+    ],
+    [
+      "Purchase cost",
+      "Purchase expenses",
+      "Hotel"
+    ],
+    [
+      "Purchase cost",
+      "Purchase expenses",
+      "Meals"
+    ],
+    [
+      "Purchase cost",
+      "Purchase expenses",
+      "Uber"
+    ],
+    [
+      "Purchase cost",
+      "Purchase expenses",
+      "Miscellaneous"
+    ],
+    [
+      "Purchase cost",
+      "Administrative",
+      "Bank service charges"
+    ],
+    [
+      "Purchase cost",
+      "Administrative",
+      "Filing fees"
+    ],
+    [
+      "Purchase cost",
+      "Administrative",
+      "Legal fees"
+    ],
+    [
+      "Purchase cost",
+      "Administrative",
+      "license Fees"
+    ],
+    [
+      "Purchase cost",
+      "Capex",
+      "Water Toys"
+    ],
+    [
+      "Purchase cost",
+      "Crew expenses",
+      "Flights"
+    ],
+    [
+      "Purchase cost",
+      "Crew expenses",
+      "Health insurance"
+    ],
+    [
+      "Purchase cost",
+      "Crew expenses",
+      "Hotel"
+    ],
+    [
+      "Purchase cost",
+      "Crew expenses",
+      "Training"
+    ],
+    [
+      "Purchase cost",
+      "Crew expenses",
+      "Transportation"
+    ],
+    [
+      "Purchase cost",
+      "Delivery expenses",
+      "Crew flights"
+    ],
+    [
+      "Purchase cost",
+      "Delivery expenses",
+      "Crew meals"
+    ],
+    [
+      "Purchase cost",
+      "Delivery expenses",
+      "Dockage"
+    ],
+    [
+      "Purchase cost",
+      "Delivery expenses",
+      "Fuel"
+    ],
+    [
+      "Purchase cost",
+      "Delivery expenses",
+      "Other"
+    ],
+    [
+      "Purchase cost",
+      "Delivery expenses",
+      "Provisions"
+    ],
+    [
+      "Purchase cost",
+      "Delivery expenses",
+      "Transportation"
+    ],
+    [
+      "Purchase cost",
+      "Delivery expenses",
+      "Uniforms"
+    ],
+    [
+      "Purchase cost",
+      "Maintenance",
+      "Bottom cleaning"
+    ],
+    [
+      "Purchase cost",
+      "Maintenance",
+      "Other"
+    ],
+    [
+      "Purchase cost",
+      "Maintenance",
+      "Preventative maintenance"
+    ],
+    [
+      "Purchase cost",
+      "Maintenance",
+      "Spares"
+    ],
+    [
+      "Purchase cost",
+      "Maintenance",
+      "Toy maintenance"
+    ],
+    [
+      "Purchase cost",
+      "Maintenance",
+      "Yard yearlies"
+    ],
+    [
+      "Purchase cost",
+      "Maintenance",
+      "Anodes"
+    ],
+    [
+      "Purchase cost",
+      "Miscellaneous",
+      "Added to Boat cash"
+    ],
+    [
+      "Purchase cost",
+      "Miscellaneous",
+      "Miscellaneous"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Automobile expense"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Automobile Fuel"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Boat provisions"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Crew Meals"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Dues and subscriptions"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Exterior supplies"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Interior supplies"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Liquor / Soft drinks"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Medicine / Pharmacy"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Other"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Satellite internet"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Streaming services"
+    ],
+    [
+      "Purchase cost",
+      "Recurrent",
+      "Seatow yearly"
+    ],
+    [
+      "Purchase cost",
+      "Repairs",
+      "Other"
+    ],
+    [
+      "Purchase cost",
+      "Repairs",
+      "Tender repairs"
+    ],
+    [
+      "Purchase cost",
+      "Repairs",
+      "Water Toys"
+    ],
+    [
+      "Purchase cost",
+      "Repairs",
+      "Tools / Hardware"
+    ],
+    [
+      "Purchase cost",
+      "Repairs",
+      "AC Repairs"
+    ],
+    [
+      "Purchase cost",
+      "Repairs",
+      "Vessel repairs"
+    ],
+    [
+      "Purchase cost",
+      "Repairs",
+      "Running gear repair"
+    ],
+    [
+      "RINA",
+      "Survey cost",
+      "Yearly + 5 year"
+    ],
+    [
+      "RINA",
+      "5-Year costs",
+      "Through Hulls"
+    ],
+    [
+      "Purchase cost",
+      "Yard cost",
+      "Vessel Supplies"
+    ],
+    [
+      "Purchase cost",
+      "Yard cost",
+      "Yard fees"
+    ]
+  ]
+}

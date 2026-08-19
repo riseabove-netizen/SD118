@@ -142,6 +142,13 @@ export function MenuPage() {
           description="Spares & consumables onboard"
         />
         <MenuItem
+          icon="🧾"
+          id="expenses"
+          label="Expense intake"
+          href="/expenses"
+          description="Snap receipts, auto-read amounts, file to spreadsheet"
+        />
+        <MenuItem
           icon="⚙️"
           id="settings"
           label="Settings"

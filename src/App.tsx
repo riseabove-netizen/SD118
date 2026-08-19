@@ -10,6 +10,7 @@ import { SetNamePage } from '@/pages/SetName'
 import { MenuPage } from '@/pages/Menu'
 import { SettingsPage } from '@/pages/Settings'
 import { AdminBroadcastPage } from '@/pages/AdminBroadcast'
+import { ExpenseIntakePage } from '@/pages/expenses/Intake'
 
 // Running Log
 import { UploadPage } from '@/pages/runlog/Upload'
@@ -117,6 +118,9 @@ function AppRoutes() {
       </Route>
       <Route path="/admin/notify">
         <AuthGuard><AdminBroadcastPage /></AuthGuard>
+      </Route>
+      <Route path="/expenses">
+        <AuthGuard><ExpenseIntakePage /></AuthGuard>
       </Route>
 
       {/* Running Log */}
