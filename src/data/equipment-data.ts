@@ -15,6 +15,10 @@ export interface EquipmentDataEntry {
   rows: EquipmentDataRow[]
   manualUrl?: string
   manualLabel?: string
+  // Optional link to an in-app Operational Guide (Guides sheet id).
+  // Renders as an internal link → /guides/<id>.
+  procedureGuideId?: string
+  procedureLabel?: string
 }
 
 export const EQUIPMENT_DATA: Record<string, EquipmentDataEntry> = {
@@ -64,5 +68,17 @@ export const EQUIPMENT_DATA: Record<string, EquipmentDataEntry> = {
       { label: 'Model', value: 'HL-Cont Compact 0125' },
       { label: 'Serial number', value: '11722' },
     ],
+  },
+  'grey-black-pump-left': {
+    title: 'Grey / black-water pump — Left',
+    rows: [],
+    procedureGuideId: 'bw-truck-pump-out',
+    procedureLabel: 'B/W truck pump-out procedure',
+  },
+  'grey-black-pump-right': {
+    title: 'Grey / black-water pump — Right',
+    rows: [],
+    procedureGuideId: 'bw-truck-pump-out',
+    procedureLabel: 'B/W truck pump-out procedure',
   },
 }

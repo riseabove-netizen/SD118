@@ -157,18 +157,20 @@ export function GeneratorDetailPage() {
                 {equip.title}
               </div>
             </div>
-            <div className="rounded-md border border-border/60 overflow-hidden">
-              <table className="w-full text-xs">
-                <tbody>
-                  {equip.rows.map((r, i) => (
-                    <tr key={r.label} className={i % 2 === 0 ? 'bg-background/30' : ''}>
-                      <td className="px-3 py-1.5 text-muted-foreground border-b border-border/40 w-1/2">{r.label}</td>
-                      <td className="px-3 py-1.5 font-mono text-foreground border-b border-border/40">{r.value}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {equip.rows.length > 0 && (
+              <div className="rounded-md border border-border/60 overflow-hidden">
+                <table className="w-full text-xs">
+                  <tbody>
+                    {equip.rows.map((r, i) => (
+                      <tr key={r.label} className={i % 2 === 0 ? 'bg-background/30' : ''}>
+                        <td className="px-3 py-1.5 text-muted-foreground border-b border-border/40 w-1/2">{r.label}</td>
+                        <td className="px-3 py-1.5 font-mono text-foreground border-b border-border/40">{r.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             {equip.manualUrl && (
               <a
                 href={equip.manualUrl}
@@ -181,6 +183,15 @@ export function GeneratorDetailPage() {
                   <span className="text-muted-foreground"> — {equip.manualLabel}</span>
                 )}
                 <span aria-hidden>↗</span>
+              </a>
+            )}
+            {equip.procedureGuideId && (
+              <a
+                href={`/guides/${equip.procedureGuideId}`}
+                className="inline-flex items-center gap-1.5 text-xs text-red-400 hover:underline"
+              >
+                📋 {equip.procedureLabel || 'View procedure'}
+                <span aria-hidden>→</span>
               </a>
             )}
           </div>
