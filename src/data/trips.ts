@@ -1206,6 +1206,11 @@ export const TRIPS: Trip[] = [
         isoDate: '2026-08-30',
         title: 'Valletta — Three Cities & Old Town',
         subtitle: 'Malta · UNESCO World Heritage',
+        dock: {
+          marina: 'Marina di Valletta',
+          marinaLink: mapsLink('Marina di Valletta'),
+          notes: 'At the dock through Sep 8 · Malta base for wedding chapter.',
+        },
         events: [
           { title: 'Birgu · Senglea · Cospicua by water taxi', time: '10:00', link: mapsLink('Birgu Vittoriosa Malta'), highlight: true },
           { title: 'Palace of the Grand Masters — second visit', time: '14:00' },
@@ -1220,6 +1225,11 @@ export const TRIPS: Trip[] = [
         subtitle: 'Malta · 5,000-year-old history',
         imageUrl: satelliteImage('14.39,35.88,14.44,35.91', '640,320'),
         imageCaption: 'Mdina — the Silent City, medieval hilltop',
+        dock: {
+          marina: 'Marina di Valletta',
+          marinaLink: mapsLink('Marina di Valletta'),
+          notes: 'At the dock through Sep 8 · Malta base for wedding chapter.',
+        },
         events: [
           { title: 'Ħaġar Qim & Mnajdra megalithic temples', time: '09:30', link: mapsLink('Hagar Qim Mnajdra Malta'), details: ['5,000 years old', 'Older than Stonehenge and the pyramids'], highlight: true, locationImage: satelliteImage('14.42,35.81,14.46,35.84', '320,160') },
           { title: 'Mdina — the Silent City, hilltop views', time: '14:00', link: mapsLink('Mdina Silent City Malta'), locationImage: satelliteImage('14.39,35.88,14.44,35.91', '320,160') },
@@ -1231,10 +1241,15 @@ export const TRIPS: Trip[] = [
         date: 'Tuesday · Sep 1',
         isoDate: '2026-09-01',
         title: 'Comino — Blue Lagoon',
-        subtitle: 'Malta · Anchor Day · Turquoise Cove',
+        subtitle: 'Malta · Day cruise to Comino · Back to Valletta overnight',
         imageUrl: satelliteImage('14.30,36.00,14.37,36.04', '640,320'),
         imageCaption: 'Blue Lagoon — impossibly clear turquoise between Comino & Cominotto',
-        overnight: 'Return to Marina di Valletta',
+        dock: {
+          marina: 'Marina di Valletta',
+          marinaLink: mapsLink('Marina di Valletta'),
+          notes: 'Day trip to Comino · Overnight back at Marina di Valletta (dock kept through Sep 8).',
+        },
+        overnight: 'Marina di Valletta',
         events: [
           { title: 'Early-morning Blue Lagoon anchor — before day-trippers', time: '07:00', link: mapsLink('Blue Lagoon Comino Malta'), highlight: true },
           { title: 'Snorkel · swim · paddleboard the crystal shallows' },
@@ -1247,6 +1262,11 @@ export const TRIPS: Trip[] = [
         isoDate: '2026-09-02',
         title: 'WWII Heritage & War Rooms',
         subtitle: 'Malta · George Cross History',
+        dock: {
+          marina: 'Marina di Valletta',
+          marinaLink: mapsLink('Marina di Valletta'),
+          notes: 'At the dock through Sep 8 · Malta base for wedding chapter.',
+        },
         events: [
           { title: 'Lascaris War Rooms — WWII underground HQ', time: '10:00', link: mapsLink('Lascaris War Rooms Valletta'), highlight: true },
           { title: 'Malta at War Museum — George Cross story', time: '13:30' },
@@ -1260,7 +1280,12 @@ export const TRIPS: Trip[] = [
         subtitle: 'Comino · Blue Lagoon day charter · ≈30 guests aboard',
         imageUrl: satelliteImage('14.30,36.00,14.37,36.04', '640,320'),
         imageCaption: 'Blue Lagoon, Comino — turquoise between Comino & Cominotto',
-        overnight: 'Return to Marina di Valletta',
+        dock: {
+          marina: 'Marina di Valletta',
+          marinaLink: mapsLink('Marina di Valletta'),
+          notes: 'Day charter to Blue Lagoon · Overnight back at Marina di Valletta (dock kept through Sep 8).',
+        },
+        overnight: 'Marina di Valletta',
         events: [
           { title: 'Guest muster & briefing — lifejackets, tender ops, headcount', time: '08:00', highlight: true, details: ['≈30 guests aboard for the day', 'Extra staff on deck · water toys prepped'] },
           { title: 'Depart Marina di Valletta for Blue Lagoon', time: '09:00' },
@@ -1277,6 +1302,11 @@ export const TRIPS: Trip[] = [
         isoDate: '2026-09-04',
         title: 'Culture & Fine Dining',
         subtitle: 'Malta · Arts & Gastronomy',
+        dock: {
+          marina: 'Marina di Valletta',
+          marinaLink: mapsLink('Marina di Valletta'),
+          notes: 'At the dock through Sep 8 · Malta base for wedding chapter.',
+        },
         events: [
           { title: 'MUZA — National Museum of Art at Auberge d\'Italie', time: '11:00', link: mapsLink('MUZA Valletta') },
           { title: 'Manoel Theatre performance — 1731', time: '19:30', link: mapsLink('Manoel Theatre Valletta'), details: ['One of Europe’s oldest working theatres'], highlight: true },
@@ -1291,6 +1321,11 @@ export const TRIPS: Trip[] = [
         subtitle: 'Malta · Leisure Day',
         imageUrl: satelliteImage('14.49,35.91,14.51,35.92', '640,320'),
         imageCaption: 'Balluta Bay · Sliema waterfront promenade',
+        dock: {
+          marina: 'Marina di Valletta',
+          marinaLink: mapsLink('Marina di Valletta'),
+          notes: 'At the dock through Sep 8 · Malta base for wedding chapter.',
+        },
         events: [
           { title: 'Balluta Bay swim', time: '11:00', link: mapsLink('Balluta Bay St Julians'), highlight: true, locationImage: satelliteImage('14.49,35.91,14.51,35.92', '320,160') },
           { title: 'Sliema waterfront promenade', time: '14:00', link: mapsLink('Sliema waterfront Malta'), locationImage: satelliteImage('14.49,35.90,14.52,35.92', '320,160') },
@@ -1303,6 +1338,11 @@ export const TRIPS: Trip[] = [
         isoDate: '2026-09-06',
         title: 'Wedding Party Recovery Day',
         subtitle: 'Malta · Dockage day · Rest before farewell',
+        dock: {
+          marina: 'Marina di Valletta',
+          marinaLink: mapsLink('Marina di Valletta'),
+          notes: 'At the dock through Sep 8 · Malta base for wedding chapter.',
+        },
         events: [
           { title: 'Rest & spa day aboard', time: '10:00', highlight: true },
           { title: 'Last souvenirs in the city', time: '15:00' },
@@ -1315,6 +1355,11 @@ export const TRIPS: Trip[] = [
         isoDate: '2026-09-07',
         title: 'Malta Reset — Guest Turnover Prep',
         subtitle: 'La Valletta marina · Prepare cabins for post-wedding chapter',
+        dock: {
+          marina: 'Marina di Valletta',
+          marinaLink: mapsLink('Marina di Valletta'),
+          notes: 'At the dock through Sep 8 · Guest turnover day.',
+        },
         events: [
           { title: 'Provisioning for the Adriatic voyage', time: '09:00' },
           { title: 'Cabin turnover, laundry, deep clean', time: '10:00' },
@@ -1328,6 +1373,12 @@ export const TRIPS: Trip[] = [
         isoDate: '2026-09-08',
         title: 'Farewell Malta — Depart for Gozo',
         subtitle: 'La Valletta marina → Mgarr, Gozo · Short morning hop',
+        dock: {
+          marina: 'Marina di Valletta',
+          marinaLink: mapsLink('Marina di Valletta'),
+          etd: '08:00',
+          notes: 'Final morning at the dock · Depart 08:00 for Gozo.',
+        },
         events: [
           { title: 'Final departure checks', time: '07:00' },
           { title: 'Depart Marina di Valletta for Gozo', time: '08:00', highlight: true },
