@@ -123,13 +123,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             })
             const prevValidation = prevMeta.data.sheets?.[0]?.data?.[0]?.rowData?.[0]?.values?.[0]?.dataValidation
             const prevRef = prevValidation?.condition?.values?.[0]?.userEnteredValue || ''
-            const mm = prevRef.match(/Dropdown1!(\d+):/)
+            // Match Dropdown1!<row>:<row>, tolerating any $ (absolute) markers
+            // Google inserts, e.g. Dropdown1!$442:$442 or Dropdown1!442:442.
+            const mm = prevRef.match(/Dropdown1!\$?(\d+):/)
             if (mm) {
               const prevDropdownRow = parseInt(mm[1], 10)
               // Same offset for our new row: prevDropdownRow was for prevRow;
               // next row keeps the same offset.
               const offset = prevDropdownRow - prevRow
               dropdownRow = rowNum + offset
+            } else {
+              console.warn('Could not parse Dropdown1 ref from prev row:', prevRef)
             }
           } catch (offsetErr: any) {
             console.warn('Could not discover dropdown offset, using rowNum:', offsetErr?.message)
