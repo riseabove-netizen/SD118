@@ -17,7 +17,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
 import webpush from 'web-push'
-import TRIPS_DATA from './_trips-data.json'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import crypto from 'crypto'
 
 // ---------- auth helpers (inlined; must match api/trips.ts + api/auth.ts) ----------
@@ -712,8 +713,26 @@ async function handlePrefillTomorrow(req: VercelRequest, res: VercelResponse) {
   const isoDate = fmt.format(tomorrow) // YYYY-MM-DD
 
   // Trip data is generated at build time from src/data/trips.ts into
-  // ./_trips-data.json so the Vercel bundler ships it into this lambda.
-  const ALL_TRIPS = TRIPS_DATA as any[]
+  // ./_trips-data.json. Load it from the lambda's on-disk sibling.
+  let ALL_TRIPS: any[] = []
+  try {
+    // process.cwd() in Vercel is typically /var/task, and api files live at /var/task/api/...
+    const candidates = [
+      join(process.cwd(), 'api', '_trips-data.json'),
+      join(process.cwd(), '_trips-data.json'),
+    ]
+    let loaded = false
+    for (const p of candidates) {
+      try {
+        ALL_TRIPS = JSON.parse(readFileSync(p, 'utf8'))
+        loaded = true
+        break
+      } catch {}
+    }
+    if (!loaded) throw new Error('_trips-data.json not found in ' + candidates.join(', '))
+  } catch (e: any) {
+    return res.status(500).json({ error: 'trip data unavailable', detail: e?.message || String(e) })
+  }
   let match: { tripId: string; tripName: string; day: any } | null = null
   for (const trip of ALL_TRIPS) {
     const day = trip.days.find((d: any) => d.isoDate === isoDate)
