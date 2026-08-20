@@ -41,8 +41,22 @@ function getAuth() {
   })
 }
 
-function normDate(s: string): string {
-  return (s || '').replace(/\//g, '-').slice(0, 10)
+// Google Sheets serial-date epoch: December 30 1899
+const SHEETS_EPOCH_MS = Date.UTC(1899, 11, 30)
+
+function normDate(v: any): string {
+  if (v == null || v === '') return ''
+  // Numeric serial date (Google Sheets returns unformatted dates as serials)
+  if (typeof v === 'number' && Number.isFinite(v)) {
+    const ms = SHEETS_EPOCH_MS + Math.floor(v) * 86400000
+    const d = new Date(ms)
+    const y = d.getUTCFullYear()
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(d.getUTCDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+  // String form: 'YYYY/MM/DD' or 'YYYY-MM-DD'
+  return String(v).replace(/\//g, '-').slice(0, 10)
 }
 
 function normMerchant(s: string): string {
@@ -100,7 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const startIdx = Math.max(0, allRows.length - SCAN_ROWS)
     const recent = allRows.slice(startIdx).map((r, i) => ({
       rowNum: 2 + startIdx + i,
-      date: normDate(String(r[0] ?? '')),
+      date: normDate(r[0]),
       account: String(r[1] ?? ''),
       store: String(r[6] ?? ''),
       usd: parseNumber(r[7]),
