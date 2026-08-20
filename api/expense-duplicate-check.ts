@@ -28,17 +28,15 @@ function cleanEnv(v: string | undefined): string | undefined {
   return s
 }
 
-const SPREADSHEET_ID = cleanEnv(process.env.EXPENSES_SPREADSHEET_ID) || cleanEnv(process.env.SPREADSHEET_ID) || ''
+const SPREADSHEET_ID = '1XBBy8ma5WmQNW2ix-K6JyBaJB7kvnXQoExGttcSu_Wk'
 const SHEET_TITLE = 'Expenses'
 const SCAN_ROWS = 200
 
 function getAuth() {
-  const raw = cleanEnv(process.env.GOOGLE_SERVICE_ACCOUNT_JSON) || cleanEnv(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) || ''
-  if (!raw) throw new Error('Missing service account credentials')
-  const creds = JSON.parse(raw)
-  return new google.auth.JWT({
-    email: creds.client_email,
-    key: creds.private_key,
+  const keyJson = cleanEnv(process.env.GOOGLE_SERVICE_ACCOUNT_KEY)
+  if (!keyJson) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY not set')
+  return new google.auth.GoogleAuth({
+    credentials: JSON.parse(keyJson),
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
   })
 }
