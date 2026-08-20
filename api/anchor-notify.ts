@@ -17,6 +17,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
 import webpush from 'web-push'
+import { TRIPS as ALL_TRIPS } from '../src/data/trips'
 import crypto from 'crypto'
 
 // ---------- auth helpers (inlined; must match api/trips.ts + api/auth.ts) ----------
@@ -710,11 +711,9 @@ async function handlePrefillTomorrow(req: VercelRequest, res: VercelResponse) {
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
   const isoDate = fmt.format(tomorrow) // YYYY-MM-DD
 
-  // Import TRIPS from the frontend data file. Vite path aliases don't apply to API routes;
-  // use a relative import.
-  const trips = (await import('../src/data/trips')).TRIPS
+  // TRIPS is statically imported so the Vercel bundler includes trips.ts in this lambda.
   let match: { tripId: string; tripName: string; day: any } | null = null
-  for (const trip of trips) {
+  for (const trip of ALL_TRIPS) {
     const day = trip.days.find((d: any) => d.isoDate === isoDate)
     if (day) { match = { tripId: trip.id, tripName: trip.name, day }; break }
   }
