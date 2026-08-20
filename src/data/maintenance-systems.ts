@@ -299,6 +299,32 @@ const WATERMAKER_KITS: MaintenanceKit[] = [
   WATERMAKER_1000H_KIT,
 ]
 
+// ---------------- Hamann sewage-system kits ----------------
+//
+// The Hamann treatment unit has one hour-based service point: clean the
+// UV lamp every 500 running hours. It's cumulative like the watermaker
+// kits (500, 1000, 1500 h ...). No initial hours or last-service hint
+// yet — crew will type the current reading into the perform screen the
+// first time it's serviced; until then the tile renders 'due now' from 0.
+
+const HAMANN_500H_KIT: MaintenanceKit = {
+  id: '500h',
+  interval: 500,
+  label: '500h UV lamp cleaning',
+  shortLabel: '500h',
+  checklist: [
+    {
+      id: 'clean-uv-lamp',
+      label: 'Clean UV light',
+      detail: 'Isolate the treatment unit, remove the UV lamp / quartz sleeve, wipe scale and fouling off the sleeve, inspect the lamp for cracks or discolouration, refit and test.',
+    },
+  ],
+}
+
+const HAMANN_KITS: MaintenanceKit[] = [
+  HAMANN_500H_KIT,
+]
+
 // ---------------- System catalog ----------------
 
 export const MAINTENANCE_SYSTEMS: MaintenanceSystem[] = [
@@ -384,7 +410,7 @@ export const MAINTENANCE_SYSTEMS: MaintenanceSystem[] = [
     label: 'Hamann sewage system',
     driveFolderPath: ['Maintenance', 'Hamann'],
     icon: '♻️',
-    kits: [],
+    kits: HAMANN_KITS,
   },
   // Strainer baskets are calendar-based (see calendar-systems.ts)
   {
