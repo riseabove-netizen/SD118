@@ -2,10 +2,16 @@
 // SD118 Expenses spreadsheet.
 //
 // Input: [{account, date (YYYY-MM-DD), eur?, usd?, merchant?}]
-// Output per input: best match { txn_id, date, merchant, amount_usd } or null.
+// Output per input:
+//   best match { txn_id, date, merchant, amount_usd, currency, category,
+//                account_label ('Amex 3240' | 'Bilt' | 'Unknown'),
+//                account_matches_selection: boolean }
+//   or null.
 //
 // Matching rules:
-//   1. Filter to the same card account (Amex 3240 -> mask "3240", Bilt -> mask "0540").
+//   1. Search ALL linked cards (Amex 3240 + Bilt) — not filtered to the
+//      crew's selected account. Reason: crews sometimes swipe the wrong
+//      card and we still want to catch the charge.
 //   2. Restrict to a ±3-day window around the receipt date.
 //   3. Score each candidate:
 //        - amount score: if usd is known, |txn - usd|; else if eur is known,
@@ -24,6 +30,11 @@ const SPREADSHEET_ID = '1XBBy8ma5WmQNW2ix-K6JyBaJB7kvnXQoExGttcSu_Wk'
 const ACCOUNT_TO_MASK: Record<string, string> = {
   'Amex 3240': '3240',
   'Bilt': '0540',
+}
+
+const MASK_TO_LABEL: Record<string, string> = {
+  '3240': 'Amex 3240',
+  '0540': 'Bilt',
 }
 
 function cleanEnv(v: string | undefined): string | undefined {
@@ -68,6 +79,9 @@ type MatchResult = {
   amount_usd: number
   currency: string
   category: string
+  account_mask: string
+  account_label: string
+  account_matches_selection: boolean
 } | null
 
 function daysBetween(a: string, b: string): number {
@@ -77,11 +91,11 @@ function daysBetween(a: string, b: string): number {
 }
 
 function matchOne(cache: PlaidRow[], q: MatchQuery): MatchResult {
-  const mask = ACCOUNT_TO_MASK[q.account] || q.account
+  const selectedMask = ACCOUNT_TO_MASK[q.account] || q.account
   const receiptMerchant = (q.merchant || '').toLowerCase().trim()
 
-  // Window: ±3 days
-  const inWindow = cache.filter(r => r.account_mask === mask && daysBetween(r.date, q.date) <= 3)
+  // Window: ±3 days across ALL known cards
+  const inWindow = cache.filter(r => daysBetween(r.date, q.date) <= 3)
   if (inWindow.length === 0) return null
 
   const usd = q.usd ?? null
@@ -137,6 +151,9 @@ function matchOne(cache: PlaidRow[], q: MatchQuery): MatchResult {
     amount_usd: best.row.amount_usd,
     currency: best.row.currency,
     category: best.row.category,
+    account_mask: best.row.account_mask,
+    account_label: MASK_TO_LABEL[best.row.account_mask] || 'Unknown',
+    account_matches_selection: best.row.account_mask === selectedMask,
   }
 }
 

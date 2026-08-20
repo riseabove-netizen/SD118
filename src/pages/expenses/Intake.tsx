@@ -31,6 +31,19 @@ type PlaidMatch = {
   amount_usd: number
   currency: string
   category: string
+  account_mask: string
+  account_label: string
+  account_matches_selection: boolean
+} | null
+
+type DuplicateHit = {
+  isDuplicate: boolean
+  matchedRow?: number
+  matchedStore?: string
+  matchedDate?: string
+  matchedAccount?: string
+  matchedUsd?: number | null
+  matchedEur?: number | null
 } | null
 
 type Photo = {
@@ -45,6 +58,7 @@ type Photo = {
   // After OCR:
   read?: ReceiptRead
   plaidMatch?: PlaidMatch
+  duplicate?: DuplicateHit
   // Editable form fields (populated from `read`, user can adjust)
   date: string          // YYYY-MM-DD
   merchant: string
@@ -256,28 +270,47 @@ export function ExpenseIntakePage() {
       if (!data?.ok) throw new Error(data?.error || 'Read failed')
       const reads: ReceiptRead[] = data.receipts || []
 
-      // Match every read receipt against Plaid cache in one batch
+      // Match every read receipt against Plaid cache AND check duplicates in parallel
       let matches: PlaidMatch[] = new Array(photos.length).fill(null)
+      let duplicates: DuplicateHit[] = new Array(photos.length).fill(null)
+      const matchQueries = photos.map((p, i) => {
+        const r = reads[i]
+        return {
+          account,
+          date: r?.date || p.date,
+          eur: r?.eur ?? null,
+          usd: r?.usd ?? null,
+          merchant: r?.merchant ?? p.merchant ?? null,
+        }
+      })
+      const dupQueries = photos.map((p, i) => {
+        const r = reads[i]
+        return {
+          date: r?.date || p.date,
+          store: r?.merchant || p.merchant || '',
+          eur: r?.eur ?? null,
+          usd: r?.usd ?? null,
+        }
+      })
       try {
-        const queries = photos.map((p, i) => {
-          const r = reads[i]
-          return {
-            account,
-            date: r?.date || p.date,
-            eur: r?.eur ?? null,
-            usd: r?.usd ?? null,
-            merchant: r?.merchant ?? p.merchant ?? null,
-          }
-        })
-        const matchResp = await fetch('/api/expense-plaid-match', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ queries }),
-        })
+        const [matchResp, dupResp] = await Promise.all([
+          fetch('/api/expense-plaid-match', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ queries: matchQueries }),
+          }),
+          fetch('/api/expense-duplicate-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ queries: dupQueries }),
+          }),
+        ])
         const matchData = await matchResp.json()
         if (matchData?.ok && Array.isArray(matchData.matches)) matches = matchData.matches
+        const dupData = await dupResp.json()
+        if (dupData?.ok && Array.isArray(dupData.results)) duplicates = dupData.results
       } catch (matchErr: any) {
-        console.warn('Plaid match failed:', matchErr?.message)
+        console.warn('Plaid match / duplicate check failed:', matchErr?.message)
       }
 
       // Apply per-photo; blank USD when there is no Plaid match (no ECB fallback)
@@ -286,10 +319,12 @@ export function ExpenseIntakePage() {
         const p = photos[i]
         const r = reads[i]
         const m = matches[i]
-        if (!r) { next.push({ ...p, reading: false, plaidMatch: m }); continue }
+        const dup = duplicates[i]
+        if (!r) { next.push({ ...p, reading: false, plaidMatch: m, duplicate: dup }); continue }
         const cls = autoClassify(r.category_hint, false)
-        // USD source of truth: Plaid match if any, else if receipt is already
-        // printed in USD use that, else blank (per user rule).
+        // USD source of truth: Plaid match if any (even if it posted on the
+        // OTHER card — the amount is still authoritative), else if receipt is
+        // already printed in USD use that, else blank (per user rule).
         let usd: number | null = null
         if (m && Number.isFinite(m.amount_usd)) usd = m.amount_usd
         else if (r.usd != null) usd = r.usd
@@ -298,6 +333,7 @@ export function ExpenseIntakePage() {
           reading: false,
           read: r,
           plaidMatch: m,
+          duplicate: dup,
           merchant: r.merchant || p.merchant,
           date: r.date || p.date,
           eur: r.eur != null ? String(r.eur) : p.eur,
@@ -517,10 +553,20 @@ export function ExpenseIntakePage() {
                     {p.read && (
                       <div className="text-xs text-muted-foreground mt-1">
                         {p.plaidMatch
-                          ? <span className="text-green-400">✓ Matched {p.plaidMatch.merchant} ${p.plaidMatch.amount_usd.toFixed(2)} on {p.plaidMatch.date}</span>
+                          ? (p.plaidMatch.account_matches_selection
+                              ? <span className="text-green-400">✓ Matched {p.plaidMatch.merchant} ${p.plaidMatch.amount_usd.toFixed(2)} on {p.plaidMatch.date}</span>
+                              : <span className="text-red-400 font-semibold">⚠ Charge posted on {p.plaidMatch.account_label} (not {account}) — ${p.plaidMatch.amount_usd.toFixed(2)} at {p.plaidMatch.merchant}. Switch account above.</span>)
                           : p.read.currency_hint === 'USD' && p.read.usd != null
                             ? 'Priced in USD (no Plaid match)'
                             : <span className="text-amber-400">No Plaid match — fill USD manually or reconcile later</span>}
+                      </div>
+                    )}
+                    {p.duplicate?.isDuplicate && (
+                      <div className="text-xs mt-1 rounded bg-red-950/40 border border-red-800 text-red-300 px-2 py-1">
+                        ⚠ Possible duplicate of row {p.duplicate.matchedRow} ({p.duplicate.matchedStore} · {p.duplicate.matchedDate} · {p.duplicate.matchedAccount}
+                        {p.duplicate.matchedUsd != null ? ` · $${p.duplicate.matchedUsd.toFixed(2)}` : ''}
+                        {p.duplicate.matchedEur != null ? ` · €${p.duplicate.matchedEur.toFixed(2)}` : ''}
+                        ). Confirm before submitting.
                       </div>
                     )}
                     {p.submitted && <div className="text-green-400 text-xs">✓ Submitted (row {p.submittedRow})</div>}
