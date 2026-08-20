@@ -656,9 +656,14 @@ async function handleCancelScheduled(req: VercelRequest, res: VercelResponse) {
 // Delivery worker — secured by WATCH_CRON_SECRET (?key= or Bearer).
 // Delivers every 'scheduled' row whose scheduledAtUtc <= now.
 async function handleDeliverScheduled(req: VercelRequest, res: VercelResponse) {
-  const secret = cleanEnv(process.env.WATCH_CRON_SECRET) || ''
+  // Accept either the Vercel Cron infra (x-vercel-cron header) or an
+  // external caller with the WATCH_CRON_SECRET via ?key= or Bearer.
+  const expectedSecret = cleanEnv(process.env.WATCH_CRON_SECRET)
   const provided = String(req.query.key || '').trim() || getBearer(req) || ''
-  if (!secret || provided !== secret) return res.status(403).json({ error: 'forbidden' })
+  const isVercelCron = !!req.headers['x-vercel-cron']
+  if (expectedSecret && !isVercelCron && provided !== expectedSecret) {
+    return res.status(403).json({ error: 'forbidden' })
+  }
   const sheets = getSheets()
   const items = await loadScheduled(sheets)
   const now = Date.now()
