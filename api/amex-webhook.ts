@@ -312,6 +312,12 @@ function parseCloudMailin(
   base.account_last4 = last4 || ''
   base.account_label = labelFromLast4(last4 || '')
 
+  // USD charges: fill usd_amount immediately (no Plaid match needed).
+  // Foreign-currency charges: leave blank; daily reconciler fills from Plaid.
+  if (amount != null && currency === 'USD') {
+    base.usd_amount = amount.toFixed(2)
+  }
+
   const missing: string[] = []
   if (amount == null) missing.push('amount')
   if (!merchant) missing.push('merchant')
