@@ -115,8 +115,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const auth = getSheetsAuth()
     const sheets = google.sheets({ version: 'v4', auth })
     await ensureRawSheet(sheets)
-    // Truncate raw_json to avoid Google's per-cell size limits (50k chars).
-    const rawJson = JSON.stringify(body).slice(0, 45000)
+    // Google Sheets caps a cell at 50k chars. A naive .slice on JSON.stringify
+    // truncates in the middle of a string and yields invalid JSON that the
+    // reconciler can't parse. Instead, keep the structure and shrink the
+    // largest text fields (html, plain) until the whole payload fits.
+    const CELL_LIMIT = 45000
+    const shrinkable = { ...body } as any
+    // Preserve headers/envelope; those are small and needed for downstream parsing.
+    let serialized = JSON.stringify(shrinkable)
+    if (serialized.length > CELL_LIMIT) {
+      // Trim html first (it's usually the culprit), then plain.
+      for (const field of ['html', 'plain'] as const) {
+        if (typeof shrinkable[field] === 'string' && shrinkable[field].length > 0) {
+          const overshoot = serialized.length - CELL_LIMIT
+          if (overshoot > 0) {
+            const currentLen = shrinkable[field].length
+            const newLen = Math.max(0, currentLen - overshoot - 200) // small headroom for escape churn
+            shrinkable[field] = shrinkable[field].slice(0, newLen)
+            serialized = JSON.stringify(shrinkable)
+          }
+        }
+        if (serialized.length <= CELL_LIMIT) break
+      }
+      // Final safety: if still over, drop attachments and re-serialize.
+      if (serialized.length > CELL_LIMIT && shrinkable.attachments) {
+        delete shrinkable.attachments
+        serialized = JSON.stringify(shrinkable)
+      }
+      // Absolute last resort: hard slice (invalid JSON, but the reconciler has
+      // a regex fallback for exactly this case).
+      if (serialized.length > CELL_LIMIT) {
+        serialized = serialized.slice(0, CELL_LIMIT)
+      }
+    }
+    const rawJson = serialized
     await sheets.spreadsheets.values.append({
       spreadsheetId: EXPENSES_SPREADSHEET_ID,
       range: `${RAW_SHEET}!A:F`,
