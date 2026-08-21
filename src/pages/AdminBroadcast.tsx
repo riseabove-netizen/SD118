@@ -27,7 +27,8 @@ const URL_PRESETS: { label: string; value: string }[] = [
 
 type SendMode = 'now' | 'schedule'
 
-// Return a datetime-local string for "tomorrow 07:00" in the user's local time.
+// Return a datetime-local string for "tomorrow 07:00" as wall-clock time.
+// (No timezone semantics — the interpretation is handled by wallClockInTzToUtc.)
 function tomorrow0700Local(): string {
   const d = new Date()
   d.setDate(d.getDate() + 1)
@@ -36,17 +37,63 @@ function tomorrow0700Local(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-// Convert a datetime-local input value (local time, no offset) to ISO UTC.
-function localToIsoUtc(local: string): string | null {
-  if (!local) return null
-  const t = new Date(local)
-  if (Number.isNaN(t.getTime())) return null
-  return t.toISOString()
-}
-
 // Best-effort IANA tz detection (browsers all support this since ~2020).
 function detectTz(): string {
   try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Rome' } catch { return 'Europe/Rome' }
+}
+
+// Convert a wall-clock datetime-local string (e.g. "2026-08-22T07:00")
+// interpreted in a specific IANA timezone to an ISO UTC instant.
+//
+// The math: build a candidate UTC date from the parts, then use Intl to see
+// how that instant renders in the target tz. The difference between what we
+// wanted (the input wall-clock) and what we got is the tz offset — subtract it
+// and we land on the exact UTC instant that renders as the input wall-clock.
+function wallClockInTzToUtc(local: string, tz: string): string | null {
+  if (!local) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(local)
+  if (!m) return null
+  const [, y, mo, d, h, mi, s] = m
+  // Candidate: treat parts as if they were UTC.
+  const utcGuess = Date.UTC(+y, +mo - 1, +d, +h, +mi, s ? +s : 0)
+  // How does that instant render in the target tz?
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(utcGuess))
+  const g: Record<string, string> = {}
+  for (const p of parts) if (p.type !== 'literal') g[p.type] = p.value
+  // Intl may render midnight as "24" in some locales — normalize.
+  const gHour = g.hour === '24' ? '00' : g.hour
+  const asIfUtc = Date.UTC(+g.year, +g.month - 1, +g.day, +gHour, +g.minute, +g.second)
+  const offsetMs = asIfUtc - utcGuess
+  const trueUtc = utcGuess - offsetMs
+  return new Date(trueUtc).toISOString()
+}
+
+// Render a UTC instant as a friendly string in a specific tz.
+function formatInTz(iso: string, tz: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      timeZone: tz,
+      weekday: 'short', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+      timeZoneName: 'short',
+    }).format(new Date(iso))
+  } catch { return iso }
+}
+
+type TzChoice = 'Europe/Rome' | 'America/New_York' | 'browser'
+function resolveTz(choice: TzChoice): string {
+  if (choice === 'browser') return detectTz()
+  return choice
+}
+const TZ_LABEL: Record<TzChoice, string> = {
+  'Europe/Rome': 'Italy (CET/CEST)',
+  'America/New_York': 'New York (EST/EDT)',
+  browser: 'Browser local',
 }
 
 export function AdminBroadcastPage() {
@@ -64,6 +111,12 @@ export function AdminBroadcastPage() {
   // Schedule mode
   const [mode, setMode] = useState<SendMode>('now')
   const [sendAtLocal, setSendAtLocal] = useState<string>(tomorrow0700Local())
+  const [tzChoice, setTzChoice] = useState<TzChoice>(() => {
+    const tz = detectTz()
+    if (tz === 'Europe/Rome') return 'Europe/Rome'
+    if (tz === 'America/New_York') return 'America/New_York'
+    return 'browser'
+  })
   const [scheduleResult, setScheduleResult] = useState<{ id: string; scheduledAtUtc: string } | null>(null)
 
   // AI prefill
@@ -114,10 +167,12 @@ export function AdminBroadcastPage() {
     return !sending && title.trim().length > 0 && body.trim().length > 0 && selected.size > 0
   }, [sending, title, body, selected])
 
+  const activeTz = useMemo(() => resolveTz(tzChoice), [tzChoice])
+
   const scheduleValidUtc = useMemo(() => {
     if (mode !== 'schedule') return null
-    return localToIsoUtc(sendAtLocal)
-  }, [mode, sendAtLocal])
+    return wallClockInTzToUtc(sendAtLocal, activeTz)
+  }, [mode, sendAtLocal, activeTz])
 
   const canSubmit = mode === 'now'
     ? canSend
@@ -228,13 +283,15 @@ export function AdminBroadcastPage() {
 
   const scheduleLocalPreview = useMemo(() => {
     if (!scheduleValidUtc) return null
-    try {
-      return new Date(scheduleValidUtc).toLocaleString(undefined, {
-        weekday: 'short', month: 'short', day: 'numeric',
-        hour: 'numeric', minute: '2-digit',
-      })
-    } catch { return scheduleValidUtc }
-  }, [scheduleValidUtc])
+    return formatInTz(scheduleValidUtc, activeTz)
+  }, [scheduleValidUtc, activeTz])
+
+  // Also show the time in the *other* main tz so it's easy to sanity-check.
+  const scheduleOtherTzPreview = useMemo(() => {
+    if (!scheduleValidUtc) return null
+    const otherTz = activeTz === 'Europe/Rome' ? 'America/New_York' : 'Europe/Rome'
+    return { tz: otherTz, label: formatInTz(scheduleValidUtc, otherTz) }
+  }, [scheduleValidUtc, activeTz])
 
   return (
     <MenuLayout title="Admin · Notifications" showBack backHref="/menu">
@@ -456,9 +513,35 @@ export function AdminBroadcastPage() {
                 onChange={e => setSendAtLocal(e.target.value)}
                 className="h-11"
               />
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Timezone</Label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['Europe/Rome', 'America/New_York', 'browser'] as TzChoice[]).map(choice => (
+                    <button
+                      key={choice}
+                      type="button"
+                      onClick={() => setTzChoice(choice)}
+                      className={`h-9 rounded-md border text-xs transition-colors ${
+                        tzChoice === choice
+                          ? 'border-red-500/70 bg-red-500/15 text-red-100'
+                          : 'border-border text-muted-foreground hover:bg-muted/40'
+                      }`}
+                    >
+                      {TZ_LABEL[choice]}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {scheduleLocalPreview && (
-                <div className="text-xs text-muted-foreground">
-                  Will fire at <span className="text-red-300">{scheduleLocalPreview}</span> (your local time).
+                <div className="space-y-0.5">
+                  <div className="text-xs text-muted-foreground">
+                    Will fire at <span className="text-red-300">{scheduleLocalPreview}</span>
+                  </div>
+                  {scheduleOtherTzPreview && (
+                    <div className="text-[11px] text-muted-foreground/70">
+                      = {scheduleOtherTzPreview.label} in {scheduleOtherTzPreview.tz.split('/')[1].replace('_', ' ')}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
