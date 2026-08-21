@@ -556,18 +556,27 @@ async function loadScheduled(sheets: any): Promise<ScheduledRow[]> {
   return rows.map((r: any[], i: number) => rowToScheduled(r, i + 2))
 }
 
-async function updateScheduledRow(sheets: any, rowNum: number, patch: Partial<Pick<ScheduledRow, 'status'|'deliveredAt'|'deliverySummary'>>) {
+type SchedulePatch = Partial<Pick<ScheduledRow,
+  'status'|'deliveredAt'|'deliverySummary'|'scheduledAtUtc'|'title'|'body'|'url'|'tag'|'recipients'>>
+
+async function updateScheduledRow(sheets: any, rowNum: number, patch: SchedulePatch) {
   // Fetch the row, patch specific columns, write back
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId: INVENTORY_ID,
     range: `ScheduledBroadcasts!A${rowNum}:L${rowNum}`,
   })
   const row = (resp.data.values || [[]])[0] || []
+  // Ensure length 12 before patching
+  while (row.length < 12) row.push('')
+  if (patch.scheduledAtUtc !== undefined) row[3] = patch.scheduledAtUtc
+  if (patch.title !== undefined) row[4] = patch.title
+  if (patch.body !== undefined) row[5] = patch.body
+  if (patch.url !== undefined) row[6] = patch.url
+  if (patch.tag !== undefined) row[7] = patch.tag
+  if (patch.recipients !== undefined) row[8] = JSON.stringify(patch.recipients)
   if (patch.status !== undefined) row[9] = patch.status
   if (patch.deliveredAt !== undefined) row[10] = patch.deliveredAt
   if (patch.deliverySummary !== undefined) row[11] = JSON.stringify(patch.deliverySummary)
-  // Ensure length 12
-  while (row.length < 12) row.push('')
   await sheets.spreadsheets.values.update({
     spreadsheetId: INVENTORY_ID,
     range: `ScheduledBroadcasts!A${rowNum}:L${rowNum}`,
@@ -652,6 +661,91 @@ async function handleCancelScheduled(req: VercelRequest, res: VercelResponse) {
   if (target.status !== 'scheduled') return res.status(400).json({ error: `cannot cancel status=${target.status}` })
   await updateScheduledRow(sheets, target.rowNum, { status: 'cancelled' })
   return res.status(200).json({ ok: true })
+}
+
+// POST /api/anchor-notify?op=update-scheduled
+// body: { id, scheduledAt?: ISO, title?, body?, url?, tag?, recipients?: string[] }
+// Only allowed while status === 'scheduled'.
+async function handleUpdateScheduled(req: VercelRequest, res: VercelResponse) {
+  const auth = verifyToken(getBearer(req))
+  if (!auth.ok || auth.role !== 'admin') return res.status(403).json({ error: 'admin only' })
+  const body = (req.body || {}) as any
+  const id = String(body.id || '').trim()
+  if (!id) return res.status(400).json({ error: 'id required' })
+
+  const sheets = getSheets()
+  const items = await loadScheduled(sheets)
+  const target = items.find(i => i.id === id)
+  if (!target) return res.status(404).json({ error: 'not found' })
+  if (target.status !== 'scheduled') return res.status(400).json({ error: `cannot edit status=${target.status}` })
+
+  const patch: SchedulePatch = {}
+  if (body.scheduledAt !== undefined) {
+    const iso = String(body.scheduledAt || '').trim()
+    if (!iso) return res.status(400).json({ error: 'scheduledAt cannot be empty' })
+    const t = new Date(iso)
+    if (Number.isNaN(t.getTime())) return res.status(400).json({ error: 'scheduledAt must be ISO' })
+    if (t.getTime() < Date.now() - 60_000) return res.status(400).json({ error: 'scheduledAt must be in the future' })
+    patch.scheduledAtUtc = t.toISOString()
+  }
+  if (body.title !== undefined) {
+    const t = String(body.title || '').trim()
+    if (!t) return res.status(400).json({ error: 'title cannot be empty' })
+    patch.title = t.slice(0, 200)
+  }
+  if (body.body !== undefined) {
+    const m = String(body.body || '').trim()
+    if (!m) return res.status(400).json({ error: 'body cannot be empty' })
+    patch.body = m.slice(0, 1000)
+  }
+  if (body.url !== undefined) patch.url = String(body.url || '/schedule').slice(0, 500)
+  if (body.tag !== undefined) patch.tag = String(body.tag || '').slice(0, 100)
+  if (body.recipients !== undefined) {
+    if (!Array.isArray(body.recipients)) return res.status(400).json({ error: 'recipients must be an array' })
+    patch.recipients = body.recipients.map((n: any) => String(n)).slice(0, 100)
+  }
+
+  if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'nothing to update' })
+
+  await updateScheduledRow(sheets, target.rowNum, patch)
+  return res.status(200).json({ ok: true, id, patch })
+}
+
+// POST /api/anchor-notify?op=send-scheduled-now
+// body: { id }  — delivers a scheduled row immediately, marks as sent.
+async function handleSendScheduledNow(req: VercelRequest, res: VercelResponse) {
+  const auth = verifyToken(getBearer(req))
+  if (!auth.ok || auth.role !== 'admin') return res.status(403).json({ error: 'admin only' })
+  const id = String((req.body || {}).id || '').trim()
+  if (!id) return res.status(400).json({ error: 'id required' })
+  const sheets = getSheets()
+  const items = await loadScheduled(sheets)
+  const target = items.find(i => i.id === id)
+  if (!target) return res.status(404).json({ error: 'not found' })
+  if (target.status !== 'scheduled') return res.status(400).json({ error: `cannot send status=${target.status}` })
+  try {
+    const summary = await sendBroadcastCore({
+      title: target.title,
+      body: target.body,
+      url: target.url,
+      tag: target.tag,
+      recipients: target.recipients,
+      from: target.createdBy,
+    })
+    await updateScheduledRow(sheets, target.rowNum, {
+      status: 'sent',
+      deliveredAt: new Date().toISOString(),
+      deliverySummary: summary,
+    })
+    return res.status(200).json({ ok: true, summary })
+  } catch (e: any) {
+    await updateScheduledRow(sheets, target.rowNum, {
+      status: 'failed',
+      deliveredAt: new Date().toISOString(),
+      deliverySummary: { error: e?.message || String(e) },
+    })
+    return res.status(500).json({ ok: false, error: e?.message || 'send failed' })
+  }
 }
 
 // POST /api/anchor-notify?op=deliver-scheduled
@@ -864,6 +958,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
       return await handleCancelScheduled(req, res)
     }
+    if (op === 'update-scheduled') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+      return await handleUpdateScheduled(req, res)
+    }
+    if (op === 'send-scheduled-now') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+      return await handleSendScheduledNow(req, res)
+    }
     if (op === 'deliver-scheduled') {
       if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'GET or POST' })
       return await handleDeliverScheduled(req, res)
@@ -876,7 +978,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
       return await handleAiPrefill(req, res)
     }
-    return res.status(400).json({ error: 'op required: schedule | subscribe | users | cron | broadcast | schedule-broadcast | list-scheduled | cancel-scheduled | deliver-scheduled | prefill-tomorrow | ai-prefill' })
+    return res.status(400).json({ error: 'op required: schedule | subscribe | users | cron | broadcast | schedule-broadcast | list-scheduled | cancel-scheduled | update-scheduled | send-scheduled-now | deliver-scheduled | prefill-tomorrow | ai-prefill' })
   } catch (e: any) {
     console.error('anchor-notify error', e)
     return res.status(500).json({ error: 'internal', detail: e?.message || String(e) })
