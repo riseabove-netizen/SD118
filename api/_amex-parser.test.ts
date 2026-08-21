@@ -1,7 +1,7 @@
-// Smoke test for the Amex parser. Run with: npx tsx api/amex-parser.test.ts
+// Smoke test for the Amex parser. Run with: npx tsx api/_amex-parser.test.ts
 // Tests both modern HTML template ("Large Purchase Approved") and legacy prose.
 
-import { parseCloudMailin } from './amex-parser'
+import { parseCloudMailin } from './_amex-parser'
 import fs from 'node:fs'
 
 function assert(cond: any, msg: string) {

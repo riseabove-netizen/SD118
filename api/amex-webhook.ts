@@ -20,7 +20,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
-import { parseCloudMailin, parsedToRow, PARSED_HEADERS, type ParsedAmex } from './amex-parser'
+import { parseCloudMailin, parsedToRow, PARSED_HEADERS, type ParsedAmex } from './_amex-parser'
 
 export const config = { maxDuration: 20 }
 
