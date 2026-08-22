@@ -340,6 +340,151 @@ function parsedToRow(p: ParsedAmex): string[] {
   return PARSED_HEADERS.map((h) => (p as any)[h] ?? '')
 }
 
+// ================================================================
+// Bilt parser (Mastercard 0540)
+// Same schema as Amex; different email layout. Runs when the CloudMailin
+// POST's From header contains "bilt.com". Bilt shows already-converted USD
+// so we set both local_amount and usd_amount at ingest.
+// ================================================================
+
+type ParsedBilt = ParsedAmex // same 16-col shape
+
+const BILT_LABELS = new Set(['transaction amount', 'amount', 'merchant', 'date'])
+
+function extractBiltLabeledFields(text: string): Record<string, string> {
+  // Bilt's plain body has "Label\n<value>" pairs, sometimes with blank lines
+  // in between. Regex-based extraction breaks because the alternation can
+  // consume the trailing newline of the previous match. Do it line-by-line.
+  const lines = text.split('\n').map(l => l.trim())
+  const out: Record<string, string> = {}
+  for (let i = 0; i < lines.length; i++) {
+    const key = lines[i].toLowerCase()
+    if (!BILT_LABELS.has(key)) continue
+    if (key in out) continue
+    for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+      const v = lines[j]
+      if (!v) continue
+      // Guard: don't take the next label as the value
+      if (BILT_LABELS.has(v.toLowerCase())) break
+      out[key] = v
+      break
+    }
+  }
+  return out
+}
+
+const RE_BILT_AMOUNT = /(?<sym>[$€£¥])?\s*(?<code>USD|EUR|GBP|JPY|CHF|CAD|AUD|MXN)?\s*(?<num>\d{1,3}(?:,\d{3})*(?:\.\d{2}))/i
+const RE_BILT_LAST4 = /Mastercard\s+(\d{4})\b/i
+
+function parseBiltCloudMailin(
+  body: any,
+  ctx: { receivedAtUtc: string; from: string; subject: string; messageId: string; plainSnippet: string },
+): ParsedBilt {
+  const parsed: ParsedBilt = {
+    message_id: ctx.messageId,
+    received_at_utc: ctx.receivedAtUtc,
+    email_from: ctx.from,
+    email_subject: ctx.subject,
+    txn_date: '',
+    merchant: '',
+    local_amount: '',
+    local_currency: '',
+    account_last4: '',
+    account_label: '',
+    usd_amount: '',
+    plaid_txn_id: '',
+    plaid_matched_at: '',
+    match_confidence: '',
+    parse_status: 'ok',
+    notes: '',
+  }
+
+  // Skip non-transaction Bilt mails (login codes, activation, etc.)
+  if (!/transaction on your bilt/i.test(ctx.subject) && !/purchase alert/i.test(ctx.subject)) {
+    parsed.parse_status = 'not_bilt'
+    parsed.notes = `non-transaction subject: ${ctx.subject}`
+    return parsed
+  }
+
+  const html = String(body.html || '')
+  const plainRaw = String(body.plain || '')
+  const plain = maybeDecodeQP(plainRaw)
+  const htmlText = stripHtmlToText(maybeDecodeQP(html))
+  // Prefer the plain body — Bilt's plain rendering is already "Label\nValue".
+  const text = plain && plain.length > 40 ? plain : htmlText
+
+  const labeled = extractBiltLabeledFields(text)
+
+  // Amount + currency: prefer "transaction amount" then "amount"
+  let amount: number | null = null
+  let currency: string | null = null
+  for (const label of ['transaction amount', 'amount']) {
+    const v = labeled[label]
+    if (!v) continue
+    const m = v.match(RE_BILT_AMOUNT)
+    if (!m || !m.groups) continue
+    const numRaw = m.groups.num.replace(/,/g, '')
+    const a = parseFloat(numRaw)
+    if (isNaN(a)) continue
+    amount = a
+    if (m.groups.code) currency = m.groups.code.toUpperCase()
+    else if (m.groups.sym) currency = (CURRENCY_BY_SYMBOL[m.groups.sym] || null)
+    if (amount != null && currency) break
+  }
+
+  // Merchant
+  const merchant = labeled['merchant']
+    ? labeled['merchant'].replace(/\s+/g, ' ').trim().slice(0, 80)
+    : null
+
+  // Last-4 from "Mastercard NNNN"
+  const mLast4 = text.match(RE_BILT_LAST4)
+  const last4 = mLast4 ? mLast4[1] : null
+
+  // Date: "M/D/YY"
+  let txnDate = ''
+  const dv = labeled['date']
+  if (dv) {
+    const m = dv.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/)
+    if (m) {
+      const [, mo, dd, yy] = m
+      const year = yy.length === 2 ? 2000 + parseInt(yy, 10) : parseInt(yy, 10)
+      txnDate = `${year}-${pad2(parseInt(mo, 10))}-${pad2(parseInt(dd, 10))}`
+    }
+  }
+  if (!txnDate) {
+    const d = new Date(ctx.receivedAtUtc)
+    if (!isNaN(d.getTime())) {
+      txnDate = `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`
+    }
+  }
+
+  parsed.txn_date = txnDate
+  parsed.merchant = merchant || ''
+  parsed.local_amount = amount != null ? amount.toFixed(2) : ''
+  parsed.local_currency = currency || ''
+  parsed.account_last4 = last4 || ''
+  parsed.account_label = last4 ? `Bilt ${last4}` : 'Bilt'
+  // Bilt Mastercard alerts always show the USD-converted amount.
+  if (amount != null && currency === 'USD') {
+    parsed.usd_amount = amount.toFixed(2)
+  }
+
+  const missing: string[] = []
+  if (amount == null) missing.push('amount')
+  if (!merchant) missing.push('merchant')
+  if (!last4) missing.push('last4')
+  if (!txnDate) missing.push('date')
+  if (missing.length) {
+    parsed.parse_status = 'parse_failed'
+    parsed.notes = `missing: ${missing.join(',')}`
+  }
+  return parsed
+}
+
+const BILT_RAW_SHEET = 'Bilt_Emails_Raw'
+const BILT_PARSED_SHEET = 'Bilt_Emails'
+
 
 export const config = { maxDuration: 20 }
 
@@ -418,12 +563,12 @@ function safeSerialize(body: any, cellLimit = 45000): string {
   return serialized
 }
 
-async function isDuplicateMessageId(sheets: any, messageId: string): Promise<boolean> {
+async function isDuplicateMessageId(sheets: any, messageId: string, sheetName: string = PARSED_SHEET): Promise<boolean> {
   if (!messageId) return false
-  // Read column A (message_id) of Amex_Emails. Small — one column.
+  // Read column A (message_id) of the parsed sheet. Small — one column.
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId: EXPENSES_SPREADSHEET_ID,
-    range: `${PARSED_SHEET}!A2:A`,
+    range: `${sheetName}!A2:A`,
   })
   const rows: string[][] = resp.data.values || []
   for (const r of rows) if (r[0] === messageId) return true
@@ -458,21 +603,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const plain = String(body.plain || '')
   const plainSnippet = plain.slice(0, 500)
 
+  // Dispatch by sender: same CloudMailin address forwards both Amex and Bilt.
+  const fromLower = from.toLowerCase()
+  const isBilt = fromLower.includes('bilt.com')
+  const isAmex = fromLower.includes('americanexpress.com')
+  const provider = isBilt ? 'bilt' : (isAmex ? 'amex' : 'unknown')
+
+  const rawSheet = isBilt ? BILT_RAW_SHEET : RAW_SHEET
+  const parsedSheet = isBilt ? BILT_PARSED_SHEET : PARSED_SHEET
+
   // Parse first — cheap, in-memory, and we want to log parse status even if
   // the sheet writes fail.
   let parsed: ParsedAmex | null = null
   let parseError: string | null = null
   try {
-    parsed = parseCloudMailin(body, {
-      receivedAtUtc: nowIso,
-      from,
-      subject,
-      messageId,
-      plainSnippet,
-    })
+    if (isBilt) {
+      parsed = parseBiltCloudMailin(body, {
+        receivedAtUtc: nowIso, from, subject, messageId, plainSnippet,
+      })
+    } else if (isAmex) {
+      parsed = parseCloudMailin(body, {
+        receivedAtUtc: nowIso, from, subject, messageId, plainSnippet,
+      })
+    } else {
+      // Unknown sender: still archive the raw envelope for triage.
+      parsed = null
+    }
   } catch (err: any) {
     parseError = err?.message || String(err)
-    console.error('[amex-webhook] parse failed:', parseError)
+    console.error(`[webhook:${provider}] parse failed:`, parseError)
   }
 
   let rawWriteOk = false
@@ -482,28 +641,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const auth = getSheetsAuth()
     const sheets = google.sheets({ version: 'v4', auth })
-    await ensureSheet(sheets, RAW_SHEET, RAW_HEADERS)
-    await ensureSheet(sheets, PARSED_SHEET, PARSED_HEADERS)
+    await ensureSheet(sheets, rawSheet, RAW_HEADERS)
+    await ensureSheet(sheets, parsedSheet, PARSED_HEADERS)
 
-    // 1) Append raw row (audit trail — always, even if parse failed).
+    // 1) Append raw row (audit trail — always, even for unknown senders).
     const rawJson = safeSerialize(body)
     await sheets.spreadsheets.values.append({
       spreadsheetId: EXPENSES_SPREADSHEET_ID,
-      range: `${RAW_SHEET}!A:F`,
+      range: `${rawSheet}!A:F`,
       valueInputOption: 'RAW',
       requestBody: { values: [[nowIso, from, subject, messageId, plainSnippet, rawJson]] },
     })
     rawWriteOk = true
 
-    // 2) Append parsed row to Amex_Emails, dedup'd by message_id.
-    if (parsed && parsed.parse_status !== 'not_amex') {
-      const dup = await isDuplicateMessageId(sheets, parsed.message_id)
+    // 2) Append parsed row to <provider>_Emails, dedup'd by message_id.
+    const notThisProvider = isBilt ? 'not_bilt' : 'not_amex'
+    if (parsed && parsed.parse_status !== notThisProvider) {
+      const dup = await isDuplicateMessageId(sheets, parsed.message_id, parsedSheet)
       if (dup) {
         parsedDedup = true
       } else {
         await sheets.spreadsheets.values.append({
           spreadsheetId: EXPENSES_SPREADSHEET_ID,
-          range: `${PARSED_SHEET}!A:P`,
+          range: `${parsedSheet}!A:P`,
           valueInputOption: 'RAW',
           requestBody: { values: [parsedToRow(parsed)] },
         })
@@ -512,27 +672,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (err: any) {
     sheetError = err?.message || String(err)
-    console.error('[amex-webhook] sheet write failed:', sheetError)
+    console.error(`[webhook:${provider}] sheet write failed:`, sheetError)
   }
 
-  console.log('[amex-webhook] received', {
-    from,
-    subject,
-    messageId,
+  console.log(`[webhook:${provider}] received`, {
+    from, subject, messageId,
     parseStatus: parsed?.parse_status,
     merchant: parsed?.merchant,
     localAmount: parsed?.local_amount,
     localCurrency: parsed?.local_currency,
     last4: parsed?.account_last4,
     txnDate: parsed?.txn_date,
-    rawWriteOk,
-    parsedWriteOk,
-    parsedDedup,
+    rawWriteOk, parsedWriteOk, parsedDedup,
   })
 
   return res.status(200).json({
     ok: true,
     receivedAt: nowIso,
+    provider,
     from,
     subject,
     messageId,
@@ -546,6 +703,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           txn_date: parsed.txn_date,
           account_last4: parsed.account_last4,
           account_label: parsed.account_label,
+          usd_amount: parsed.usd_amount,
           notes: parsed.notes,
         }
       : null,
