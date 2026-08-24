@@ -1976,30 +1976,85 @@ export async function loadTrip(id: string): Promise<Trip | undefined> {
 }
 
 /**
- * Merge a saved override onto a seed baseline. Only user-authored fields
- * are copied from the override so seed changes remain visible.
+ * Merge a saved override onto a seed baseline.
+ *
+ * Trip-level fields the user can edit (`name`, `subtitle`, `guests`,
+ * `guestList`) are reapplied when present in the override. Days are matched
+ * by `isoDate`: for each seed day, if the override has an entry with the
+ * same `isoDate`, we merge the override's user-editable day fields
+ * (`date`, `title`, `subtitle`, `events`) onto the seed day. Seed-only
+ * fields (`imageUrl`, `imageCaption`, `overnight`, `dock`, `leg`,
+ * `locationImage`, etc.) always shine through from the seed so seed edits
+ * remain visible for anything the user hasn't edited.
+ *
+ * New days that only exist in the override are appended in order, so the
+ * app also supports adding days that the seed doesn't have.
  */
-function mergeTripOverride(baseline: Trip, override: Partial<Trip>): Trip {
+function mergeTripOverride(baseline: Trip, override: Partial<Trip> & { days?: Partial<TripDay>[] }): Trip {
   const merged: Trip = { ...baseline }
+  if (override.name !== undefined) merged.name = override.name
+  if (override.subtitle !== undefined) merged.subtitle = override.subtitle
   if (override.guests !== undefined) merged.guests = override.guests
   if (override.guestList !== undefined) merged.guestList = override.guestList
+  if (Array.isArray(override.days)) {
+    const overrideByIso = new Map<string, Partial<TripDay>>()
+    for (const d of override.days) {
+      if (d && typeof d.isoDate === 'string' && d.isoDate) overrideByIso.set(d.isoDate, d)
+    }
+    const usedIsos = new Set<string>()
+    const mergedDays: TripDay[] = baseline.days.map(seedDay => {
+      const ov = overrideByIso.get(seedDay.isoDate)
+      if (!ov) return seedDay
+      usedIsos.add(seedDay.isoDate)
+      const nextDay: TripDay = { ...seedDay }
+      if (ov.date !== undefined) nextDay.date = ov.date
+      if (ov.title !== undefined) nextDay.title = ov.title
+      if (ov.subtitle !== undefined) nextDay.subtitle = ov.subtitle
+      if (Array.isArray(ov.events)) nextDay.events = ov.events as TripDay['events']
+      return nextDay
+    })
+    // Append override-only days (unknown isoDate not in seed) so users can
+    // add days from the UI without a source-code edit.
+    for (const d of override.days) {
+      if (!d || typeof d.isoDate !== 'string' || !d.isoDate) continue
+      if (usedIsos.has(d.isoDate)) continue
+      mergedDays.push({
+        date: d.date || d.isoDate,
+        isoDate: d.isoDate,
+        title: d.title || 'Untitled day',
+        subtitle: d.subtitle,
+        events: Array.isArray(d.events) ? (d.events as TripDay['events']) : [],
+      } as TripDay)
+    }
+    merged.days = mergedDays
+  }
   return merged
 }
 
 /**
  * Persist a trip override to the backend.
  *
- * We only send the user-authored fields (`guests`, `guestList`) so we don't
- * bake the current seed into the override row. The load path is
- * override-on-top-of-seed, so preserving the full snapshot buys us nothing
- * and would only re-introduce the "stale snapshot masks seed changes" bug
- * that we just fixed in `loadTrip`.
+ * We send only the user-editable fields — trip meta (`name`, `subtitle`,
+ * `guests`, `guestList`) and per-day edits keyed by `isoDate` with just the
+ * fields the day editor exposes (`date`, `title`, `subtitle`, `events`).
+ * Seed-only fields like `imageUrl`, `dock`, `overnight`, and `leg` are
+ * omitted so the seed remains the source of truth for anything the user
+ * hasn't touched — this preserves the "seed changes stay visible" property.
  */
 export async function saveTrip(trip: Trip, user?: string): Promise<{ ok: boolean; detail?: string }> {
-  const overrideOnly: Partial<Trip> & { id: string } = {
+  const overrideOnly = {
     id: trip.id,
+    name: trip.name,
+    subtitle: trip.subtitle,
     guests: trip.guests,
     guestList: trip.guestList,
+    days: trip.days.map(d => ({
+      isoDate: d.isoDate,
+      date: d.date,
+      title: d.title,
+      subtitle: d.subtitle,
+      events: d.events,
+    })),
   }
   try {
     const resp = await fetch('/api/trips', {
