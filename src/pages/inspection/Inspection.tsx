@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { Button } from '@/components/ui/button'
-import { getCrewName } from '@/lib/auth'
+import { getCrewName, isAdmin } from '@/lib/auth'
 import { compressImageToJpegBase64 } from '@/lib/imageCompress'
 import { useGeolocation, formatCoords } from '@/lib/useGeolocation'
 
@@ -86,6 +86,7 @@ function makeExtraHoursSlots(): ExtraHoursSlot[] {
 
 export function InspectionPage() {
   const [, setLocation] = useLocation()
+  const admin = isAdmin()
   const [sections, setSections] = useState<SectionDraft[]>(makeSections())
   const [generator, setGenerator] = useState<{ running: string; portHours: string; stbdHours: string }>({
     running: '',
@@ -166,8 +167,12 @@ export function InspectionPage() {
       for (const c of s.checks) {
         if (c.ok === null) return `${s.title}: every check must be marked OK or Issue.`
       }
-      for (const p of s.photos) {
-        if (p.required && !p.base64) return `${s.title}: photo "${p.label}" is required.`
+      // Admins can submit without photos — useful for dockside/harbour
+      // inspections where they only need to confirm the checklist items.
+      if (!admin) {
+        for (const p of s.photos) {
+          if (p.required && !p.base64) return `${s.title}: photo "${p.label}" is required.`
+        }
       }
     }
     return null
@@ -415,11 +420,14 @@ export function InspectionPage() {
             {/* Photos */}
             {s.photos.length > 0 && (
               <div className="space-y-2">
-                <div className="text-xs text-muted-foreground">Required photos</div>
+                <div className="text-xs text-muted-foreground">
+                  {admin ? 'Photos (optional for admin)' : 'Required photos'}
+                </div>
                 {s.photos.map((p, pi) => (
                   <PhotoSlot
                     key={pi}
                     photo={p}
+                    required={p.required && !admin}
                     onPick={file => handlePhoto(si, pi, file)}
                     onClear={() => clearPhoto(si, pi)}
                   />
@@ -455,13 +463,13 @@ export function InspectionPage() {
   )
 }
 
-function PhotoSlot({ photo, onPick, onClear }: { photo: Photo; onPick: (f: File | null) => void; onClear: () => void }) {
+function PhotoSlot({ photo, required, onPick, onClear }: { photo: Photo; required: boolean; onPick: (f: File | null) => void; onClear: () => void }) {
   const cameraRef = useRef<HTMLInputElement>(null)
   const libRef = useRef<HTMLInputElement>(null)
   return (
     <div className="p-2 rounded-lg border border-border bg-secondary/30">
       <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="text-sm">{photo.label}{photo.required && <span className="text-red-500"> *</span>}</div>
+        <div className="text-sm">{photo.label}{required && <span className="text-red-500"> *</span>}</div>
         {photo.base64 && (
           <button onClick={onClear} className="text-xs text-red-400 underline">Clear</button>
         )}
