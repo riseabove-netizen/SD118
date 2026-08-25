@@ -22,11 +22,14 @@ const ISM_ANCHOR_WATCH_FOLDER_ID = cleanEnv(process.env.ISM_ANCHOR_WATCH_FOLDER_
 const ISM_DRILLS_FOLDER_ID = cleanEnv(process.env.ISM_DRILLS_FOLDER_ID)
 const ISM_SAFETY_EQUIPMENT_FOLDER_ID = cleanEnv(process.env.ISM_SAFETY_EQUIPMENT_FOLDER_ID)
 const ISM_OPERATING_EMERGENCY_FOLDER_ID = cleanEnv(process.env.ISM_OPERATING_EMERGENCY_FOLDER_ID)
+const MANUALS_FOLDER_ID = cleanEnv(process.env.MANUALS_FOLDER_ID)
 
 function pickFolder(label: string | undefined, isPdf: boolean): { folderId: string | undefined; bucket: string } {
   // PDFs of known ISM forms route to their dedicated sub-folder.
   if (isPdf && label) {
     const l = label.toLowerCase()
+    // Operational-guide manual exports: label starts with "manual"
+    if (l.startsWith('manual') && MANUALS_FOLDER_ID) return { folderId: MANUALS_FOLDER_ID, bucket: 'manuals' }
     // Generic operating/emergency form PDFs (label = "IsmForm-<formId>")
     if (l.startsWith('ismform') && ISM_OPERATING_EMERGENCY_FOLDER_ID) return { folderId: ISM_OPERATING_EMERGENCY_FOLDER_ID, bucket: 'ism-operating-emergency' }
     if (l.includes('anchor') && ISM_ANCHOR_WATCH_FOLDER_ID) return { folderId: ISM_ANCHOR_WATCH_FOLDER_ID, bucket: 'ism-anchor-watch' }

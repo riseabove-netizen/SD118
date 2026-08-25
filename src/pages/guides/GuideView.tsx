@@ -12,6 +12,7 @@ export function GuideViewPage() {
   const id = params?.id || ''
   const [shareOpen, setShareOpen] = useState(false)
   const [shareMsg, setShareMsg] = useState<string | null>(null)
+  const [archiveBusy, setArchiveBusy] = useState(false)
 
   const { data: guide, isLoading, error } = useQuery({
     queryKey: ['guide', id],
@@ -43,6 +44,43 @@ export function GuideViewPage() {
       updatedBy: guide['Updated By'] || '',
       markdown: guide.Markdown || '',
     })
+    // Fire-and-forget archive to Manuals folder in Google Drive.
+    // The user gets their device-side PDF from the print dialog above;
+    // this stores an official copy in the Manuals folder for the fleet.
+    fetch(`/api/guides?action=archive&id=${encodeURIComponent(id)}`, { method: 'POST' })
+      .then(r => r.json())
+      .then(j => {
+        if (j?.ok) {
+          setShareMsg('Also archived to Manuals folder in Drive')
+          setTimeout(() => setShareMsg(null), 3500)
+        }
+      })
+      .catch(() => { /* silent — crew already got the on-device PDF */ })
+  }
+
+  async function handleArchiveOnly() {
+    if (!guide || archiveBusy) return
+    setArchiveBusy(true)
+    try {
+      const resp = await fetch(`/api/guides?action=archive&id=${encodeURIComponent(id)}`, {
+        method: 'POST',
+      })
+      const j = await resp.json()
+      if (j?.ok && j?.viewUrl) {
+        setShareOpen(false)
+        setShareMsg('Archived to Manuals folder — opening in Drive')
+        window.open(j.viewUrl, '_blank', 'noopener')
+        setTimeout(() => setShareMsg(null), 3500)
+      } else {
+        setShareMsg(j?.detail || j?.error || 'Archive failed')
+        setTimeout(() => setShareMsg(null), 4000)
+      }
+    } catch (err: any) {
+      setShareMsg('Archive failed: ' + (err?.message || err))
+      setTimeout(() => setShareMsg(null), 4000)
+    } finally {
+      setArchiveBusy(false)
+    }
   }
 
   return (
@@ -138,7 +176,18 @@ export function GuideViewPage() {
               <PdfIcon />
               <div className="flex-1">
                 <div>Save as PDF</div>
-                <div className="text-xs text-muted-foreground">Opens print dialog → Save as PDF</div>
+                <div className="text-xs text-muted-foreground">Print → Save as PDF, plus archive to Manuals folder</div>
+              </div>
+            </button>
+            <button
+              onClick={handleArchiveOnly}
+              disabled={archiveBusy}
+              className="w-full h-12 rounded-lg bg-secondary text-foreground font-medium flex items-center gap-3 px-4 text-left disabled:opacity-60"
+            >
+              <ArchiveIcon />
+              <div className="flex-1">
+                <div>{archiveBusy ? 'Archiving…' : 'Save to Manuals folder'}</div>
+                <div className="text-xs text-muted-foreground">Store a PDF copy in Drive without printing</div>
               </div>
             </button>
             <button
@@ -188,6 +237,16 @@ function PdfIcon() {
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <path d="M14 2v6h6" />
       <path d="M9 13h6M9 17h4" />
+    </svg>
+  )
+}
+
+function ArchiveIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5 text-primary" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 4h18v4H3z" />
+      <path d="M5 8v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+      <path d="M10 12h4" />
     </svg>
   )
 }
