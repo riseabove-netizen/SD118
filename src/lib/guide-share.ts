@@ -69,46 +69,41 @@ function isIOS(): boolean {
 export function printGuideAsPdf(g: PrintGuideArgs) {
   const html = buildPrintableHtml(g)
 
-  // Strategy:
-  //   1) Open a real top-level tab with the printable HTML. This works
-  //      on iOS Safari, macOS Safari, Chrome, Firefox. Hidden iframes'
-  //      .print() is blocked by iOS Safari entirely, which is why the
-  //      previous version silently did nothing on the crew's phones.
-  //   2) Once images have loaded, call window.print() from inside that
-  //      tab. If print() is blocked, the guide is still visible and the
-  //      user can use the browser's own Share → "Save as PDF" / "Print".
-  //   3) If popup blocking prevents the tab from opening (common when
-  //      the call didn't originate from a user gesture, or from an
-  //      installed PWA on iOS), fall back to a full-page navigation via
-  //      a blob URL — no popup needed.
+  // Strategy: open a new tab synchronously (must be inside the user
+  // gesture), then write the HTML into it with document.write. This
+  // avoids blob: URLs entirely — blob URLs on iOS Safari get revoked
+  // during the print sheet lifecycle, which caused the tab to reload
+  // to a blank page after the print dialog closed.
+  //
+  //   1) window.open('about:blank') synchronously reserves a real tab.
+  //   2) document.write injects the full printable HTML. The inline
+  //      script inside that HTML then fires window.print() once images
+  //      finish loading (or the user taps the red "Save as PDF" button
+  //      — on iOS Safari, browser-initiated print() after a fresh
+  //      document.open is unreliable, so we surface a visible button).
+  //   3) If popup blocking prevents open() (common inside installed
+  //      iOS PWAs), fall back to opening a data: URL in the current tab.
+  //      Not as nice, but it always works.
 
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-
-  // Some browsers require a synchronous window.open() from the user
-  // gesture. We call it immediately and let the new tab load the blob.
-  const w = window.open(url, '_blank')
-  const revoke = () => setTimeout(() => URL.revokeObjectURL(url), 60_000)
-
+  const w = window.open('about:blank', '_blank')
   if (w) {
-    // iOS Safari will NOT honor window.print() called from the parent
-    // frame after navigation completes — the printable HTML itself
-    // includes a small script that fires print() after images load and
-    // also exposes a "Save as PDF" button as a manual fallback.
-    revoke()
-    return
+    try {
+      w.document.open()
+      w.document.write(html)
+      w.document.close()
+      return
+    } catch (err) {
+      // Some browsers throw on cross-origin about:blank writes when
+      // the app is embedded (rare). Fall through to same-tab data-URL.
+      console.warn('printGuideAsPdf: document.write failed, falling back', err)
+      try { w.close() } catch {}
+    }
   }
 
-  // Popup was blocked — navigate the current tab instead. The user can
-  // hit "back" once the PDF is saved. Not as nice, but it always works.
-  if (isIOS()) {
-    // On iOS, opening a blob: URL in the same tab is reliable; on other
-    // platforms we do the same for consistency.
-    window.location.href = url
-  } else {
-    window.location.href = url
-  }
-  revoke()
+  // Popup blocked — use a data: URL in the current tab. The user hits
+  // the browser back button after saving.
+  const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(html)
+  window.location.href = dataUrl
 }
 
 function buildPrintableHtml(g: PrintGuideArgs): string {
