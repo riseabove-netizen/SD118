@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { getToken, getCrewName, isAdmin } from '@/lib/auth'
+import { DESTINATION_MENUS, findMenuForUrl } from '@/data/notification-destinations'
 
 interface BroadcastResult {
   ok: boolean
@@ -15,15 +16,6 @@ interface BroadcastResult {
   note?: string
   error?: string
 }
-
-const URL_PRESETS: { label: string; value: string }[] = [
-  { label: 'Schedule', value: '/schedule' },
-  { label: "Enrico's Summer", value: '/schedule/enricos-summer-2026' },
-  { label: 'Sardinia → Ponza', value: '/schedule/sardinia-2026' },
-  { label: 'Naples · Family', value: '/schedule/naples-family-2026' },
-  { label: 'Menu', value: '/menu' },
-  { label: 'Watch', value: '/watch' },
-]
 
 type SendMode = 'now' | 'schedule'
 
@@ -103,6 +95,11 @@ export function AdminBroadcastPage() {
   const [title, setTitle] = useState('Schedule update — M/Y Rise Above')
   const [body, setBody] = useState('')
   const [url, setUrl] = useState('/schedule')
+  // Two-dropdown picker state. The menu drives which sub-pages are visible;
+  // the sub-page drives the actual URL. '__custom' means "admin is typing a
+  // raw path" and the picker leaves `url` alone.
+  const [menuId, setMenuId] = useState<string>('schedule')
+  const [subValue, setSubValue] = useState<string>('/schedule')
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<BroadcastResult | null>(null)
   const [loading, setLoading] = useState(true)
@@ -177,6 +174,54 @@ export function AdminBroadcastPage() {
   const canSubmit = mode === 'now'
     ? canSend
     : (canSend && !!scheduleValidUtc && new Date(scheduleValidUtc as string).getTime() > Date.now())
+
+  // Keep the picker in sync when url is set by another path (AI prefill,
+  // prefill-tomorrow, manual typing). If the incoming url matches a known
+  // destination, snap the menu + sub-page dropdowns to it; otherwise switch
+  // to the custom-URL mode so nothing overrides what the user typed.
+  useEffect(() => {
+    const match = findMenuForUrl(url)
+    if (match) {
+      setMenuId(match.menuId)
+      setSubValue(match.value)
+    } else {
+      setSubValue('__custom')
+    }
+  }, [url])
+
+  const activeMenu = useMemo(
+    () => DESTINATION_MENUS.find(m => m.id === menuId) ?? DESTINATION_MENUS[0],
+    [menuId]
+  )
+
+  const handleMenuChange = (nextMenuId: string) => {
+    const next = DESTINATION_MENUS.find(m => m.id === nextMenuId) ?? DESTINATION_MENUS[0]
+    setMenuId(next.id)
+    setSubValue(next.rootValue)
+    setUrl(next.rootValue)
+  }
+
+  const handleSubChange = (nextValue: string) => {
+    setSubValue(nextValue)
+    if (nextValue !== '__custom') setUrl(nextValue)
+  }
+
+  // Group the active menu's sub-pages by their optional `group` field so the
+  // <select> can render <optgroup>s (Operating / Emergency, Itinerary chapters,
+  // Equipment, etc.).
+  const groupedSubOptions = useMemo(() => {
+    const groups = new Map<string, { label: string; value: string }[]>()
+    const ungrouped: { label: string; value: string }[] = []
+    for (const opt of activeMenu.options) {
+      if (opt.group) {
+        if (!groups.has(opt.group)) groups.set(opt.group, [])
+        groups.get(opt.group)!.push({ label: opt.label, value: opt.value })
+      } else {
+        ungrouped.push({ label: opt.label, value: opt.value })
+      }
+    }
+    return { ungrouped, groups: Array.from(groups.entries()) }
+  }, [activeMenu])
 
   const handlePrefillTomorrow = async () => {
     setPrefillBusy(true)
@@ -441,30 +486,56 @@ export function AdminBroadcastPage() {
             <div className="text-xs text-muted-foreground text-right">{body.length}/500</div>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="notif-url" className="text-sm">Open when tapped</Label>
-            <Input
-              id="notif-url"
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              placeholder="/schedule"
-              className="h-11"
-            />
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {URL_PRESETS.map(p => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setUrl(p.value)}
-                  className={`px-2 py-1 text-xs rounded-md border transition-colors ${
-                    url === p.value
-                      ? 'border-red-500/70 bg-red-500/15 text-red-100'
-                      : 'border-border text-muted-foreground hover:bg-muted/40'
-                  }`}
+          <div className="space-y-2">
+            <Label className="text-sm">Open when tapped</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="notif-menu" className="text-[11px] uppercase tracking-wide text-muted-foreground">Menu</Label>
+                <select
+                  id="notif-menu"
+                  value={menuId}
+                  onChange={e => handleMenuChange(e.target.value)}
+                  className="w-full h-11 rounded-md border border-border bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40"
                 >
-                  {p.label}
-                </button>
-              ))}
+                  {DESTINATION_MENUS.map(m => (
+                    <option key={m.id} value={m.id}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="notif-subpage" className="text-[11px] uppercase tracking-wide text-muted-foreground">Sub-page</Label>
+                <select
+                  id="notif-subpage"
+                  value={subValue}
+                  onChange={e => handleSubChange(e.target.value)}
+                  className="w-full h-11 rounded-md border border-border bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                >
+                  {groupedSubOptions.ungrouped.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                  {groupedSubOptions.groups.map(([groupLabel, opts]) => (
+                    <optgroup key={groupLabel} label={groupLabel}>
+                      {opts.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                  <option value="__custom">Custom URL…</option>
+                </select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="notif-url" className="text-[11px] uppercase tracking-wide text-muted-foreground">Resolved URL</Label>
+              <Input
+                id="notif-url"
+                value={url}
+                onChange={e => setUrl(e.target.value)}
+                placeholder="/schedule"
+                className="h-11 font-mono text-xs"
+              />
+              <div className="text-[11px] text-muted-foreground">
+                Pick a menu and sub-page above, or edit the path directly for anything not listed.
+              </div>
             </div>
           </div>
         </section>
