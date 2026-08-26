@@ -47,7 +47,7 @@ export function GuideViewPage() {
     // Fire-and-forget archive to Manuals folder in Google Drive.
     // The user gets their device-side PDF from the print dialog above;
     // this stores an official copy in the Manuals folder for the fleet.
-    fetch(`/api/guides?action=archive&id=${encodeURIComponent(id)}`, { method: 'POST' })
+    fetch(`/api/guide-archive?id=${encodeURIComponent(id)}`, { method: 'POST' })
       .then(r => r.json())
       .then(j => {
         if (j?.ok) {
@@ -62,7 +62,7 @@ export function GuideViewPage() {
     if (!guide || archiveBusy) return
     setArchiveBusy(true)
     try {
-      const resp = await fetch(`/api/guides?action=archive&id=${encodeURIComponent(id)}`, {
+      const resp = await fetch(`/api/guide-archive?id=${encodeURIComponent(id)}`, {
         method: 'POST',
       })
       const j = await resp.json()
