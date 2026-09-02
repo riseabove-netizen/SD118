@@ -47,7 +47,7 @@ type ParsedAmex = {
   plaid_txn_id: string
   plaid_matched_at: string
   match_confidence: string
-  parse_status: 'ok' | 'parse_failed' | 'not_amex' | ''
+  parse_status: 'ok' | 'parse_failed' | 'not_amex' | 'not_bilt' | ''
   notes: string
 }
 
