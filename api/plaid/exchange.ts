@@ -4,7 +4,7 @@
 //
 // Body: { public_token: string, account_labels?: {[account_id]: string} }
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { plaidClient, requireAdmin, appendPlaidItem } from '../_plaid'
+import { plaidClient, requireAdmin, appendPlaidItem } from '../_plaid.js'
 
 const KNOWN_MASKS: Record<string, string> = {
   '3240': 'Amex 3240',

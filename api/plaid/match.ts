@@ -9,7 +9,7 @@
 // Body: { queries: [{ account: string, date: string (YYYY-MM-DD), eur?: number, usd?: number, merchant?: string }] }
 // Response: { ok: true, matches: [ {plaid_txn_id, usd, currency, merchant, date, account_label} | null ] }
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { plaidClient, readPlaidItems, buildAccountLabelMap, PlaidItemRow } from '../_plaid'
+import { plaidClient, readPlaidItems, buildAccountLabelMap, PlaidItemRow } from '../_plaid.js'
 
 type MatchQuery = { account: string; date: string; eur?: number; usd?: number; merchant?: string }
 type MatchResult = {

@@ -1,7 +1,7 @@
 // POST /api/plaid/link-token
 // Admin-only. Creates a Plaid Link token so the frontend can launch Plaid Link.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { plaidClient, plaidEnvName, requireAdmin, PLAID_PRODUCTS, PLAID_COUNTRIES } from '../_plaid'
+import { plaidClient, plaidEnvName, requireAdmin, PLAID_PRODUCTS, PLAID_COUNTRIES } from '../_plaid.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })

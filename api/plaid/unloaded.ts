@@ -6,7 +6,7 @@ import { google } from 'googleapis'
 import {
   plaidClient, requireAdmin, readPlaidItems, buildAccountLabelMap,
   sheetsAuth, SPREADSHEET_ID, EXPENSES_TAB,
-} from '../_plaid'
+} from '../_plaid.js'
 
 function parseUsd(v: any): number | null {
   if (v === null || v === undefined || v === '') return null

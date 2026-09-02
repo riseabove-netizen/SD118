@@ -1,7 +1,7 @@
 // POST /api/plaid/unlink   { item_id: string }
 // Admin-only. Removes the item from Plaid and marks the Plaid_Items row unlinked.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { plaidClient, requireAdmin, readPlaidItems, updatePlaidItem } from '../_plaid'
+import { plaidClient, requireAdmin, readPlaidItems, updatePlaidItem } from '../_plaid.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
