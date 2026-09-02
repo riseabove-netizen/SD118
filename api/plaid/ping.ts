@@ -13,6 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         plaid_env: process.env.PLAID_ENV || null,
         has_google_key: !!process.env.GOOGLE_SERVICE_ACCOUNT_KEY,
         has_hmac: !!process.env.HMAC_SECRET,
+        has_app_secret: !!process.env.APP_SECRET,
       },
     })
   } catch (e: any) {
