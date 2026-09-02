@@ -6,9 +6,10 @@
 //   PLAID_SANDBOX_SECRET
 //   PLAID_ENV=production|sandbox   (default: production)
 // Admin endpoints require header:  Authorization: Bearer <admin-token>  (matches api/auth.ts scheme)
-import { Configuration, PlaidApi, PlaidEnvironments, CountryCode, Products } from 'plaid'
-import { google } from 'googleapis'
+// Re-exported from a Plaid + Sheets helper. Vercel Node runtime.
 import crypto from 'crypto'
+import { google } from 'googleapis'
+import { Configuration, PlaidApi, PlaidEnvironments, CountryCode, Products } from 'plaid'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export const SPREADSHEET_ID = '1XBBy8ma5WmQNW2ix-K6JyBaJB7kvnXQoExGttcSu_Wk'
