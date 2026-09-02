@@ -294,7 +294,7 @@ export function ExpenseIntakePage() {
       })
       try {
         const [matchResp, dupResp] = await Promise.all([
-          fetch('/api/expense-plaid-match', {
+          fetch('/api/plaid/match', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ queries: matchQueries }),
@@ -389,23 +389,30 @@ export function ExpenseIntakePage() {
     setPhotos(prev => prev.map(p => ({ ...p, submitting: true, submitError: undefined })))
     try {
       const payload = {
-        expenses: photos.map(p => ({
-          date: p.date,
-          account,
-          project: p.project || 'Operating',
-          expenseType: p.expenseType,
-          category: p.category,
-          guestTrip: p.guestTrip ? (p.guestTripName || 'Yes') : '',
-          store: p.merchant,
-          usd: p.usd ? Number(p.usd) : null,
-          eur: p.eur ? Number(p.eur) : null,
-          refunded: p.refunded,
-          description: p.description,
-          specificRepair: p.specificRepair,
-          statement: p.statement,
-          inputBy: crewName || 'Unknown',
-          receiptUrl: p.driveViewUrl || '',
-        })),
+        expenses: photos.map(p => {
+          const matched = p.plaidMatch && (p.plaidMatch as any).plaid_txn_id
+          const crosscheck = matched
+            ? `matched:${(p.plaidMatch as any).plaid_txn_id}`
+            : 'no plaid match'
+          return {
+            date: p.date,
+            account,
+            project: p.project || 'Operating',
+            expenseType: p.expenseType,
+            category: p.category,
+            guestTrip: p.guestTrip ? (p.guestTripName || 'Yes') : '',
+            store: p.merchant,
+            usd: p.usd ? Number(p.usd) : null,
+            eur: p.eur ? Number(p.eur) : null,
+            refunded: p.refunded,
+            description: p.description,
+            specificRepair: p.specificRepair,
+            statement: p.statement,
+            inputBy: crewName || 'Unknown',
+            receiptUrl: p.driveViewUrl || '',
+            crosscheck,
+          }
+        }),
       }
       const resp = await fetch('/api/expense-submit', {
         method: 'POST',

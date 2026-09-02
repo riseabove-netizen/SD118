@@ -12,6 +12,8 @@ import { SettingsPage } from '@/pages/Settings'
 import { AdminBroadcastPage } from '@/pages/AdminBroadcast'
 import { AdminScheduledBroadcastsPage } from '@/pages/AdminScheduledBroadcasts'
 import { ExpenseIntakePage } from '@/pages/expenses/Intake'
+import { PlaidLinkPage } from '@/pages/expenses/PlaidLink'
+import { PlaidUnloadedPage } from '@/pages/expenses/PlaidUnloaded'
 
 // Running Log
 import { UploadPage } from '@/pages/runlog/Upload'
@@ -125,6 +127,12 @@ function AppRoutes() {
       </Route>
       <Route path="/expenses">
         <AuthGuard><ExpenseIntakePage /></AuthGuard>
+      </Route>
+      <Route path="/admin/plaid/link">
+        <AuthGuard><PlaidLinkPage /></AuthGuard>
+      </Route>
+      <Route path="/admin/plaid/unloaded">
+        <AuthGuard><PlaidUnloadedPage /></AuthGuard>
       </Route>
 
       {/* Running Log */}

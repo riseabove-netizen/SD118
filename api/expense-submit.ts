@@ -50,6 +50,7 @@ export type SubmitExpense = {
   statement?: string           // Col M
   inputBy: string              // Col N — crew name
   receiptUrl?: string          // Col O — Drive link
+  crosscheck?: string          // Col S — Plaid crosscheck ('matched:<plaid_txn_id>' | 'no plaid match' | '')
 }
 
 function colLetter(n: number): string {
@@ -164,6 +165,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: [rowValues] },
         })
+
+        // Also write Crosscheck (col S) if provided — do not touch P/Q/R.
+        if (ex.crosscheck && ex.crosscheck.trim()) {
+          try {
+            await sheets.spreadsheets.values.update({
+              spreadsheetId: SPREADSHEET_ID,
+              range: `${EXPENSES_SHEET_TITLE}!S${rowNum}`,
+              valueInputOption: 'USER_ENTERED',
+              requestBody: { values: [[ex.crosscheck]] },
+            })
+          } catch (ccErr: any) {
+            console.warn('Could not write Crosscheck for row', rowNum, ccErr?.message)
+          }
+        }
 
         // 4) Write the Dropdown1 / Dropdown2 formulas on the mapped row.
         const dropdown1Formula = `=if(Expenses!C${rowNum}="","",transpose(unique(FILTER(Definitions!B:B,Definitions!A:A=Expenses!C${rowNum}))))`

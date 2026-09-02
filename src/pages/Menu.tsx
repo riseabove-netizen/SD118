@@ -164,6 +164,24 @@ export function MenuPage() {
             description="Push schedule updates to selected crew &amp; guests"
           />
         )}
+        {role === 'admin' && (
+          <MenuItem
+            icon="🏦"
+            id="admin-plaid-link"
+            label="Plaid Link"
+            href="/admin/plaid/link"
+            description="Connect &amp; manage bank accounts"
+          />
+        )}
+        {role === 'admin' && (
+          <MenuItem
+            icon="💳"
+            id="admin-plaid-unloaded"
+            label="Plaid Intake"
+            href="/admin/plaid/unloaded"
+            description="Insert unmatched card transactions"
+          />
+        )}
       </div>
 
       {/* Footer */}
