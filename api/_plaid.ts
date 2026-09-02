@@ -58,10 +58,9 @@ export function sheetsAuth(readWrite: boolean = false) {
   })
 }
 
-const HMAC_SECRET = cleanEnv(process.env.HMAC_SECRET) || cleanEnv(process.env.APP_SECRET) || 'fallback-secret'
-
 function _hmac(payload: string): string {
-  return crypto.createHmac('sha256', HMAC_SECRET).update(payload).digest('hex')
+  const secret = (process.env.HMAC_SECRET || process.env.APP_SECRET || 'fallback-secret').trim()
+  return crypto.createHmac('sha256', secret).update(payload).digest('hex')
 }
 
 function verifyToken(token: string | undefined | null): { ok: boolean; role?: 'admin' | 'viewer' | 'crew' } {
