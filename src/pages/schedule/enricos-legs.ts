@@ -31,12 +31,8 @@ export const CHAPTER_ANCHORS: ChapterAnchor[] = [
   { id: 'naples-friends-2026',        label: 'Naples · Friends → Catania', coord: { lat: 38.500, lon: 14.950 } }, // Aeolians midpoint
   { id: 'malta-2026',                 label: 'Valletta, Malta',         coord: { lat: 35.895, lon: 14.515 } },
   { id: 'gozo-2026',                  label: 'Mgarr, Gozo',             coord: { lat: 36.025, lon: 14.300 } },
-  { id: 'sicily-aeolians-revisited-2026', label: 'Taormina / Sicily E.', coord: { lat: 37.850, lon: 15.300 } },
-  { id: 'crotone-calabria-2026',      label: 'Crotone, Calabria',       coord: { lat: 39.080, lon: 17.130 } },
+  { id: 'sicily-aeolians-revisited-2026', label: 'Sicily SE → Salento', coord: { lat: 37.850, lon: 15.300 } },
   { id: 'corfu-2026',                 label: 'Corfu',                   coord: { lat: 39.620, lon: 19.920 } },
-  { id: 'albania-2026',               label: 'Sarandë, Albania',        coord: { lat: 39.875, lon: 20.005 } },
-  { id: 'montenegro-2026',            label: 'Kotor Bay, Montenegro',   coord: { lat: 42.430, lon: 18.770 } },
-  { id: 'dubrovnik-2026',             label: 'Dubrovnik, Croatia',      coord: { lat: 42.660, lon: 18.080 } },
 ]
 
 // Per-leg speed override (knots). Defaults to CRUISE_KNOTS.
@@ -100,7 +96,7 @@ export type Leg = {
   mapsUrl: string
 }
 
-/** Build all 14 consecutive legs between the 15 anchors. */
+/** Build all consecutive legs between chapter anchors. */
 export function buildLegs(): Leg[] {
   const legs: Leg[] = []
   for (let i = 0; i < CHAPTER_ANCHORS.length - 1; i++) {

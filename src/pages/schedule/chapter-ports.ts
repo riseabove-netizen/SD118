@@ -156,54 +156,38 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
     },
   },
 
-  // Chapter 9 — Sicily / Aeolians revisited
+  // Chapter 9 — Sicily Coast → Grotta di San Gregorio (Sept 9–14)
   'sicily-aeolians-revisited-2026': {
     stops: [
-      { name: 'Mgarr, Gozo',     coord: { lat: 36.025, lon: 14.298 } },
-      { name: 'Catania',         coord: { lat: 37.500, lon: 15.110 } },
-      { name: 'Taormina',        coord: { lat: 37.852, lon: 15.295 } },
-      { name: 'Vulcano',         coord: { lat: 38.395, lon: 14.965 } },
-      { name: 'Lipari',          coord: { lat: 38.470, lon: 14.955 } },
+      { name: 'Mgarr, Gozo',              coord: { lat: 36.025, lon: 14.298 } },
+      { name: 'Isola delle Correnti',     coord: { lat: 36.646, lon: 15.088 } },
+      { name: 'Isola Vendicari',          coord: { lat: 36.797, lon: 15.100 } },
+      { name: 'Punta Arenella',           coord: { lat: 36.955, lon: 15.213 } },
+      { name: 'Syracuse',                 coord: { lat: 37.060, lon: 15.295 } },
+      { name: 'Taormina anchorage',       coord: { lat: 37.852, lon: 15.295 } },
+      { name: 'Taormina Marina',          coord: { lat: 37.865, lon: 15.305 } },
+      { name: 'Grotta di San Gregorio',   coord: { lat: 39.833, lon: 18.360 } },
     ],
     waypoints: {
-      // Gozo → Catania: long open-water passage
-      '0-1': [{ lat: 36.500, lon: 14.700 }, { lat: 37.100, lon: 15.200 }],
-      // Taormina → Vulcano: round NE Sicily
-      '2-3': [{ lat: 38.150, lon: 15.450 }, { lat: 38.350, lon: 15.100 }],
-    },
-  },
-
-  // Chapter 10 — Crotone / Calabria
-  'crotone-calabria-2026': {
-    stops: [
-      { name: 'Lipari',     coord: { lat: 38.470, lon: 14.955 } },
-      { name: 'Tropea',     coord: { lat: 38.680, lon: 15.895 } },
-      { name: 'Crotone',    coord: { lat: 39.080, lon: 17.130 } },
-    ],
-    waypoints: {
-      // Lipari → Tropea: through Messina Strait — narrow but all water; go east first
-      '0-1': [{ lat: 38.350, lon: 15.700 }, { lat: 38.450, lon: 15.850 }],
-      // Tropea → Crotone: round the toe of Italy southward then east into Ionian
-      '1-2': [
-        { lat: 38.300, lon: 16.200 }, // south of Tropea
-        { lat: 37.900, lon: 16.300 }, // off Capo Spartivento (toe of Italy)
-        { lat: 38.500, lon: 17.200 }, // approach Crotone from SE
+      // Gozo → Isola delle Correnti: open Malta Channel crossing
+      '0-1': [{ lat: 36.300, lon: 14.700 }],
+      // Taormina Marina → Grotta di San Gregorio: overnight NE across Ionian, clear NE tip of Sicily
+      '6-7': [
+        { lat: 38.400, lon: 15.700 }, // NE of Taormina, offshore of Messina strait mouth
+        { lat: 39.200, lon: 17.500 }, // mid-Ionian
       ],
     },
   },
 
-  // Chapter 11 — Corfu
+  // Chapter 10 — Corfu (arrive Sept 15)
   'corfu-2026': {
     stops: [
-      { name: 'Crotone',           coord: { lat: 39.080, lon: 17.130 } },
-      { name: 'Corfu Town',        coord: { lat: 39.620, lon: 19.920 } },
-      { name: 'Paleokastritsa',    coord: { lat: 39.675, lon: 19.700 } },
+      { name: 'Grotta di San Gregorio', coord: { lat: 39.833, lon: 18.360 } },
+      { name: 'Corfu — Marina Gouvia', coord: { lat: 39.680, lon: 19.850 } },
     ],
     waypoints: {
-      // Crotone → Corfu: open Ionian crossing
-      '0-1': [{ lat: 39.300, lon: 18.500 }],
-      // Corfu Town → Paleokastritsa: round Corfu's north tip (no overland)
-      '1-2': [{ lat: 39.800, lon: 19.800 }],
+      // Salento → Corfu: open Otranto Channel crossing
+      '0-1': [{ lat: 39.750, lon: 19.100 }],
     },
   },
 
