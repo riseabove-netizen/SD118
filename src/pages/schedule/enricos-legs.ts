@@ -31,12 +31,21 @@ export const CHAPTER_ANCHORS: ChapterAnchor[] = [
   { id: 'naples-friends-2026',        label: 'Naples · Friends → Catania', coord: { lat: 38.500, lon: 14.950 } }, // Aeolians midpoint
   { id: 'malta-2026',                 label: 'Valletta, Malta',         coord: { lat: 35.895, lon: 14.515 } },
   { id: 'gozo-2026',                  label: 'Mgarr, Gozo',             coord: { lat: 36.025, lon: 14.300 } },
-  { id: 'sicily-aeolians-revisited-2026', label: 'Sicily SE → Salento', coord: { lat: 37.850, lon: 15.300 } },
+  { id: 'sicily-aeolians-revisited-2026', label: 'Grotta di San Gregorio', coord: { lat: 39.833, lon: 18.360 } },
   { id: 'corfu-2026',                 label: 'Corfu',                   coord: { lat: 39.620, lon: 19.920 } },
 ]
 
 // Per-leg speed override (knots). Defaults to CRUISE_KNOTS.
 const CRUISE_KNOTS = 12
+
+// Per-leg overrides keyed by `${fromId}->${toId}`. Use when the actual passage
+// distance/time deviates from the straight-line anchor-to-anchor computation
+// (e.g. slow overnight crossings, routing around obstacles, planned speed).
+type LegOverride = { distanceNm?: number; travelHours?: number; cruiseKnots?: number }
+const LEG_OVERRIDES: Record<string, LegOverride> = {
+  // Grotta di San Gregorio → Corfu: overnight 192 NM crossing at ~10 kn
+  'sicily-aeolians-revisited-2026->corfu-2026': { distanceNm: 192, travelHours: 19, cruiseKnots: 10 },
+}
 
 // =================== math helpers ===================
 
@@ -102,9 +111,10 @@ export function buildLegs(): Leg[] {
   for (let i = 0; i < CHAPTER_ANCHORS.length - 1; i++) {
     const a = CHAPTER_ANCHORS[i]
     const b = CHAPTER_ANCHORS[i + 1]
-    const dist = distanceNm(a.coord, b.coord)
-    const knots = CRUISE_KNOTS
-    const hours = dist / knots
+    const override = LEG_OVERRIDES[`${a.id}->${b.id}`] || {}
+    const dist = override.distanceNm ?? distanceNm(a.coord, b.coord)
+    const knots = override.cruiseKnots ?? CRUISE_KNOTS
+    const hours = override.travelHours ?? dist / knots
     legs.push({
       fromId: a.id,
       toId: b.id,
