@@ -160,19 +160,17 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
   'sicily-aeolians-revisited-2026': {
     stops: [
       { name: 'Mgarr, Gozo',              coord: { lat: 36.025, lon: 14.298 } },
-      { name: 'Isola delle Correnti',     coord: { lat: 36.646, lon: 15.088 } },
-      { name: 'Isola Vendicari',          coord: { lat: 36.797, lon: 15.100 } },
-      { name: 'Punta Arenella',           coord: { lat: 36.955, lon: 15.213 } },
-      { name: 'Syracuse',                 coord: { lat: 37.060, lon: 15.295 } },
+      { name: 'Spiaggia La Tonnara',      coord: { lat: 36.665, lon: 15.130 } },
+      { name: 'Ortigia / Siracusa',       coord: { lat: 37.060, lon: 15.295 } },
       { name: 'Taormina anchorage',       coord: { lat: 37.852, lon: 15.295 } },
       { name: 'Taormina Marina',          coord: { lat: 37.865, lon: 15.305 } },
       { name: 'Grotta di San Gregorio',   coord: { lat: 39.833, lon: 18.360 } },
     ],
     waypoints: {
-      // Gozo → Isola delle Correnti: open Malta Channel crossing
+      // Gozo → La Tonnara: open Malta Channel crossing
       '0-1': [{ lat: 36.300, lon: 14.700 }],
       // Taormina Marina → Grotta di San Gregorio: overnight NE across Ionian, clear NE tip of Sicily
-      '6-7': [
+      '4-5': [
         { lat: 38.400, lon: 15.700 }, // NE of Taormina, offshore of Messina strait mouth
         { lat: 39.200, lon: 17.500 }, // mid-Ionian
       ],
