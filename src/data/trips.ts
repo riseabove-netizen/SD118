@@ -1464,10 +1464,10 @@ export const TRIPS: Trip[] = [
   // =================================================================
   {
     id: 'sicily-aeolians-revisited-2026',
-    name: 'Sicily Coast → Grotta di San Gregorio',
-    subtitle: 'Isola delle Correnti · Vendicari · Punta Arenella · Syracuse · Taormina · Grotta di San Gregorio',
+    name: 'Sicily Coast → Taormina',
+    subtitle: 'Isola delle Correnti · Vendicari · Punta Arenella · Syracuse · Taormina',
     startDate: '2026-09-09',
-    endDate: '2026-09-14',
+    endDate: '2026-09-13',
     hero: { icon: '\ud83c\udfdb\ufe0f', gradient: 'from-slate-900 via-zinc-800 to-amber-900' },
     guests: 'Final chapter — Enrico, Antoniette, Daniel, Laura, Marco, Deanna, Brianna, Matt, Candace, The Dog. Split Sep 13: Daniel, Laura, Marco, Deanna, Candace & The Dog depart; Brianna & Matt continue.',
     guestList: [
@@ -1594,6 +1594,26 @@ export const TRIPS: Trip[] = [
           knots: 12,
         },
       },
+    ],
+  },
+
+  // =================================================================
+  // CHAPTER ELEVEN — FINAL PASSAGE: SALENTO → IONIAN → ALBANIA (Sep 14–20)
+  // =================================================================
+  {
+    id: 'final-passage-2026',
+    name: 'Final Passage — Salento → Ionian → Albania',
+    subtitle: 'Grotta di San Gregorio · Corfu · Sivota · Paxos · Diapontia · Porto Palermo · Dhermi · Vlorë',
+    startDate: '2026-09-14',
+    endDate: '2026-09-20',
+    hero: { icon: '\ud83c\uddec\ud83c\uddf7', gradient: 'from-blue-950 via-sky-900 to-emerald-800' },
+    guests: 'Final chapter — Enrico, Antoniette, Brianna, Matt (Brianna & Matt depart Sep 20)',
+    guestList: [
+      { name: 'Enrico' }, { name: 'Antoniette' },
+      { name: 'Brianna' }, { name: 'Matt' },
+    ],
+
+    days: [
       {
         date: 'Monday · September 14',
         isoDate: '2026-09-14',
@@ -1618,26 +1638,6 @@ export const TRIPS: Trip[] = [
           knots: 12,
         },
       },
-    ],
-  },
-
-  // =================================================================
-  // CHAPTER ELEVEN — CORFU (Sep 15–16)
-  // =================================================================
-  {
-    id: 'corfu-2026',
-    name: 'Corfu — Gateway to the Ionian',
-    subtitle: 'Dock Sep 15 · Depart Sep 16 for the Ionian Islands',
-    startDate: '2026-09-15',
-    endDate: '2026-09-16',
-    hero: { icon: '\ud83c\uddec\ud83c\uddf7', gradient: 'from-blue-950 via-sky-900 to-emerald-800' },
-    guests: 'Final chapter — Enrico, Antoniette, Brianna, Matt',
-    guestList: [
-      { name: 'Enrico' }, { name: 'Antoniette' },
-      { name: 'Brianna' }, { name: 'Matt' },
-    ],
-
-    days: [
       {
         date: 'Tuesday · September 15',
         isoDate: '2026-09-15',
@@ -1687,26 +1687,6 @@ export const TRIPS: Trip[] = [
           knots: 11,
         },
       },
-    ],
-  },
-
-  // =================================================================
-  // CHAPTER TWELVE — IONIAN ISLANDS: PAXOS (Sep 17)
-  // =================================================================
-  {
-    id: 'ionian-paxos-2026',
-    name: 'Ionian Islands — Paxos & Antipaxos',
-    subtitle: 'Sivota → Paxos → Gaios overnight',
-    startDate: '2026-09-17',
-    endDate: '2026-09-17',
-    hero: { icon: '\ud83c\uddec\ud83c\uddf7', gradient: 'from-cyan-950 via-sky-900 to-teal-800' },
-    guests: 'Final chapter — Enrico, Antoniette, Brianna, Matt',
-    guestList: [
-      { name: 'Enrico' }, { name: 'Antoniette' },
-      { name: 'Brianna' }, { name: 'Matt' },
-    ],
-
-    days: [
       {
         date: 'Thursday · September 17',
         isoDate: '2026-09-17',
@@ -1744,26 +1724,6 @@ export const TRIPS: Trip[] = [
           knots: 11,
         },
       },
-    ],
-  },
-
-  // =================================================================
-  // CHAPTER THIRTEEN — ALBANIAN RIVIERA (Sep 18–20)
-  // =================================================================
-  {
-    id: 'albania-2026',
-    name: 'Albanian Riviera',
-    subtitle: 'Diapontia → Porto Palermo → Gjipe → Dhermi → Vlorë',
-    startDate: '2026-09-18',
-    endDate: '2026-09-20',
-    hero: { icon: '\ud83c\udde6\ud83c\uddf1', gradient: 'from-red-950 via-rose-900 to-orange-800' },
-    guests: 'Final chapter — Enrico, Antoniette, Brianna, Matt (Brianna & Matt depart Sep 20)',
-    guestList: [
-      { name: 'Enrico' }, { name: 'Antoniette' },
-      { name: 'Brianna' }, { name: 'Matt' },
-    ],
-
-    days: [
       {
         date: 'Friday · September 18',
         isoDate: '2026-09-18',

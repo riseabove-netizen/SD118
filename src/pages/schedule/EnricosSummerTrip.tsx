@@ -22,9 +22,7 @@ const CHAPTER_IDS = [
   'malta-2026',
   'gozo-2026',
   'sicily-aeolians-revisited-2026',
-  'corfu-2026',
-  'ionian-paxos-2026',
-  'albania-2026',
+  'final-passage-2026',
 ]
 
 function formatRange(startIso: string, endIso: string): string {

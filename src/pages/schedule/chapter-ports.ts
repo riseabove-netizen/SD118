@@ -177,55 +177,37 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
     },
   },
 
-  // Chapter 10 — Corfu (arrive Sept 15, depart Sept 16 for Sivota)
-  'corfu-2026': {
+  // Chapter 11 — Final Passage: Salento → Ionian → Albania (Sept 14–20)
+  'final-passage-2026': {
     stops: [
-      { name: 'Grotta di San Gregorio', coord: { lat: 39.833, lon: 18.360 } },
-      { name: 'Corfu — Marina Gouvia', coord: { lat: 39.680, lon: 19.850 } },
-      { name: 'Blue Lagoon (Sivota)',    coord: { lat: 39.410, lon: 20.243 } },
-      { name: 'Sivota',                  coord: { lat: 39.415, lon: 20.250 } },
+      { name: 'Grotta di San Gregorio',    coord: { lat: 39.833, lon: 18.360 } },
+      { name: 'Corfu — Marina Gouvia',     coord: { lat: 39.680, lon: 19.850 } },
+      { name: 'Blue Lagoon (Sivota)',       coord: { lat: 39.410, lon: 20.243 } },
+      { name: 'Sivota',                     coord: { lat: 39.415, lon: 20.250 } },
+      { name: 'Ortholithos (Paxos)',        coord: { lat: 39.220, lon: 20.125 } },
+      { name: 'Antipaxos',                  coord: { lat: 39.150, lon: 20.240 } },
+      { name: 'Gaios',                      coord: { lat: 39.202, lon: 20.184 } },
+      { name: 'Mathraki',                   coord: { lat: 39.776, lon: 19.540 } },
+      { name: 'Braghini (Ereikoussa)',      coord: { lat: 39.877, lon: 19.590 } },
+      { name: 'Porto Palermo',              coord: { lat: 40.060, lon: 19.790 } },
+      { name: 'Gjipe',                      coord: { lat: 40.127, lon: 19.670 } },
+      { name: 'Dhermi',                     coord: { lat: 40.144, lon: 19.635 } },
+      { name: 'Secret Blue Cave',           coord: { lat: 40.232, lon: 19.453 } },
+      { name: 'Orikum Marina',              coord: { lat: 40.325, lon: 19.470 } },
     ],
     waypoints: {
       // Salento → Corfu: open Otranto Channel crossing
       '0-1': [{ lat: 39.750, lon: 19.100 }],
       // Corfu → Blue Lagoon: coastal SE
       '1-2': [{ lat: 39.550, lon: 20.150 }],
-    },
-  },
-
-  // Chapter 12 — Ionian Islands: Paxos (Sept 17)
-  'ionian-paxos-2026': {
-    stops: [
-      { name: 'Sivota',              coord: { lat: 39.415, lon: 20.250 } },
-      { name: 'Ortholithos (Paxos)', coord: { lat: 39.220, lon: 20.125 } },
-      { name: 'Antipaxos',           coord: { lat: 39.150, lon: 20.240 } },
-      { name: 'Gaios',               coord: { lat: 39.202, lon: 20.184 } },
-    ],
-    waypoints: {
-      // Sivota → Ortholithos: south down west coast of Paxos
-      '0-1': [{ lat: 39.300, lon: 20.150 }],
-    },
-  },
-
-  // Chapter 13 — Albanian Riviera (Sept 18–20)
-  'albania-2026': {
-    stops: [
-      { name: 'Gaios (Paxos)',    coord: { lat: 39.202, lon: 20.184 } },
-      { name: 'Mathraki',         coord: { lat: 39.776, lon: 19.540 } },
-      { name: 'Braghini (Ereikoussa)', coord: { lat: 39.877, lon: 19.590 } },
-      { name: 'Porto Palermo',    coord: { lat: 40.060, lon: 19.790 } },
-      { name: 'Gjipe',            coord: { lat: 40.127, lon: 19.670 } },
-      { name: 'Dhermi',           coord: { lat: 40.144, lon: 19.635 } },
-      { name: 'Secret Blue Cave', coord: { lat: 40.232, lon: 19.453 } },
-      { name: 'Orikum Marina',    coord: { lat: 40.325, lon: 19.470 } },
-    ],
-    waypoints: {
+      // Sivota → Ortholithos (Paxos): south down west coast of Paxos
+      '3-4': [{ lat: 39.300, lon: 20.150 }],
       // Gaios → Mathraki: N/NW open crossing around Corfu west side
-      '0-1': [{ lat: 39.500, lon: 19.700 }, { lat: 39.700, lon: 19.500 }],
+      '6-7': [{ lat: 39.500, lon: 19.700 }, { lat: 39.700, lon: 19.500 }],
       // Braghini → Porto Palermo: SE across Corfu Strait to Albanian coast
-      '2-3': [{ lat: 40.000, lon: 19.700 }],
+      '8-9': [{ lat: 40.000, lon: 19.700 }],
       // Secret Blue Cave → Orikum: north along Karaburun then into Vlorë Bay
-      '6-7': [{ lat: 40.280, lon: 19.400 }, { lat: 40.320, lon: 19.420 }],
+      '12-13': [{ lat: 40.280, lon: 19.400 }, { lat: 40.320, lon: 19.420 }],
     },
   },
 
