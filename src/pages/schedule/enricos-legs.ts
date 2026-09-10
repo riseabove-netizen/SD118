@@ -33,6 +33,8 @@ export const CHAPTER_ANCHORS: ChapterAnchor[] = [
   { id: 'gozo-2026',                  label: 'Mgarr, Gozo',             coord: { lat: 36.025, lon: 14.300 } },
   { id: 'sicily-aeolians-revisited-2026', label: 'Grotta di San Gregorio', coord: { lat: 39.833, lon: 18.360 } },
   { id: 'corfu-2026',                 label: 'Corfu',                   coord: { lat: 39.620, lon: 19.920 } },
+  { id: 'ionian-paxos-2026',          label: 'Paxos — Gaios',            coord: { lat: 39.202, lon: 20.184 } },
+  { id: 'albania-2026',               label: 'Albanian Riviera',        coord: { lat: 40.325, lon: 19.470 } }, // Orikum Marina
 ]
 
 // Per-leg speed override (knots). Defaults to CRUISE_KNOTS.
@@ -45,6 +47,10 @@ type LegOverride = { distanceNm?: number; travelHours?: number; cruiseKnots?: nu
 const LEG_OVERRIDES: Record<string, LegOverride> = {
   // Grotta di San Gregorio → Corfu: overnight 192 NM crossing at ~10 kn
   'sicily-aeolians-revisited-2026->corfu-2026': { distanceNm: 192, travelHours: 19, cruiseKnots: 10 },
+  // Corfu (Sivota) → Paxos (Gaios): short Ionian hop
+  'corfu-2026->ionian-paxos-2026': { distanceNm: 40, travelHours: 4, cruiseKnots: 11 },
+  // Paxos → Albanian Riviera (Orikum): Mathraki → Braghini → Porto Palermo → Gjipe → Dhermi → Vlorë multi-day
+  'ionian-paxos-2026->albania-2026': { distanceNm: 137, travelHours: 17, cruiseKnots: 11 },
 }
 
 // =================== math helpers ===================
