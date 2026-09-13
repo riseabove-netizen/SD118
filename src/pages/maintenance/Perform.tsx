@@ -21,6 +21,12 @@ import {
   unionChecklists,
   UnifiedChecklistItem,
 } from '@/data/maintenance-systems'
+import {
+  buildCustomPickerGroups,
+  findPickerSystem,
+  PickerGroup,
+  PickerSystem,
+} from '@/data/all-systems-picker'
 import { fetchSystemState, submitMaintenanceLog, fileToBase64 } from '@/lib/maintenance-api'
 import { ZincRodsGuide, isZincRodItem } from '@/components/ZincRodsGuide'
 
@@ -100,15 +106,32 @@ export function PerformMaintenancePage() {
   const [currentHours, setCurrentHours] = useState<number | null>(null)
 
   const system = useMemo(() => MAINTENANCE_SYSTEMS.find(s => s.id === systemId), [systemId])
+  const pickerGroups = useMemo(() => buildCustomPickerGroups(), [])
+  // For custom repairs on calendar-only systems (jetski, tender, chillers…)
+  // we don't have a MaintenanceSystem — synthesize a lightweight one so the
+  // downstream PerformStep can render its header + submit to the log API.
+  const pickerHit = useMemo(() => findPickerSystem(systemId), [systemId])
+  const syntheticSystem: MaintenanceSystem | undefined = useMemo(() => {
+    if (system) return undefined
+    if (!pickerHit || pickerHit.kind !== 'calendar') return undefined
+    return {
+      id: pickerHit.id,
+      parentId: pickerHit.id.split('#')[0],
+      kind: 'ac' as any, // synthetic — not used for kit math since kits=[]
+      label: pickerHit.label,
+      driveFolderPath: pickerHit.driveFolderPath,
+      icon: pickerHit.icon,
+      kits: [],
+    }
+  }, [system, pickerHit])
+  const effectiveSystem = system || syntheticSystem
+  const isCalendarSystem = !system && !!syntheticSystem
   const activeSystems = MAINTENANCE_SYSTEMS.filter(s => s.kits.length > 0)
-  // Custom repairs can target ANY system — including ones with no kits
-  // (Hamann, main engines, watermakers, etc.) — so we expose the full list.
-  const allSystems = MAINTENANCE_SYSTEMS
   const isCustom = selectedKits.length === 1 && selectedKits[0] === 'custom'
 
   // Fetch current hours when a system is picked, so the "hours at service"
-  // field pre-fills. Only active systems (with kits) actually go to the
-  // API — others get 0 as a placeholder.
+  // field pre-fills. Only active hour-based systems actually go to the
+  // API — calendar systems get null (the field is hidden).
   useEffect(() => {
     let cancelled = false
     if (!system) { setCurrentHours(null); return }
@@ -131,7 +154,7 @@ export function PerformMaintenancePage() {
       {step === 'pick' ? (
         <PickStep
           activeSystems={activeSystems}
-          allSystems={allSystems}
+          pickerGroups={pickerGroups}
           systemId={systemId}
           setSystemId={setSystemId}
           selectedKits={selectedKits}
@@ -142,12 +165,13 @@ export function PerformMaintenancePage() {
             setStep('perform')
           }}
         />
-      ) : system ? (
+      ) : effectiveSystem ? (
         <PerformStep
-          system={system}
+          system={effectiveSystem}
           selectedKits={selectedKits}
           setSelectedKits={setSelectedKits}
           isCustom={isCustom}
+          isCalendarSystem={isCalendarSystem}
           customTitle={customTitle}
           setCustomTitle={setCustomTitle}
           currentHours={currentHours}
@@ -155,10 +179,17 @@ export function PerformMaintenancePage() {
           onBack={() => setStep('pick')}
           onDone={eventId => {
             void eventId
-            if (system.kind === 'generator' && system.side) {
+            if (isCalendarSystem) {
+              // Route back to the calendar system detail page. Strip any
+              // #unit suffix — the CalendarSystem page keys off the base id.
+              const baseId = effectiveSystem.id.split('#')[0]
+              setLocation(`/maintenance/calendar/${baseId}`)
+            } else if (system && system.kind === 'generator' && system.side) {
               setLocation(`/maintenance/generator/${system.side}`)
-            } else {
+            } else if (system) {
               setLocation(`/maintenance/system/${system.id}`)
+            } else {
+              setLocation('/maintenance')
             }
           }}
         />
@@ -173,7 +204,7 @@ export function PerformMaintenancePage() {
 
 interface PickProps {
   activeSystems: MaintenanceSystem[]
-  allSystems: MaintenanceSystem[]
+  pickerGroups: PickerGroup[]
   systemId: string
   setSystemId(id: string): void
   selectedKits: string[]
@@ -181,13 +212,71 @@ interface PickProps {
   onContinue(): void
 }
 
-function PickStep({ activeSystems, allSystems, systemId, setSystemId, selectedKits, setSelectedKits, onContinue }: PickProps) {
+function PickStep({ activeSystems, pickerGroups, systemId, setSystemId, selectedKits, setSelectedKits, onContinue }: PickProps) {
   const isCustom = selectedKits.length === 1 && selectedKits[0] === 'custom'
-  // In custom mode any system is pickable. Otherwise only ones with
-  // predefined kits show up (so the checkbox row makes sense).
-  const pickable = isCustom ? allSystems : activeSystems
-  const system = pickable.find(s => s.id === systemId)
 
+  // Which parent group is expanded (side picker) when in custom mode.
+  // Defaults to whichever group owns the currently-selected systemId.
+  const initialParent = useMemo(() => {
+    if (!systemId) return ''
+    for (const g of pickerGroups) {
+      if (g.systems.some(s => s.id === systemId)) return g.parentId
+    }
+    return ''
+  }, [systemId, pickerGroups])
+  const [openParent, setOpenParent] = useState<string>(initialParent)
+  useEffect(() => { if (initialParent && !openParent) setOpenParent(initialParent) }, [initialParent])
+
+  // Non-custom (hour-based scheduled kits): keep the original flat list —
+  // kits are what drive the picker in that mode.
+  const system = activeSystems.find(s => s.id === systemId)
+
+  if (!isCustom) {
+    return (
+      <div className="space-y-5">
+        <div>
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+            1. Select system
+          </div>
+          <div className="space-y-2">
+            {activeSystems.map(s => (
+              <label
+                key={s.id}
+                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                  systemId === s.id ? 'border-red-500 bg-red-500/5' : 'border-border bg-card hover:bg-secondary'
+                }`}
+              >
+                <input
+                  type="radio"
+                  className="accent-red-600"
+                  checked={systemId === s.id}
+                  onChange={() => { setSystemId(s.id); setSelectedKits([]) }}
+                />
+                <span className="text-lg">{s.icon}</span>
+                <span className="text-sm font-medium flex-1">{s.label}</span>
+              </label>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            More systems will unlock as we fill in their service intervals.
+          </p>
+        </div>
+
+        {system && (
+          <KitPicker system={system} selectedKits={selectedKits} setSelectedKits={setSelectedKits} />
+        )}
+
+        <ContinueButtons
+          isCustom={false}
+          canContinue={!!systemId && selectedKits.length > 0}
+          onContinue={onContinue}
+          onToggleCustom={() => setSelectedKits(['custom'])}
+        />
+      </div>
+    )
+  }
+
+  // Custom mode: hierarchical group -> side picker.
   return (
     <div className="space-y-5">
       <div>
@@ -195,34 +284,129 @@ function PickStep({ activeSystems, allSystems, systemId, setSystemId, selectedKi
           1. Select system
         </div>
         <div className="space-y-2">
-          {pickable.map(s => (
-            <label
-              key={s.id}
-              className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                systemId === s.id ? 'border-red-500 bg-red-500/5' : 'border-border bg-card hover:bg-secondary'
-              }`}
-            >
-              <input
-                type="radio"
-                className="accent-red-600"
-                checked={systemId === s.id}
-                onChange={() => { setSystemId(s.id); if (!isCustom) setSelectedKits([]) }}
-              />
-              <span className="text-lg">{s.icon}</span>
-              <span className="text-sm font-medium flex-1">{s.label}</span>
-            </label>
-          ))}
+          {pickerGroups.map(g => {
+            const groupSelected = g.systems.some(s => s.id === systemId)
+            const isOpen = openParent === g.parentId || groupSelected
+            const atomic = g.systems.length === 1
+            const only = g.systems[0]
+            return (
+              <div
+                key={g.parentId}
+                className={`rounded-xl border ${groupSelected ? 'border-red-500 bg-red-500/5' : 'border-border bg-card'}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (atomic) {
+                      setSystemId(only.id)
+                      setOpenParent(g.parentId)
+                    } else {
+                      setOpenParent(isOpen ? '' : g.parentId)
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 p-3 text-left"
+                >
+                  <input
+                    type="radio"
+                    className="accent-red-600 pointer-events-none"
+                    readOnly
+                    checked={groupSelected}
+                  />
+                  <span className="text-lg">{g.icon}</span>
+                  <span className="text-sm font-medium flex-1">{g.label}</span>
+                  {!atomic && (
+                    <span className="text-xs text-muted-foreground">
+                      {isOpen ? '▾' : '▸'} {g.systems.length}
+                    </span>
+                  )}
+                </button>
+                {!atomic && isOpen && (
+                  <div className="px-3 pb-3 space-y-1.5">
+                    {g.systems.map(s => (
+                      <label
+                        key={s.id}
+                        className={`flex items-center gap-2.5 pl-8 pr-3 py-2 rounded-md border cursor-pointer text-xs ${
+                          systemId === s.id
+                            ? 'border-red-500/60 bg-red-500/10 text-foreground'
+                            : 'border-border bg-background hover:bg-secondary text-foreground/80'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          className="accent-red-600"
+                          checked={systemId === s.id}
+                          onChange={() => setSystemId(s.id)}
+                        />
+                        <span className="flex-1">{s.sideLabel || s.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
         <p className="text-[11px] text-muted-foreground mt-2">
-          More systems will unlock as we fill in their service intervals.
+          Pick any system to log a one-off repair. Groups with multiple units
+          (main engines, generators, watermakers, chillers…) expand to let you
+          pick which side.
         </p>
       </div>
 
-      {system && !isCustom && (
-        <div>
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-            2. Which kit(s)?
-          </div>
+      <ContinueButtons
+        isCustom={true}
+        canContinue={!!systemId}
+        onContinue={onContinue}
+        onToggleCustom={() => setSelectedKits([])}
+      />
+    </div>
+  )
+}
+
+function ContinueButtons({
+  isCustom, canContinue, onContinue, onToggleCustom,
+}: {
+  isCustom: boolean
+  canContinue: boolean
+  onContinue(): void
+  onToggleCustom(): void
+}) {
+  return (
+    <div className="space-y-2">
+      <button
+        onClick={onContinue}
+        disabled={!canContinue}
+        className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-semibold text-sm"
+      >
+        Continue
+      </button>
+      <button
+        type="button"
+        onClick={onToggleCustom}
+        className={`w-full py-2.5 rounded-xl border text-sm font-medium ${
+          isCustom
+            ? 'border-red-500 bg-red-500/10 text-red-300'
+            : 'border-border bg-card hover:bg-secondary text-foreground'
+        }`}
+      >
+        {isCustom ? '✓ Custom / one-off repair (tap to cancel)' : '🔧 Log custom / one-off repair'}
+      </button>
+    </div>
+  )
+}
+
+function KitPicker({
+  system, selectedKits, setSelectedKits,
+}: {
+  system: MaintenanceSystem
+  selectedKits: string[]
+  setSelectedKits(k: string[]): void
+}) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+        2. Which kit(s)?
+      </div>
           <div className="space-y-2">
             {system.kits.map(kit => (
               <label
@@ -248,42 +432,8 @@ function PickStep({ activeSystems, allSystems, systemId, setSystemId, selectedKi
             ))}
           </div>
           <p className="text-[11px] text-muted-foreground mt-2">
-            Pick more than one when multiple kits fall on the same milestone (e.g. 2000 h = 250 + 500 + 2000).
-          </p>
-        </div>
-      )}
-
-      {system && isCustom && (
-        <p className="text-[11px] text-muted-foreground">
-          Custom repair mode — you’ll enter a title and description on the next screen.
-        </p>
-      )}
-
-      <button
-        onClick={onContinue}
-        disabled={!systemId || selectedKits.length === 0}
-        className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-semibold text-sm"
-      >
-        Continue
-      </button>
-
-      {/* Custom / repair mode toggle. Available for any system — lets the
-          user log one-off repairs or non-scheduled maintenance without a
-          predefined checklist. */}
-      <button
-        type="button"
-        onClick={() => {
-          if (isCustom) setSelectedKits([])
-          else setSelectedKits(['custom'])
-        }}
-        className={`w-full py-2.5 rounded-xl border text-sm font-medium ${
-          isCustom
-            ? 'border-red-500 bg-red-500/10 text-red-300'
-            : 'border-border bg-card hover:bg-secondary text-foreground'
-        }`}
-      >
-        {isCustom ? '✓ Custom / one-off repair (tap to cancel)' : '🔧 Custom / one-off repair'}
-      </button>
+        Pick more than one when multiple kits fall on the same milestone (e.g. 2000 h = 250 + 500 + 2000).
+      </p>
     </div>
   )
 }
@@ -295,6 +445,7 @@ interface PerformProps {
   selectedKits: string[]
   setSelectedKits(k: string[]): void
   isCustom: boolean
+  isCalendarSystem: boolean
   customTitle: string
   setCustomTitle(v: string): void
   currentHours: number | null
@@ -303,7 +454,7 @@ interface PerformProps {
   onDone(eventId: string): void
 }
 
-function PerformStep({ system, selectedKits, setSelectedKits, isCustom, customTitle, setCustomTitle, currentHours, crewName, onBack, onDone }: PerformProps) {
+function PerformStep({ system, selectedKits, setSelectedKits, isCustom, isCalendarSystem, customTitle, setCustomTitle, currentHours, crewName, onBack, onDone }: PerformProps) {
   const kits = system.kits.filter(k => selectedKits.includes(k.id))
   const unified: UnifiedChecklistItem[] = useMemo(
     () => (isCustom ? [] : unionChecklists(system, selectedKits)),
@@ -357,7 +508,7 @@ function PerformStep({ system, selectedKits, setSelectedKits, isCustom, customTi
   }
 
   async function submit() {
-    if (!hoursAtService) { setErrorMsg('Hours at service is required.'); return }
+    if (!isCalendarSystem && !hoursAtService) { setErrorMsg('Hours at service is required.'); return }
     if (!technician.trim()) { setErrorMsg('Technician name is required.'); return }
     if (isCustom && !customTitle.trim()) { setErrorMsg('Please give this repair a short title.'); return }
     setSubmitting(true)
@@ -375,7 +526,7 @@ function PerformStep({ system, selectedKits, setSelectedKits, isCustom, customTi
         driveFolderPath: system.driveFolderPath,
         kitIds: isCustom ? ['custom'] : selectedKits,
         kitLabels: isCustom ? [`Custom repair: ${customTitle.trim()}`] : kits.map(k => k.label),
-        hoursAtService: Number(hoursAtService),
+        hoursAtService: isCalendarSystem ? 0 : Number(hoursAtService),
         technician: technician.trim(),
         notes: isCustom
           ? (customTitle.trim() + (notes.trim() ? `\n\n${notes.trim()}` : ''))
@@ -468,17 +619,19 @@ function PerformStep({ system, selectedKits, setSelectedKits, isCustom, customTi
 
       {/* Meta fields */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <label className="text-xs">
-            <span className="block text-muted-foreground mb-1">Hours at service</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={hoursAtService}
-              onChange={e => setHoursAtService(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-            />
-          </label>
+        <div className={isCalendarSystem ? '' : 'grid grid-cols-2 gap-3'}>
+          {!isCalendarSystem && (
+            <label className="text-xs">
+              <span className="block text-muted-foreground mb-1">Hours at service</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={hoursAtService}
+                onChange={e => setHoursAtService(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+            </label>
+          )}
           <label className="text-xs">
             <span className="block text-muted-foreground mb-1">Technician</span>
             <input

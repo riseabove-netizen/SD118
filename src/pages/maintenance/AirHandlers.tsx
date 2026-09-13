@@ -6,7 +6,7 @@
 // the Perform flow pre-scoped to that zone.
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'wouter'
+import { Link, useLocation } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { Button } from '@/components/ui/button'
 import {
@@ -181,7 +181,30 @@ export function AirHandlersPage() {
           Interval: every {AIR_HANDLER_INTERVAL_DAYS} days · grace period {AIR_HANDLER_OVERDUE_GRACE_DAYS} days
           before overdue.
         </div>
+
+        {/* Custom / one-off repair entry point. Uses the AC system id
+            since air handlers roll up under "ac" in MAINTENANCE_SYSTEMS. */}
+        <div className="pt-2 border-t border-border/60">
+          <CustomRepairButton />
+        </div>
       </div>
     </MenuLayout>
+  )
+}
+
+function CustomRepairButton() {
+  const [, setLocation] = useLocation()
+  return (
+    <>
+      <button
+        onClick={() => setLocation('/maintenance/perform?mode=custom')}
+        className="w-full text-xs px-3 py-2.5 rounded-md border border-border bg-card hover:bg-secondary text-foreground font-medium"
+      >
+        🔧 Log custom / one-off repair
+      </button>
+      <p className="text-[10px] text-muted-foreground mt-1.5 text-center">
+        For any air-handler repair not covered by the monthly checklist.
+      </p>
+    </>
   )
 }

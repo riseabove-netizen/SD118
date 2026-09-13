@@ -230,6 +230,22 @@ export function CalendarSystemPage() {
         {loading && events.length === 0 && (
           <div className="text-xs text-muted-foreground">Loading history…</div>
         )}
+
+        {/* Always-available custom repair entry point. Calendar systems
+            don't have hours or scheduled kits, but the user can still log
+            a one-off repair (e.g. jetski impeller replacement) that goes
+            into the same MaintenanceLog / Drive PDF stream. */}
+        <div className="pt-2 border-t border-border/60">
+          <button
+            onClick={() => setLocation(`/maintenance/perform?systemId=${system.id}&mode=custom`)}
+            className="w-full text-xs px-3 py-2.5 rounded-md border border-border bg-card hover:bg-secondary text-foreground font-medium"
+          >
+            🔧 Log custom / one-off repair
+          </button>
+          <p className="text-[10px] text-muted-foreground mt-1.5 text-center">
+            For non-scheduled work — breakdowns, upgrades, or anything not in the list above.
+          </p>
+        </div>
       </div>
     </MenuLayout>
   )
