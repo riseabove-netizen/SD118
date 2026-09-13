@@ -211,34 +211,27 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
     },
   },
 
-  // Chapter 13 — Montenegro (Kotor Bay)
-  'montenegro-2026': {
+  // Chapter 13 — Croatia: Dubrovnik → Dalmatian coast → Šibenik yard
+  'croatia-2026': {
     stops: [
-      { name: 'Himarë',     coord: { lat: 40.100, lon: 19.745 } },
-      { name: 'Budva',      coord: { lat: 42.275, lon: 18.840 } },
-      { name: 'Kotor',      coord: { lat: 42.430, lon: 18.770 } },
-      { name: 'Porto Montenegro', coord: { lat: 42.435, lon: 18.690 } },
+      { name: 'Dubrovnik',   coord: { lat: 42.660, lon: 18.080 } },
+      { name: 'Žuljana',     coord: { lat: 42.870, lon: 17.475 } },
+      { name: 'Kaprije',     coord: { lat: 43.680, lon: 15.720 } },
+      { name: 'Primošten',   coord: { lat: 43.585, lon: 15.925 } },
+      { name: 'Skradin',     coord: { lat: 43.820, lon: 15.925 } },
+      { name: 'Šibenik yard', coord: { lat: 43.735, lon: 15.895 } },
     ],
     waypoints: {
-      // Himarë → Budva: long open Adriatic passage NW
-      '0-1': [{ lat: 40.800, lon: 19.300 }, { lat: 41.800, lon: 19.000 }],
-      // Budva → Kotor: round Luštica peninsula into Bay of Kotor (no land cuts)
-      '1-2': [{ lat: 42.380, lon: 18.560 }, { lat: 42.420, lon: 18.680 }],
-      // Kotor → Porto Montenegro (Tivat): along the bay
-    },
-  },
-
-  // Chapter 14 — Dubrovnik
-  'dubrovnik-2026': {
-    stops: [
-      { name: 'Porto Montenegro', coord: { lat: 42.435, lon: 18.690 } },
-      { name: 'Cavtat',           coord: { lat: 42.583, lon: 18.215 } },
-      { name: 'Dubrovnik',        coord: { lat: 42.660, lon: 18.080 } },
-      { name: 'Mljet',            coord: { lat: 42.770, lon: 17.555 } },
-    ],
-    waypoints: {
-      // Tivat → Cavtat: out of Kotor bay, then NW along coast offshore
-      '0-1': [{ lat: 42.380, lon: 18.560 }, { lat: 42.500, lon: 18.350 }],
+      // Dubrovnik → Žuljana: NW along the Pelješac south coast, staying offshore
+      '0-1': [{ lat: 42.720, lon: 17.900 }, { lat: 42.820, lon: 17.700 }],
+      // Žuljana → Kaprije: long overnight run NW along the outer Dalmatian coast, well offshore of Korčula and Hvar
+      '1-2': [{ lat: 43.000, lon: 17.100 }, { lat: 43.250, lon: 16.500 }, { lat: 43.500, lon: 16.100 }],
+      // Kaprije → Primošten: short coastal hop east/northeast
+      '2-3': [{ lat: 43.640, lon: 15.850 }],
+      // Primošten → Skradin: N along coast into the Šibenik channel, up the Krka fjord
+      '3-4': [{ lat: 43.700, lon: 15.910 }, { lat: 43.735, lon: 15.895 }, { lat: 43.790, lon: 15.905 }],
+      // Skradin → Šibenik yard: back down the Krka fjord to the yard
+      '4-5': [{ lat: 43.790, lon: 15.905 }],
     },
   },
 
