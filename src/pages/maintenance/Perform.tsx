@@ -526,7 +526,9 @@ function PerformStep({ system, selectedKits, setSelectedKits, isCustom, isCalend
         driveFolderPath: system.driveFolderPath,
         kitIds: isCustom ? ['custom'] : selectedKits,
         kitLabels: isCustom ? [`Custom repair: ${customTitle.trim()}`] : kits.map(k => k.label),
-        hoursAtService: isCalendarSystem ? 0 : Number(hoursAtService),
+        hoursAtService: isCalendarSystem
+          ? (hoursAtService ? Number(hoursAtService) : 0)
+          : Number(hoursAtService),
         technician: technician.trim(),
         notes: isCustom
           ? (customTitle.trim() + (notes.trim() ? `\n\n${notes.trim()}` : ''))
@@ -619,19 +621,20 @@ function PerformStep({ system, selectedKits, setSelectedKits, isCustom, isCalend
 
       {/* Meta fields */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-        <div className={isCalendarSystem ? '' : 'grid grid-cols-2 gap-3'}>
-          {!isCalendarSystem && (
-            <label className="text-xs">
-              <span className="block text-muted-foreground mb-1">Hours at service</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={hoursAtService}
-                onChange={e => setHoursAtService(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              />
-            </label>
-          )}
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-xs">
+            <span className="block text-muted-foreground mb-1">
+              Hours at service{isCalendarSystem ? ' (optional)' : ''}
+            </span>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={hoursAtService}
+              onChange={e => setHoursAtService(e.target.value)}
+              placeholder={isCalendarSystem ? 'e.g. 142' : ''}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+          </label>
           <label className="text-xs">
             <span className="block text-muted-foreground mb-1">Technician</span>
             <input
@@ -721,14 +724,29 @@ function PerformStep({ system, selectedKits, setSelectedKits, isCustom, isCalend
       {/* Photos */}
       <div className="rounded-xl border border-border bg-card p-4 space-y-3">
         <div className="text-sm font-semibold">Photos</div>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          capture="environment"
-          onChange={e => onPickPhotos(e.target.files)}
-          className="text-xs"
-        />
+        <div className="flex flex-wrap gap-2">
+          <label className="inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-border bg-secondary hover:bg-secondary/80 cursor-pointer">
+            <span>📷</span><span>Take photo</span>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              capture="environment"
+              onChange={e => onPickPhotos(e.target.files)}
+              className="hidden"
+            />
+          </label>
+          <label className="inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-border bg-secondary hover:bg-secondary/80 cursor-pointer">
+            <span>🖼️</span><span>Upload from library</span>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={e => onPickPhotos(e.target.files)}
+              className="hidden"
+            />
+          </label>
+        </div>
         {photos.length > 0 && (
           <div className="grid grid-cols-3 gap-2">
             {photos.map((p, i) => (

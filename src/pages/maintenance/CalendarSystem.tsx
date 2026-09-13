@@ -27,6 +27,7 @@ import {
   type CalendarServiceEvent,
   type CellStatus,
 } from '@/lib/calendar-service-api'
+import { fetchSystemState, type MaintenanceEvent } from '@/lib/maintenance-api'
 
 function cellKey(unitId: string, itemId: string) { return `${unitId}|${itemId}` }
 
@@ -66,6 +67,10 @@ export function CalendarSystemPage() {
   const [events, setEvents] = useState<CalendarServiceEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Custom / one-off repairs logged against this system go into the hour-based
+  // MaintenanceLog sheet (via Perform.tsx). Fetch them here so past repairs
+  // show up on the system page under "Repair history".
+  const [repairs, setRepairs] = useState<MaintenanceEvent[]>([])
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [technician, setTechnician] = useState('')
@@ -76,9 +81,29 @@ export function CalendarSystemPage() {
 
   async function reload() {
     setLoading(true); setError(null)
-    try { setEvents(await fetchCalendarServiceEvents(system!.id)) }
-    catch (e) { setError((e as Error).message) }
-    finally { setLoading(false) }
+    // Fetch scheduled service history (calendar-service sheet) and
+    // per-unit custom repair history (maintenance sheet) in parallel.
+    // For multi-unit calendar systems each unit lands under
+    // `<systemId>#<unitId>`; single-unit systems (jetski, tender) use the
+    // bare system id. Query all of them and merge.
+    const unitIds = system!.units.length > 1
+      ? system!.units.map(u => `${system!.id}#${u.id}`)
+      : [system!.id]
+    try {
+      const [evs, ...states] = await Promise.all([
+        fetchCalendarServiceEvents(system!.id),
+        ...unitIds.map(id => fetchSystemState(id).catch(() => null)),
+      ])
+      setEvents(evs)
+      const merged: MaintenanceEvent[] = []
+      for (const st of states) if (st?.events) merged.push(...st.events)
+      merged.sort((a, b) => (b.Timestamp || '').localeCompare(a.Timestamp || ''))
+      setRepairs(merged)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -246,6 +271,52 @@ export function CalendarSystemPage() {
             For non-scheduled work — breakdowns, upgrades, or anything not in the list above.
           </p>
         </div>
+
+        {/* Repair history — past custom / one-off repairs on this system. */}
+        {repairs.length > 0 && (
+          <div className="pt-4 border-t border-border/60 space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Repair history ({repairs.length})
+            </div>
+            <ul className="space-y-2">
+              {repairs.map(ev => {
+                const date = (ev.Timestamp || '').slice(0, 10) || '—'
+                const title = (ev.Notes || '').split('\n')[0].trim() || '(no title)'
+                const hrs = ev.HoursAtService && ev.HoursAtService !== '0'
+                  ? `${ev.HoursAtService} h`
+                  : null
+                const unitSuffix = ev.SystemId.includes('#')
+                  ? ev.SystemId.split('#')[1]
+                  : null
+                return (
+                  <li key={ev.EventId} className="rounded-md border border-border bg-card p-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-medium truncate">{title}</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          {date}
+                          {ev.Technician ? ` · ${ev.Technician}` : ''}
+                          {hrs ? ` · ${hrs}` : ''}
+                          {unitSuffix ? ` · ${unitSuffix}` : ''}
+                        </div>
+                      </div>
+                      {ev.DriveLink && (
+                        <a
+                          href={ev.DriveLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] px-2 py-1 rounded border border-border hover:bg-secondary shrink-0"
+                        >
+                          PDF
+                        </a>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        )}
       </div>
     </MenuLayout>
   )
