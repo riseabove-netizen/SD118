@@ -1598,19 +1598,20 @@ export const TRIPS: Trip[] = [
   },
 
   // =================================================================
-  // CHAPTER ELEVEN — FINAL PASSAGE: SALENTO → IONIAN → ALBANIA (Sep 14–20)
+  // CHAPTER ELEVEN — FINAL PASSAGE: SALENTO → IONIAN → ALBANIA → CROATIA (Sep 14–23)
   // =================================================================
   {
     id: 'final-passage-2026',
-    name: 'Final Passage — Salento → Ionian → Albania',
-    subtitle: 'Santa Maria di Leuca · Corfu · Sivota · Paxos · Diapontia · Porto Palermo · Dhermi',
+    name: 'Final Passage — Salento → Ionian → Albania → Croatia',
+    subtitle: 'Santa Maria di Leuca · Corfu · Sivota · Paxos · Diapontia · Porto Palermo · Dhermi · Dubrovnik · Žuljana · Kaprije · Primošten · Krka & Skradin · Šibenik Yard',
     startDate: '2026-09-14',
-    endDate: '2026-09-19',
+    endDate: '2026-09-23',
     hero: { icon: '\ud83c\uddec\ud83c\uddf7', gradient: 'from-blue-950 via-sky-900 to-emerald-800' },
-    guests: 'Final chapter — Enrico, Antoniette, Brianna, Matt (Brianna & Matt hotel ashore Sep 19)',
+    guests: 'Enrico, Antoniette, Brianna, Matt — Brianna & Matt hotel ashore Sep 19 (Dhermi) · Enrico & Antoniette continue through Croatia to Šibenik yard Sep 23',
     guestList: [
       { name: 'Enrico' }, { name: 'Antoniette' },
-      { name: 'Brianna' }, { name: 'Matt' },
+      { name: 'Brianna', note: 'hotel ashore Sep 19 (Dhermi)' },
+      { name: 'Matt', note: 'hotel ashore Sep 19 (Dhermi)' },
     ],
 
     days: [
@@ -1791,25 +1792,6 @@ export const TRIPS: Trip[] = [
           knots: 12,
         },
       },
-    ],
-  },
-
-  // =================================================================
-  // CHAPTER FOURTEEN — CROATIA: DUBROVNIK → DALMATIAN COAST → SIBENIK YARD (Sep 20–23)
-  // =================================================================
-  {
-    id: 'croatia-2026',
-    name: 'Croatia — Dubrovnik to Šibenik Yard',
-    subtitle: 'Dubrovnik customs · Žuljana · Kaprije archipelago · Primošten · Krka Fjord & Skradin',
-    startDate: '2026-09-20',
-    endDate: '2026-09-23',
-    hero: { icon: '\ud83c\udded\ud83c\uddf7', gradient: 'from-sky-950 via-blue-900 to-amber-700' },
-    guests: 'Enrico & Antoniette',
-    guestList: [
-      { name: 'Enrico' }, { name: 'Antoniette' },
-    ],
-
-    days: [
       {
         date: 'Sunday · September 20',
         isoDate: '2026-09-20',

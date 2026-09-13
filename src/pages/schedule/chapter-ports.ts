@@ -171,22 +171,27 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
     },
   },
 
-  // Chapter 11 — Final Passage: Salento → Ionian → Albania (Sept 14–19)
+  // Chapter 11 — Final Passage: Salento → Ionian → Albania → Croatia → Šibenik yard (Sept 14–23)
   'final-passage-2026': {
     stops: [
-      { name: 'Santa Maria di Leuca',      coord: { lat: 39.795, lon: 18.360 } },
-      { name: 'Corfu — Marina Gouvia',     coord: { lat: 39.680, lon: 19.850 } },
-      { name: 'Blue Lagoon (Sivota)',       coord: { lat: 39.410, lon: 20.243 } },
-      { name: 'Sivota',                     coord: { lat: 39.415, lon: 20.250 } },
-      { name: 'Ortholithos (Paxos)',        coord: { lat: 39.220, lon: 20.125 } },
-      { name: 'Antipaxos',                  coord: { lat: 39.150, lon: 20.240 } },
-      { name: 'Gaios',                      coord: { lat: 39.202, lon: 20.184 } },
-      { name: 'Mathraki',                   coord: { lat: 39.776, lon: 19.540 } },
-      { name: 'Braghini (Ereikoussa)',      coord: { lat: 39.877, lon: 19.590 } },
-      { name: 'Porto Palermo',              coord: { lat: 40.060, lon: 19.790 } },
-      { name: 'Gjipe',                      coord: { lat: 40.127, lon: 19.670 } },
-      { name: 'Dhermi',                     coord: { lat: 40.144, lon: 19.635 } },
-      { name: 'Secret Blue Cave',           coord: { lat: 40.232, lon: 19.453 } },
+      { name: 'Santa Maria di Leuca',      coord: { lat: 39.795, lon: 18.360 } }, // 0
+      { name: 'Corfu — Marina Gouvia',     coord: { lat: 39.680, lon: 19.850 } }, // 1
+      { name: 'Blue Lagoon (Sivota)',       coord: { lat: 39.410, lon: 20.243 } }, // 2
+      { name: 'Sivota',                     coord: { lat: 39.415, lon: 20.250 } }, // 3
+      { name: 'Ortholithos (Paxos)',        coord: { lat: 39.220, lon: 20.125 } }, // 4
+      { name: 'Antipaxos',                  coord: { lat: 39.150, lon: 20.240 } }, // 5
+      { name: 'Gaios',                      coord: { lat: 39.202, lon: 20.184 } }, // 6
+      { name: 'Mathraki',                   coord: { lat: 39.776, lon: 19.540 } }, // 7
+      { name: 'Braghini (Ereikoussa)',      coord: { lat: 39.877, lon: 19.590 } }, // 8
+      { name: 'Porto Palermo',              coord: { lat: 40.060, lon: 19.790 } }, // 9
+      { name: 'Gjipe',                      coord: { lat: 40.127, lon: 19.670 } }, // 10
+      { name: 'Dhermi',                     coord: { lat: 40.144, lon: 19.635 } }, // 11
+      { name: 'Dubrovnik',                  coord: { lat: 42.660, lon: 18.080 } }, // 12
+      { name: 'Žuljana',                    coord: { lat: 42.870, lon: 17.475 } }, // 13
+      { name: 'Kaprije',                    coord: { lat: 43.680, lon: 15.720 } }, // 14
+      { name: 'Primošten',                  coord: { lat: 43.585, lon: 15.925 } }, // 15
+      { name: 'Skradin',                    coord: { lat: 43.820, lon: 15.925 } }, // 16
+      { name: 'Šibenik yard',                coord: { lat: 43.735, lon: 15.895 } }, // 17
     ],
     waypoints: {
       // Salento → Corfu: open Otranto Channel crossing
@@ -199,32 +204,18 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
       '6-7': [{ lat: 39.500, lon: 19.700 }, { lat: 39.700, lon: 19.500 }],
       // Braghini → Porto Palermo: SE across Corfu Strait to Albanian coast
       '8-9': [{ lat: 40.000, lon: 19.700 }],
-      // (Dhermi → Secret Blue Cave stays coastal)
-      '12-13': [{ lat: 40.280, lon: 19.400 }, { lat: 40.320, lon: 19.420 }],
-    },
-  },
-
-  // Chapter 13 — Croatia: Dubrovnik → Dalmatian coast → Šibenik yard
-  'croatia-2026': {
-    stops: [
-      { name: 'Dubrovnik',   coord: { lat: 42.660, lon: 18.080 } },
-      { name: 'Žuljana',     coord: { lat: 42.870, lon: 17.475 } },
-      { name: 'Kaprije',     coord: { lat: 43.680, lon: 15.720 } },
-      { name: 'Primošten',   coord: { lat: 43.585, lon: 15.925 } },
-      { name: 'Skradin',     coord: { lat: 43.820, lon: 15.925 } },
-      { name: 'Šibenik yard', coord: { lat: 43.735, lon: 15.895 } },
-    ],
-    waypoints: {
+      // Dhermi → Dubrovnik: overnight NW across the Adriatic
+      '11-12': [{ lat: 40.700, lon: 19.200 }, { lat: 41.500, lon: 18.600 }, { lat: 42.200, lon: 18.200 }],
       // Dubrovnik → Žuljana: NW along the Pelješac south coast, staying offshore
-      '0-1': [{ lat: 42.720, lon: 17.900 }, { lat: 42.820, lon: 17.700 }],
+      '12-13': [{ lat: 42.720, lon: 17.900 }, { lat: 42.820, lon: 17.700 }],
       // Žuljana → Kaprije: long overnight run NW along the outer Dalmatian coast, well offshore of Korčula and Hvar
-      '1-2': [{ lat: 43.000, lon: 17.100 }, { lat: 43.250, lon: 16.500 }, { lat: 43.500, lon: 16.100 }],
+      '13-14': [{ lat: 43.000, lon: 17.100 }, { lat: 43.250, lon: 16.500 }, { lat: 43.500, lon: 16.100 }],
       // Kaprije → Primošten: short coastal hop east/northeast
-      '2-3': [{ lat: 43.640, lon: 15.850 }],
+      '14-15': [{ lat: 43.640, lon: 15.850 }],
       // Primošten → Skradin: N along coast into the Šibenik channel, up the Krka fjord
-      '3-4': [{ lat: 43.700, lon: 15.910 }, { lat: 43.735, lon: 15.895 }, { lat: 43.790, lon: 15.905 }],
+      '15-16': [{ lat: 43.700, lon: 15.910 }, { lat: 43.735, lon: 15.895 }, { lat: 43.790, lon: 15.905 }],
       // Skradin → Šibenik yard: back down the Krka fjord to the yard
-      '4-5': [{ lat: 43.790, lon: 15.905 }],
+      '16-17': [{ lat: 43.790, lon: 15.905 }],
     },
   },
 
