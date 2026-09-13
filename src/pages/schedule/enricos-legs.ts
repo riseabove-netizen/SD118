@@ -31,8 +31,8 @@ export const CHAPTER_ANCHORS: ChapterAnchor[] = [
   { id: 'naples-friends-2026',        label: 'Naples · Friends → Catania', coord: { lat: 38.500, lon: 14.950 } }, // Aeolians midpoint
   { id: 'malta-2026',                 label: 'Valletta, Malta',         coord: { lat: 35.895, lon: 14.515 } },
   { id: 'gozo-2026',                  label: 'Mgarr, Gozo',             coord: { lat: 36.025, lon: 14.300 } },
-  { id: 'sicily-aeolians-revisited-2026', label: 'Grotta di San Gregorio', coord: { lat: 39.833, lon: 18.360 } },
-  { id: 'final-passage-2026',         label: 'Corfu → Ionian → Albania', coord: { lat: 39.620, lon: 19.920 } }, // starts at Corfu on Sep 15
+  { id: 'sicily-aeolians-revisited-2026', label: 'Taormina, Sicily',       coord: { lat: 37.865, lon: 15.305 } }, // Taormina Marina — departure for the overnight to Leuca
+  { id: 'final-passage-2026',         label: 'Santa Maria di Leuca → Corfu → Albania', coord: { lat: 39.795, lon: 18.360 } }, // starts at Santa Maria di Leuca on Sep 14
 ]
 
 // Per-leg speed override (knots). Defaults to CRUISE_KNOTS.
@@ -43,8 +43,8 @@ const CRUISE_KNOTS = 12
 // (e.g. slow overnight crossings, routing around obstacles, planned speed).
 type LegOverride = { distanceNm?: number; travelHours?: number; cruiseKnots?: number }
 const LEG_OVERRIDES: Record<string, LegOverride> = {
-  // Grotta di San Gregorio (Sep 14 depart) → Corfu (Sep 15 arrive): overnight Otranto crossing
-  'sicily-aeolians-revisited-2026->final-passage-2026': { distanceNm: 138, travelHours: 19, cruiseKnots: 10 },
+  // Taormina (Sep 13 depart 21:30) → Santa Maria di Leuca (Sep 14 arrive 07:30): overnight Ionian passage
+  'sicily-aeolians-revisited-2026->final-passage-2026': { distanceNm: 138, travelHours: 10, cruiseKnots: 12 },
 }
 
 // =================== math helpers ===================

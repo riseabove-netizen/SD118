@@ -156,7 +156,7 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
     },
   },
 
-  // Chapter 9 — Sicily Coast → Grotta di San Gregorio (Sept 9–14)
+  // Chapter 9 — Sicily Coast → Taormina (Sept 9–13; overnight to Leuca departs late Sep 13)
   'sicily-aeolians-revisited-2026': {
     stops: [
       { name: 'Mgarr, Gozo',              coord: { lat: 36.025, lon: 14.298 } },
@@ -164,23 +164,17 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
       { name: 'Ortigia / Siracusa',       coord: { lat: 37.060, lon: 15.295 } },
       { name: 'Taormina anchorage',       coord: { lat: 37.852, lon: 15.295 } },
       { name: 'Taormina Marina',          coord: { lat: 37.865, lon: 15.305 } },
-      { name: 'Grotta di San Gregorio',   coord: { lat: 39.833, lon: 18.360 } },
     ],
     waypoints: {
       // Gozo → La Tonnara: open Malta Channel crossing
       '0-1': [{ lat: 36.300, lon: 14.700 }],
-      // Taormina Marina → Grotta di San Gregorio: overnight NE across Ionian, clear NE tip of Sicily
-      '4-5': [
-        { lat: 38.400, lon: 15.700 }, // NE of Taormina, offshore of Messina strait mouth
-        { lat: 39.200, lon: 17.500 }, // mid-Ionian
-      ],
     },
   },
 
-  // Chapter 11 — Final Passage: Salento → Ionian → Albania (Sept 14–20)
+  // Chapter 11 — Final Passage: Salento → Ionian → Albania (Sept 14–19)
   'final-passage-2026': {
     stops: [
-      { name: 'Grotta di San Gregorio',    coord: { lat: 39.833, lon: 18.360 } },
+      { name: 'Santa Maria di Leuca',      coord: { lat: 39.795, lon: 18.360 } },
       { name: 'Corfu — Marina Gouvia',     coord: { lat: 39.680, lon: 19.850 } },
       { name: 'Blue Lagoon (Sivota)',       coord: { lat: 39.410, lon: 20.243 } },
       { name: 'Sivota',                     coord: { lat: 39.415, lon: 20.250 } },
@@ -193,7 +187,6 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
       { name: 'Gjipe',                      coord: { lat: 40.127, lon: 19.670 } },
       { name: 'Dhermi',                     coord: { lat: 40.144, lon: 19.635 } },
       { name: 'Secret Blue Cave',           coord: { lat: 40.232, lon: 19.453 } },
-      { name: 'Orikum Marina',              coord: { lat: 40.325, lon: 19.470 } },
     ],
     waypoints: {
       // Salento → Corfu: open Otranto Channel crossing
@@ -206,7 +199,7 @@ export const CHAPTER_ROUTES: Record<string, ChapterRoute> = {
       '6-7': [{ lat: 39.500, lon: 19.700 }, { lat: 39.700, lon: 19.500 }],
       // Braghini → Porto Palermo: SE across Corfu Strait to Albanian coast
       '8-9': [{ lat: 40.000, lon: 19.700 }],
-      // Secret Blue Cave → Orikum: north along Karaburun then into Vlorë Bay
+      // (Dhermi → Secret Blue Cave stays coastal)
       '12-13': [{ lat: 40.280, lon: 19.400 }, { lat: 40.320, lon: 19.420 }],
     },
   },
