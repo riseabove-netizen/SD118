@@ -102,6 +102,26 @@ export function requireAdmin(req: VercelRequest, res: VercelResponse): boolean {
   return true
 }
 
+// Crew or admin — used for endpoints that any write-capable user can hit.
+export function requireCrew(req: VercelRequest, res: VercelResponse): boolean {
+  const auth = verifyToken(getBearer(req))
+  if (!auth.ok || (auth.role !== 'admin' && auth.role !== 'crew')) {
+    res.status(401).json({ error: 'Unauthorized: crew or admin token required' })
+    return false
+  }
+  return true
+}
+
+// Cron auth: Vercel cron sends x-vercel-cron header. Also accept admin token for manual triggers.
+export function requireCronOrAdmin(req: VercelRequest, res: VercelResponse): boolean {
+  const cronHeader = req.headers['x-vercel-cron']
+  if (cronHeader) return true
+  const auth = verifyToken(getBearer(req))
+  if (auth.ok && auth.role === 'admin') return true
+  res.status(401).json({ error: 'Unauthorized: cron header or admin token required' })
+  return false
+}
+
 export type PlaidItemRow = {
   rowIndex: number   // 1-based row in Plaid_Items including header row
   item_id: string

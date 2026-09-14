@@ -1,6 +1,16 @@
+// Expense intake — role-split.
+//
+// Admin sees a hub with three surfaces:
+//   1. Plaid queue      — daily-pulled card charges awaiting categorisation.
+//   2. Orphan receipts  — OCR'd receipts that never matched a Plaid charge.
+//   3. Scan (my own)    — same scan flow crews use, for admin-owned expenses.
+//
+// Crew sees the scan flow only. On scan: compress → Drive upload → OCR →
+// try to match against the Plaid backlog. If no match, automatically trigger a
+// crew-scoped 14-day Plaid sync and re-match. Still no match → orphan queue.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { MenuLayout } from '@/components/MenuLayout'
-import { getCrewName, getRole, canWrite } from '@/lib/auth'
+import { getCrewName, getRole, canWrite, getToken } from '@/lib/auth'
 import { compressImageToJpegBase64 } from '@/lib/imageCompress'
 import { useLocation } from 'wouter'
 
@@ -25,6 +35,7 @@ type ReceiptRead = {
 }
 
 type PlaidMatch = {
+  plaid_txn_id?: string
   txn_id: string
   date: string
   merchant: string
@@ -34,49 +45,100 @@ type PlaidMatch = {
   account_mask: string
   account_label: string
   account_matches_selection: boolean
-} | null
-
-type DuplicateHit = {
-  isDuplicate: boolean
-  matchedRow?: number
-  matchedStore?: string
-  matchedDate?: string
-  matchedAccount?: string
-  matchedUsd?: number | null
-  matchedEur?: number | null
+  source?: 'cache' | 'live'
 } | null
 
 type Photo = {
   id: string
-  base64: string        // no data: prefix
-  thumbDataUrl: string  // data:image/jpeg;base64,... for preview
+  base64: string
+  thumbDataUrl: string
   file?: File
-  // After upload:
   driveFileId?: string
   driveViewUrl?: string
   driveThumbUrl?: string
-  // After OCR:
   read?: ReceiptRead
   plaidMatch?: PlaidMatch
-  duplicate?: DuplicateHit
-  // Editable form fields (populated from `read`, user can adjust)
-  date: string          // YYYY-MM-DD
+  date: string
   merchant: string
-  eur: string           // string so blank is allowed
+  eur: string
   usd: string
-  guestTrip: boolean    // toggle
-  guestTripName: string // free text if guestTrip
-  project: string       // e.g. Operating
-  expenseType: string   // Category column D
-  category: string      // Subcategory column E
+  guestTrip: boolean
+  guestTripName: string
+  project: string
+  expenseType: string
+  category: string
   description: string
   refunded: string
   specificRepair: string
   statement: string
-  // Status flags
   uploading?: boolean
   uploadError?: string
   reading?: boolean
+  syncing?: boolean          // auto-sync fallback in progress
+  submitting?: boolean
+  submitted?: boolean
+  submitError?: string
+  submittedRow?: number
+  submittedAs?: 'matched' | 'orphan'
+}
+
+type PendingQueueTxn = {
+  row: number
+  txn_id: string
+  date: string
+  merchant: string
+  amount_usd: number
+  account: string
+  account_mask: string
+  account_queue_label: string
+  category: string
+  currency: string
+}
+
+type OrphanRow = {
+  row: number
+  id: string
+  added_at: string
+  receipt_url: string
+  receipt_thumb_url: string
+  ocr_merchant: string
+  ocr_date: string
+  ocr_eur: number | null
+  ocr_usd: number | null
+  added_by: string
+  status: string
+}
+
+// Editable card state shared between Plaid-queue and Orphan-queue admin views.
+type CardEdit = {
+  // identity
+  key: string           // txn_id for plaid, orphan.id for orphan
+  source: 'plaid' | 'orphan'
+  // pre-fill from source
+  origDate: string
+  origMerchant: string
+  origUsd: number | null
+  origEur: number | null
+  account: Account
+  receiptUrl?: string
+  receiptThumbUrl?: string
+  // editable fields
+  date: string
+  merchant: string
+  usd: string
+  eur: string
+  project: string
+  expenseType: string
+  category: string
+  guestTrip: boolean
+  guestTripName: string
+  description: string
+  // optional receipt upload (Plaid queue admin can attach a photo they just took)
+  photoBase64?: string
+  photoThumb?: string
+  uploading?: boolean
+  uploadError?: string
+  selectedForSkip: boolean
   submitting?: boolean
   submitted?: boolean
   submitError?: string
@@ -92,7 +154,6 @@ function todayISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-// Determine default project/category/subcategory triple from Claude's coarse hint.
 function autoClassify(
   category_hint: ReceiptRead['category_hint'],
   isGuestTrip: boolean,
@@ -122,13 +183,23 @@ function autoClassify(
   return null
 }
 
+function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const token = getToken()
+  const headers = new Headers(init.headers || {})
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  if (!headers.has('Content-Type') && init.body && typeof init.body === 'string') {
+    headers.set('Content-Type', 'application/json')
+  }
+  return fetch(url, { ...init, headers, credentials: 'include' })
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Top-level page
+// ══════════════════════════════════════════════════════════════════════
 export function ExpenseIntakePage() {
-  const [, setLocation] = useLocation()
   const role = getRole()
   const isAdmin = role === 'admin'
-  const crewName = getCrewName() || ''
 
-  // Not authenticated to write? Gate out.
   if (!canWrite()) {
     return (
       <MenuLayout title="Expense intake" showBack backHref="/menu">
@@ -137,18 +208,97 @@ export function ExpenseIntakePage() {
     )
   }
 
-  const [account, setAccount] = useState<Account>('Amex 3240')
-  const [photos, setPhotos] = useState<Photo[]>([])
+  if (isAdmin) return <AdminIntake />
+  return <CrewIntake />
+}
+
+export default ExpenseIntakePage
+
+// ══════════════════════════════════════════════════════════════════════
+// Admin — hub + Plaid queue + Orphan queue + Scan (my own)
+// ══════════════════════════════════════════════════════════════════════
+type AdminView = 'hub' | 'plaid' | 'orphan' | 'scan'
+
+function AdminIntake() {
+  const [view, setView] = useState<AdminView>('hub')
+  const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const [orphanCount, setOrphanCount] = useState<number | null>(null)
+  const [countsError, setCountsError] = useState<string | null>(null)
+
+  const loadCounts = async () => {
+    setCountsError(null)
+    try {
+      const [q, o] = await Promise.all([
+        authFetch('/api/plaid/queue-list').then(r => r.json()),
+        authFetch('/api/expenses/orphan-list').then(r => r.json()),
+      ])
+      if (q?.ok) setPendingCount(q.count)
+      if (o?.ok) setOrphanCount(o.count)
+      if (!q?.ok) setCountsError(q?.error || 'Queue load failed')
+      if (!o?.ok && q?.ok) setCountsError(o?.error || 'Orphan load failed')
+    } catch (err: any) {
+      setCountsError(err?.message || String(err))
+    }
+  }
+
+  useEffect(() => { loadCounts() }, [view])
+
+  if (view === 'plaid') return <AdminPlaidQueue onBack={() => setView('hub')} />
+  if (view === 'orphan') return <AdminOrphanQueue onBack={() => setView('hub')} />
+  if (view === 'scan') return <CrewIntake adminScanBack={() => setView('hub')} />
+
+  return (
+    <MenuLayout title="Expense intake" showBack backHref="/menu">
+      <div className="space-y-3">
+        {countsError && (
+          <div className="rounded-lg border border-red-500/40 bg-red-950/40 text-red-200 text-sm p-3">
+            {countsError}
+          </div>
+        )}
+        <button
+          onClick={() => setView('plaid')}
+          className="w-full h-16 rounded-xl border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-left px-4 flex items-center justify-between"
+        >
+          <div>
+            <div className="font-semibold">Plaid queue</div>
+            <div className="text-xs text-neutral-400">Categorise daily card charges</div>
+          </div>
+          <div className="text-red-500 font-bold text-lg">
+            {pendingCount ?? '…'} →
+          </div>
+        </button>
+        <button
+          onClick={() => setView('orphan')}
+          className="w-full h-16 rounded-xl border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-left px-4 flex items-center justify-between"
+        >
+          <div>
+            <div className="font-semibold">Orphan receipts</div>
+            <div className="text-xs text-neutral-400">Receipts with no Plaid match</div>
+          </div>
+          <div className="text-red-500 font-bold text-lg">
+            {orphanCount ?? '…'} →
+          </div>
+        </button>
+        <button
+          onClick={() => setView('scan')}
+          className="w-full h-16 rounded-xl border border-neutral-800 bg-red-600 hover:bg-red-700 text-white text-left px-4 flex items-center gap-3"
+        >
+          <span className="text-2xl">📷</span>
+          <div>
+            <div className="font-semibold">Scan receipt (my own)</div>
+            <div className="text-xs opacity-80">Same flow crew uses</div>
+          </div>
+        </button>
+      </div>
+    </MenuLayout>
+  )
+}
+
+// ── Shared definitions loader ────────────────────────────────────────
+function useDefinitions() {
   const [definitions, setDefinitions] = useState<DefRow[]>([])
-  const [defsLoading, setDefsLoading] = useState(true)
-  const [defsError, setDefsError] = useState<string | null>(null)
-  const [readingAll, setReadingAll] = useState(false)
-  const [globalError, setGlobalError] = useState<string | null>(null)
-
-  const cameraInputRef = useRef<HTMLInputElement>(null)
-  const uploadInputRef = useRef<HTMLInputElement>(null)
-
-  // Load Definitions once.
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     let cancelled = false
     fetch('/api/expense-definitions')
@@ -158,27 +308,780 @@ export function ExpenseIntakePage() {
         if (!data?.ok) throw new Error(data?.error || 'Failed to load definitions')
         setDefinitions(data.rows as DefRow[])
       })
-      .catch(err => { if (!cancelled) setDefsError(err?.message || String(err)) })
-      .finally(() => { if (!cancelled) setDefsLoading(false) })
+      .catch(err => { if (!cancelled) setError(err?.message || String(err)) })
+      .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+  return { definitions, loading, error }
+}
 
-  // Available definitions for this role.
-  const visibleDefs = useMemo(() => {
-    if (isAdmin) return definitions.filter(r => r.project === 'Operating')
-    return definitions.filter(r => r.showToUser)
-  }, [definitions, isAdmin])
-
-  // Category tree for the picker: category → subcategories.
-  const categoryTree = useMemo(() => {
+function useCategoryTree(defs: DefRow[], isAdmin: boolean) {
+  return useMemo(() => {
+    const visible = isAdmin ? defs.filter(r => r.project === 'Operating') : defs.filter(r => r.showToUser)
     const tree = new Map<string, string[]>()
-    for (const r of visibleDefs) {
+    for (const r of visible) {
       if (!tree.has(r.category)) tree.set(r.category, [])
       const arr = tree.get(r.category)!
       if (!arr.includes(r.subcategory)) arr.push(r.subcategory)
     }
     return tree
-  }, [visibleDefs])
+  }, [defs, isAdmin])
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Admin — Plaid queue
+// ══════════════════════════════════════════════════════════════════════
+function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
+  const [txns, setTxns] = useState<PendingQueueTxn[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [cards, setCards] = useState<Record<string, CardEdit>>({})
+  const { definitions, error: defsError } = useDefinitions()
+  const catTree = useCategoryTree(definitions, true)
+  const crewName = getCrewName() || 'Admin'
+  const [globalError, setGlobalError] = useState<string | null>(null)
+  const [submittingBatch, setSubmittingBatch] = useState(false)
+  const [skippingBatch, setSkippingBatch] = useState(false)
+
+  const load = async () => {
+    setLoading(true); setLoadError(null)
+    try {
+      const r = await authFetch('/api/plaid/queue-list')
+      const d = await r.json()
+      if (!d?.ok) throw new Error(d?.error || 'load failed')
+      setTxns(d.pending || [])
+      // Initialise editable cards for any new txn (preserve existing edits).
+      setCards(prev => {
+        const next: Record<string, CardEdit> = { ...prev }
+        for (const t of d.pending || []) {
+          if (!next[t.txn_id]) {
+            const account: Account = t.account_mask === '0540' ? 'Bilt' : 'Amex 3240'
+            next[t.txn_id] = {
+              key: t.txn_id,
+              source: 'plaid',
+              origDate: t.date,
+              origMerchant: t.merchant,
+              origUsd: t.amount_usd,
+              origEur: null,
+              account,
+              date: t.date,
+              merchant: t.merchant,
+              usd: String(t.amount_usd ?? ''),
+              eur: '',
+              project: 'Operating',
+              expenseType: '',
+              category: '',
+              guestTrip: false,
+              guestTripName: '',
+              description: '',
+              selectedForSkip: false,
+            }
+          }
+        }
+        return next
+      })
+    } catch (err: any) {
+      setLoadError(err?.message || String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => { load() }, [])
+
+  const setCard = (key: string, patch: Partial<CardEdit>) => {
+    setCards(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }))
+  }
+
+  const attachReceipt = async (card: CardEdit, file: File) => {
+    setCard(card.key, { uploading: true, uploadError: undefined })
+    try {
+      const b64 = await compressImageToJpegBase64(file, { maxDim: 1800, quality: 0.85 })
+      const thumb = `data:image/jpeg;base64,${b64}`
+      setCard(card.key, { photoBase64: b64, photoThumb: thumb })
+      // Upload to Drive immediately so submit is instant.
+      const resp = await authFetch('/api/expense-drive-upload', {
+        method: 'POST',
+        body: JSON.stringify({ base64: b64, account: card.account, date: card.date }),
+      })
+      const data = await resp.json()
+      if (!data?.ok) throw new Error(data?.error || data?.detail || 'Upload failed')
+      setCard(card.key, { uploading: false, receiptUrl: data.viewUrl, receiptThumbUrl: data.thumbUrl })
+    } catch (err: any) {
+      setCard(card.key, { uploading: false, uploadError: err?.message || String(err) })
+    }
+  }
+
+  const filled = useMemo(
+    () => txns.filter(t => {
+      const c = cards[t.txn_id]
+      return c && !c.selectedForSkip && c.expenseType && c.category && (c.usd || c.eur)
+    }),
+    [txns, cards],
+  )
+  const selectedForSkip = useMemo(
+    () => txns.filter(t => cards[t.txn_id]?.selectedForSkip),
+    [txns, cards],
+  )
+
+  const submitFilled = async () => {
+    if (filled.length === 0) return
+    setSubmittingBatch(true); setGlobalError(null)
+    try {
+      const submissions = filled.map(t => {
+        const c = cards[t.txn_id]
+        return {
+          txn_id: t.txn_id,
+          date: c.date,
+          account: c.account,
+          project: c.project || 'Operating',
+          expenseType: c.expenseType,
+          category: c.category,
+          guestTrip: c.guestTrip ? (c.guestTripName || 'Yes') : '',
+          store: c.merchant,
+          usd: c.usd ? Number(c.usd) : null,
+          eur: c.eur ? Number(c.eur) : null,
+          refunded: '',
+          description: c.description,
+          specificRepair: '',
+          statement: '',
+          inputBy: crewName,
+          receiptUrl: c.receiptUrl || '',
+          driveViewUrl: c.receiptUrl || '',
+        }
+      })
+      const resp = await authFetch('/api/plaid/queue-submit', {
+        method: 'POST',
+        body: JSON.stringify({ submissions }),
+      })
+      const data = await resp.json()
+      if (!resp.ok || (!data?.ok && !Array.isArray(data?.results))) {
+        throw new Error(data?.error || 'Submit failed')
+      }
+      const results: Array<{ txn_id: string; ok: boolean; error?: string; row?: number }> = data.results || []
+      const okIds = new Set(results.filter(r => r.ok).map(r => r.txn_id))
+      // Remove filled+ok txns from the queue view; keep errors for retry.
+      setTxns(prev => prev.filter(t => !okIds.has(t.txn_id)))
+      setCards(prev => {
+        const next = { ...prev }
+        for (const r of results) {
+          if (r.ok) delete next[r.txn_id]
+          else if (r.error && next[r.txn_id]) next[r.txn_id] = { ...next[r.txn_id], submitError: r.error }
+        }
+        return next
+      })
+      const failed = results.filter(r => !r.ok)
+      if (failed.length > 0) setGlobalError(`${failed.length} of ${results.length} failed. Fix the highlighted cards and retry.`)
+    } catch (err: any) {
+      setGlobalError(err?.message || String(err))
+    } finally {
+      setSubmittingBatch(false)
+    }
+  }
+
+  const skipSelected = async () => {
+    if (selectedForSkip.length === 0) return
+    setSkippingBatch(true); setGlobalError(null)
+    try {
+      const ids = selectedForSkip.map(t => t.txn_id)
+      const resp = await authFetch('/api/plaid/queue-skip', {
+        method: 'POST',
+        body: JSON.stringify({ txn_ids: ids }),
+      })
+      const data = await resp.json()
+      if (!data?.ok) throw new Error(data?.error || 'Skip failed')
+      const skipped = new Set(ids)
+      setTxns(prev => prev.filter(t => !skipped.has(t.txn_id)))
+      setCards(prev => {
+        const next = { ...prev }
+        for (const id of skipped) delete next[id]
+        return next
+      })
+    } catch (err: any) {
+      setGlobalError(err?.message || String(err))
+    } finally {
+      setSkippingBatch(false)
+    }
+  }
+
+  return (
+    <MenuLayout title="Plaid queue" showBack backHref="/expenses">
+      <div className="space-y-3">
+        <button onClick={onBack} className="text-xs text-red-400 hover:underline">← Hub</button>
+        {defsError && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-950/40 text-amber-200 text-sm p-3">
+            Categories failed to load: {defsError}
+          </div>
+        )}
+        {loadError && (
+          <div className="rounded-lg border border-red-500/40 bg-red-950/40 text-red-200 text-sm p-3">{loadError}</div>
+        )}
+        {globalError && (
+          <div className="rounded-lg border border-red-500/40 bg-red-950/40 text-red-200 text-sm p-3">{globalError}</div>
+        )}
+        {loading && <div className="text-sm text-neutral-400">Loading queue…</div>}
+        {!loading && txns.length === 0 && (
+          <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 text-sm text-neutral-400">
+            Nothing pending. New card charges appear here after the daily 03:00 pull.
+          </div>
+        )}
+
+        {txns.map(t => {
+          const c = cards[t.txn_id]
+          if (!c) return null
+          const cats = Array.from(catTree.keys())
+          const subs = catTree.get(c.expenseType) || []
+          return (
+            <div
+              key={t.txn_id}
+              className={`rounded-xl border p-3 space-y-3 ${
+                c.submitError
+                  ? 'border-red-600/60 bg-red-950/30'
+                  : c.selectedForSkip
+                    ? 'border-neutral-700 bg-neutral-900/50 opacity-70'
+                    : 'border-neutral-800 bg-neutral-900'
+              }`}
+            >
+              {/* Header row */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold text-sm truncate">{t.merchant || '(no merchant)'}</div>
+                  <div className="text-xs text-neutral-400">
+                    {t.date} · ${t.amount_usd?.toFixed?.(2) ?? t.amount_usd} · {t.account_queue_label}
+                  </div>
+                  {t.category && <div className="text-xs text-neutral-500">{t.category}</div>}
+                </div>
+                <label className="text-xs flex items-center gap-1 select-none">
+                  <input
+                    type="checkbox"
+                    checked={c.selectedForSkip}
+                    onChange={(e) => setCard(t.txn_id, { selectedForSkip: e.target.checked })}
+                    className="accent-red-600"
+                  />
+                  Skip
+                </label>
+              </div>
+
+              {!c.selectedForSkip && (
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="col-span-2">
+                    <label className="text-xs text-neutral-400">Store / merchant</label>
+                    <input
+                      type="text"
+                      value={c.merchant}
+                      onChange={(e) => setCard(t.txn_id, { merchant: e.target.value })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400">Date</label>
+                    <input
+                      type="date"
+                      value={c.date}
+                      onChange={(e) => setCard(t.txn_id, { date: e.target.value })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400">USD</label>
+                    <input
+                      type="number" step="0.01"
+                      value={c.usd}
+                      onChange={(e) => setCard(t.txn_id, { usd: e.target.value })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400">EUR (optional)</label>
+                    <input
+                      type="number" step="0.01"
+                      value={c.eur}
+                      onChange={(e) => setCard(t.txn_id, { eur: e.target.value })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400">Guest trip?</label>
+                    <div className="flex gap-1 mt-1">
+                      <button
+                        onClick={() => setCard(t.txn_id, { guestTrip: false })}
+                        className={`flex-1 h-9 rounded border font-semibold text-xs ${!c.guestTrip ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
+                      >No</button>
+                      <button
+                        onClick={() => setCard(t.txn_id, { guestTrip: true })}
+                        className={`flex-1 h-9 rounded border font-semibold text-xs ${c.guestTrip ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
+                      >Yes</button>
+                    </div>
+                  </div>
+                  {c.guestTrip && (
+                    <div className="col-span-2">
+                      <label className="text-xs text-neutral-400">Guest trip name</label>
+                      <input
+                        type="text"
+                        value={c.guestTripName}
+                        onChange={(e) => setCard(t.txn_id, { guestTripName: e.target.value })}
+                        className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                      />
+                    </div>
+                  )}
+                  <div className="col-span-2">
+                    <label className="text-xs text-neutral-400">Category</label>
+                    <select
+                      value={c.expenseType}
+                      onChange={(e) => setCard(t.txn_id, { expenseType: e.target.value, category: '' })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    >
+                      <option value="">— pick —</option>
+                      {cats.map(x => <option key={x} value={x}>{x}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-neutral-400">Subcategory</label>
+                    <select
+                      value={c.category}
+                      onChange={(e) => setCard(t.txn_id, { category: e.target.value })}
+                      disabled={!c.expenseType}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950 disabled:opacity-50"
+                    >
+                      <option value="">{c.expenseType ? '— pick —' : 'Pick category first'}</option>
+                      {subs.map(x => <option key={x} value={x}>{x}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-neutral-400">Description (optional)</label>
+                    <input
+                      type="text"
+                      value={c.description}
+                      onChange={(e) => setCard(t.txn_id, { description: e.target.value })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-neutral-400">Receipt photo (optional)</label>
+                    <div className="flex items-center gap-2">
+                      {c.photoThumb && (
+                        <img src={c.photoThumb} alt="receipt" className="h-12 w-12 object-cover rounded border border-neutral-800" />
+                      )}
+                      <label className="text-xs px-3 h-9 flex items-center rounded border border-neutral-800 bg-neutral-950 hover:bg-neutral-900 cursor-pointer">
+                        {c.uploading ? 'Uploading…' : c.receiptUrl ? '✓ Attached — replace' : '+ Attach'}
+                        <input
+                          type="file" accept="image/*" className="hidden"
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) attachReceipt(c, f) }}
+                        />
+                      </label>
+                      {c.uploadError && <span className="text-xs text-red-400">{c.uploadError}</span>}
+                    </div>
+                  </div>
+                  {c.submitError && <div className="col-span-2 text-xs text-red-400">Submit error: {c.submitError}</div>}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {!loading && (filled.length > 0 || selectedForSkip.length > 0) && (
+          <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-neutral-950/95 border-t border-neutral-800 flex gap-2">
+            <button
+              onClick={submitFilled}
+              disabled={submittingBatch || filled.length === 0}
+              className="flex-1 h-11 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold"
+            >
+              {submittingBatch ? 'Submitting…' : `Submit ${filled.length} filled`}
+            </button>
+            <button
+              onClick={skipSelected}
+              disabled={skippingBatch || selectedForSkip.length === 0}
+              className="flex-1 h-11 rounded-lg border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 font-semibold"
+            >
+              {skippingBatch ? 'Skipping…' : `Skip ${selectedForSkip.length}`}
+            </button>
+          </div>
+        )}
+      </div>
+    </MenuLayout>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Admin — Orphan queue
+// ══════════════════════════════════════════════════════════════════════
+function AdminOrphanQueue({ onBack }: { onBack: () => void }) {
+  const [orphans, setOrphans] = useState<OrphanRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [cards, setCards] = useState<Record<string, CardEdit>>({})
+  const { definitions, error: defsError } = useDefinitions()
+  const catTree = useCategoryTree(definitions, true)
+  const crewName = getCrewName() || 'Admin'
+  const [globalError, setGlobalError] = useState<string | null>(null)
+  const [submittingBatch, setSubmittingBatch] = useState(false)
+  const [skippingBatch, setSkippingBatch] = useState(false)
+
+  const load = async () => {
+    setLoading(true); setLoadError(null)
+    try {
+      const r = await authFetch('/api/expenses/orphan-list')
+      const d = await r.json()
+      if (!d?.ok) throw new Error(d?.error || 'load failed')
+      setOrphans(d.orphans || [])
+      setCards(prev => {
+        const next: Record<string, CardEdit> = { ...prev }
+        for (const o of (d.orphans || []) as OrphanRow[]) {
+          if (!next[o.id]) {
+            next[o.id] = {
+              key: o.id,
+              source: 'orphan',
+              origDate: o.ocr_date || todayISO(),
+              origMerchant: o.ocr_merchant,
+              origUsd: o.ocr_usd,
+              origEur: o.ocr_eur,
+              account: 'Amex 3240',
+              receiptUrl: o.receipt_url,
+              receiptThumbUrl: o.receipt_thumb_url,
+              date: o.ocr_date || todayISO(),
+              merchant: o.ocr_merchant || '',
+              usd: o.ocr_usd != null ? String(o.ocr_usd) : '',
+              eur: o.ocr_eur != null ? String(o.ocr_eur) : '',
+              project: 'Operating',
+              expenseType: '',
+              category: '',
+              guestTrip: false,
+              guestTripName: '',
+              description: '',
+              selectedForSkip: false,
+            }
+          }
+        }
+        return next
+      })
+    } catch (err: any) {
+      setLoadError(err?.message || String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => { load() }, [])
+
+  const setCard = (key: string, patch: Partial<CardEdit>) => {
+    setCards(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }))
+  }
+
+  const filled = useMemo(
+    () => orphans.filter(o => {
+      const c = cards[o.id]
+      return c && !c.selectedForSkip && c.expenseType && c.category && (c.usd || c.eur)
+    }),
+    [orphans, cards],
+  )
+  const selectedForSkip = useMemo(
+    () => orphans.filter(o => cards[o.id]?.selectedForSkip),
+    [orphans, cards],
+  )
+
+  const submitFilled = async () => {
+    if (filled.length === 0) return
+    setSubmittingBatch(true); setGlobalError(null)
+    try {
+      const expenses = filled.map(o => {
+        const c = cards[o.id]
+        return {
+          date: c.date,
+          account: c.account,
+          project: c.project || 'Operating',
+          expenseType: c.expenseType,
+          category: c.category,
+          guestTrip: c.guestTrip ? (c.guestTripName || 'Yes') : '',
+          store: c.merchant,
+          usd: c.usd ? Number(c.usd) : null,
+          eur: c.eur ? Number(c.eur) : null,
+          refunded: '',
+          description: c.description,
+          specificRepair: '',
+          statement: '',
+          inputBy: crewName,
+          receiptUrl: c.receiptUrl || '',
+          crosscheck: 'orphan-resolved',
+        }
+      })
+      const resp = await authFetch('/api/expense-submit', {
+        method: 'POST',
+        body: JSON.stringify({ expenses }),
+      })
+      const data = await resp.json()
+      const errors: Array<{ index: number; error: string }> = data?.errors || []
+      const inserted: Array<{ row: number }> = data?.inserted || []
+      const okIds: string[] = []
+      const nextCards: Record<string, CardEdit> = { ...cards }
+      for (let i = 0; i < filled.length; i++) {
+        const o = filled[i]
+        const errHit = errors.find(e => e.index === i)
+        if (errHit) {
+          nextCards[o.id] = { ...nextCards[o.id], submitError: errHit.error }
+        } else {
+          okIds.push(o.id)
+          delete nextCards[o.id]
+        }
+      }
+      setCards(nextCards)
+      if (okIds.length > 0) {
+        // Mark resolved on the sheet, then drop from view.
+        try {
+          await authFetch('/api/expenses/orphan-resolve', {
+            method: 'POST',
+            body: JSON.stringify({ ids: okIds, status: 'resolved' }),
+          })
+        } catch (e: any) {
+          console.warn('orphan-resolve failed:', e?.message)
+        }
+        const okSet = new Set(okIds)
+        setOrphans(prev => prev.filter(o => !okSet.has(o.id)))
+      }
+      if (errors.length > 0) setGlobalError(`${errors.length} of ${filled.length} failed.`)
+    } catch (err: any) {
+      setGlobalError(err?.message || String(err))
+    } finally {
+      setSubmittingBatch(false)
+    }
+  }
+
+  const skipSelected = async () => {
+    if (selectedForSkip.length === 0) return
+    setSkippingBatch(true); setGlobalError(null)
+    try {
+      const ids = selectedForSkip.map(o => o.id)
+      const resp = await authFetch('/api/expenses/orphan-resolve', {
+        method: 'POST',
+        body: JSON.stringify({ ids, status: 'skipped' }),
+      })
+      const data = await resp.json()
+      if (!data?.ok) throw new Error(data?.error || 'Skip failed')
+      const skipped = new Set(ids)
+      setOrphans(prev => prev.filter(o => !skipped.has(o.id)))
+      setCards(prev => {
+        const next = { ...prev }
+        for (const id of skipped) delete next[id]
+        return next
+      })
+    } catch (err: any) {
+      setGlobalError(err?.message || String(err))
+    } finally {
+      setSkippingBatch(false)
+    }
+  }
+
+  return (
+    <MenuLayout title="Orphan receipts" showBack backHref="/expenses">
+      <div className="space-y-3">
+        <button onClick={onBack} className="text-xs text-red-400 hover:underline">← Hub</button>
+        {defsError && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-950/40 text-amber-200 text-sm p-3">
+            Categories failed to load: {defsError}
+          </div>
+        )}
+        {loadError && (
+          <div className="rounded-lg border border-red-500/40 bg-red-950/40 text-red-200 text-sm p-3">{loadError}</div>
+        )}
+        {globalError && (
+          <div className="rounded-lg border border-red-500/40 bg-red-950/40 text-red-200 text-sm p-3">{globalError}</div>
+        )}
+        {loading && <div className="text-sm text-neutral-400">Loading orphan queue…</div>}
+        {!loading && orphans.length === 0 && (
+          <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4 text-sm text-neutral-400">
+            No orphan receipts.
+          </div>
+        )}
+
+        {orphans.map(o => {
+          const c = cards[o.id]
+          if (!c) return null
+          const cats = Array.from(catTree.keys())
+          const subs = catTree.get(c.expenseType) || []
+          return (
+            <div
+              key={o.id}
+              className={`rounded-xl border p-3 space-y-3 ${
+                c.submitError
+                  ? 'border-red-600/60 bg-red-950/30'
+                  : c.selectedForSkip
+                    ? 'border-neutral-700 bg-neutral-900/50 opacity-70'
+                    : 'border-neutral-800 bg-neutral-900'
+              }`}
+            >
+              <div className="flex gap-3">
+                <a href={o.receipt_url} target="_blank" rel="noreferrer" className="flex-shrink-0">
+                  <img
+                    src={o.receipt_thumb_url || o.receipt_url}
+                    alt="receipt"
+                    className="h-24 w-24 object-cover rounded-lg border border-neutral-800"
+                  />
+                </a>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-neutral-400">
+                    Added {o.added_at ? o.added_at.slice(0, 10) : ''} by {o.added_by || '?'}
+                  </div>
+                  <div className="text-xs text-neutral-500 mt-1">
+                    OCR: {o.ocr_merchant || '?'} · {o.ocr_date || '?'} · {o.ocr_eur != null ? `€${o.ocr_eur}` : ''} {o.ocr_usd != null ? `$${o.ocr_usd}` : ''}
+                  </div>
+                </div>
+                <label className="text-xs flex items-center gap-1 select-none">
+                  <input
+                    type="checkbox"
+                    checked={c.selectedForSkip}
+                    onChange={(e) => setCard(o.id, { selectedForSkip: e.target.checked })}
+                    className="accent-red-600"
+                  />
+                  Skip
+                </label>
+              </div>
+
+              {!c.selectedForSkip && (
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <label className="text-xs text-neutral-400">Account</label>
+                    <div className="flex gap-1 mt-1">
+                      {(['Amex 3240', 'Bilt'] as Account[]).map(a => (
+                        <button
+                          key={a}
+                          onClick={() => setCard(o.id, { account: a })}
+                          className={`flex-1 h-9 rounded border font-semibold text-xs ${c.account === a ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
+                        >{a}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400">Date</label>
+                    <input
+                      type="date"
+                      value={c.date}
+                      onChange={(e) => setCard(o.id, { date: e.target.value })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-neutral-400">Store / merchant</label>
+                    <input
+                      type="text"
+                      value={c.merchant}
+                      onChange={(e) => setCard(o.id, { merchant: e.target.value })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400">EUR</label>
+                    <input
+                      type="number" step="0.01"
+                      value={c.eur}
+                      onChange={(e) => setCard(o.id, { eur: e.target.value })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400">USD</label>
+                    <input
+                      type="number" step="0.01"
+                      value={c.usd}
+                      onChange={(e) => setCard(o.id, { usd: e.target.value })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-neutral-400">Guest trip?</label>
+                    <div className="flex gap-1 mt-1">
+                      <button
+                        onClick={() => setCard(o.id, { guestTrip: false })}
+                        className={`flex-1 h-9 rounded border font-semibold text-xs ${!c.guestTrip ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
+                      >No</button>
+                      <button
+                        onClick={() => setCard(o.id, { guestTrip: true })}
+                        className={`flex-1 h-9 rounded border font-semibold text-xs ${c.guestTrip ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
+                      >Yes</button>
+                    </div>
+                  </div>
+                  {c.guestTrip && (
+                    <div className="col-span-2">
+                      <label className="text-xs text-neutral-400">Guest trip name</label>
+                      <input
+                        type="text"
+                        value={c.guestTripName}
+                        onChange={(e) => setCard(o.id, { guestTripName: e.target.value })}
+                        className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                      />
+                    </div>
+                  )}
+                  <div className="col-span-2">
+                    <label className="text-xs text-neutral-400">Category</label>
+                    <select
+                      value={c.expenseType}
+                      onChange={(e) => setCard(o.id, { expenseType: e.target.value, category: '' })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    >
+                      <option value="">— pick —</option>
+                      {cats.map(x => <option key={x} value={x}>{x}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-neutral-400">Subcategory</label>
+                    <select
+                      value={c.category}
+                      onChange={(e) => setCard(o.id, { category: e.target.value })}
+                      disabled={!c.expenseType}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950 disabled:opacity-50"
+                    >
+                      <option value="">{c.expenseType ? '— pick —' : 'Pick category first'}</option>
+                      {subs.map(x => <option key={x} value={x}>{x}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-neutral-400">Description (optional)</label>
+                    <input
+                      type="text"
+                      value={c.description}
+                      onChange={(e) => setCard(o.id, { description: e.target.value })}
+                      className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                    />
+                  </div>
+                  {c.submitError && <div className="col-span-2 text-xs text-red-400">Submit error: {c.submitError}</div>}
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {!loading && (filled.length > 0 || selectedForSkip.length > 0) && (
+          <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-neutral-950/95 border-t border-neutral-800 flex gap-2">
+            <button
+              onClick={submitFilled}
+              disabled={submittingBatch || filled.length === 0}
+              className="flex-1 h-11 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold"
+            >
+              {submittingBatch ? 'Submitting…' : `Submit ${filled.length} filled`}
+            </button>
+            <button
+              onClick={skipSelected}
+              disabled={skippingBatch || selectedForSkip.length === 0}
+              className="flex-1 h-11 rounded-lg border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 font-semibold"
+            >
+              {skippingBatch ? 'Skipping…' : `Skip ${selectedForSkip.length}`}
+            </button>
+          </div>
+        )}
+      </div>
+    </MenuLayout>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Crew — scan flow (also used by admin "scan my own")
+// ══════════════════════════════════════════════════════════════════════
+function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
+  const [, setLocation] = useLocation()
+  const [account, setAccount] = useState<Account>('Amex 3240')
+  const [photos, setPhotos] = useState<Photo[]>([])
+  const [readingAll, setReadingAll] = useState(false)
+  const [globalError, setGlobalError] = useState<string | null>(null)
+  const crewName = getCrewName() || 'Unknown'
+
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
 
   const handleFilesSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) return
@@ -212,23 +1115,19 @@ export function ExpenseIntakePage() {
     }
     if (newPhotos.length === 0) return
     setPhotos(prev => [...prev, ...newPhotos])
-    // Kick off Drive upload in the background for each new one.
-    for (const p of newPhotos) {
-      uploadPhotoToDrive(p)
-    }
+    for (const p of newPhotos) uploadPhotoToDrive(p)
+  }
+
+  const updatePhoto = (id: string, patch: Partial<Photo>) => {
+    setPhotos(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p))
   }
 
   const uploadPhotoToDrive = async (photo: Photo) => {
     updatePhoto(photo.id, { uploading: true, uploadError: undefined })
     try {
-      const resp = await fetch('/api/expense-drive-upload', {
+      const resp = await authFetch('/api/expense-drive-upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          base64: photo.base64,
-          account,
-          date: photo.date,
-        }),
+        body: JSON.stringify({ base64: photo.base64, account, date: photo.date }),
       })
       const data = await resp.json()
       if (!data?.ok) throw new Error(data?.error || data?.detail || 'Upload failed')
@@ -243,215 +1142,214 @@ export function ExpenseIntakePage() {
     }
   }
 
-  const updatePhoto = (id: string, patch: Partial<Photo>) => {
-    setPhotos(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p))
-  }
+  const removePhoto = (id: string) => setPhotos(prev => prev.filter(p => p.id !== id))
 
-  const removePhoto = (id: string) => {
-    setPhotos(prev => prev.filter(p => p.id !== id))
-  }
-
-  const readAllReceipts = async () => {
-    if (photos.length === 0) return
-    setReadingAll(true)
-    setGlobalError(null)
-    // Mark all as reading
-    setPhotos(prev => prev.map(p => ({ ...p, reading: true })))
+  // Try to match a single receipt against the Plaid backlog (cache + live).
+  const runMatchFor = async (p: Photo, r: ReceiptRead): Promise<PlaidMatch> => {
     try {
-      // Batch: send all base64 in one call so Claude can OCR them in one shot.
-      const resp = await fetch('/api/expense-read-receipts', {
+      const resp = await authFetch('/api/plaid/match', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          images: photos.map(p => ({ base64: p.base64, mime: 'image/jpeg' })),
+          queries: [{
+            account,
+            date: r.date || p.date,
+            eur: r.eur ?? null,
+            usd: r.usd ?? null,
+            merchant: r.merchant ?? null,
+          }],
         }),
+      })
+      const data = await resp.json()
+      if (data?.ok && Array.isArray(data.matches)) return data.matches[0] || null
+    } catch (err: any) {
+      console.warn('match failed:', err?.message)
+    }
+    return null
+  }
+
+  // Submit one photo as a matched expense (auto-submits via /api/expense-submit).
+  const submitMatched = async (p: Photo, m: NonNullable<PlaidMatch>): Promise<{ ok: boolean; row?: number; error?: string }> => {
+    try {
+      const usd = Number.isFinite(m.amount_usd) ? m.amount_usd : (p.usd ? Number(p.usd) : null)
+      // Use the receipt EUR when we have it; otherwise blank.
+      const eur = p.read?.eur ?? (p.eur ? Number(p.eur) : null)
+      const cls = autoClassify(p.read?.category_hint || null, p.guestTrip)
+      const expense = {
+        date: m.date,
+        account,
+        project: cls?.project || 'Operating',
+        expenseType: cls?.expenseType || 'Recurrent',
+        category: cls?.category || '',
+        guestTrip: p.guestTrip ? (p.guestTripName || 'Yes') : '',
+        store: m.merchant || p.read?.merchant || p.merchant,
+        usd,
+        eur,
+        refunded: '',
+        description: p.read?.notes || '',
+        specificRepair: '',
+        statement: '',
+        inputBy: crewName,
+        receiptUrl: p.driveViewUrl || '',
+        crosscheck: `matched:${m.txn_id}`,
+      }
+      const resp = await authFetch('/api/expense-submit', {
+        method: 'POST',
+        body: JSON.stringify({ expenses: [expense] }),
+      })
+      const data = await resp.json()
+      if (!data?.ok) {
+        const err = data?.errors?.[0]?.error || data?.error || 'Submit failed'
+        return { ok: false, error: err }
+      }
+      const row = data.inserted?.[0]?.row
+      // Mark the Plaid txn as submitted (idempotent, admin-only endpoint would be
+      // needed for full write; here we rely on the daily reconciliation to skip.
+      // We flag via crosscheck so admin can see the link.
+      return { ok: true, row }
+    } catch (err: any) {
+      return { ok: false, error: err?.message || String(err) }
+    }
+  }
+
+  const addOrphan = async (p: Photo): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const resp = await authFetch('/api/expenses/orphan-add', {
+        method: 'POST',
+        body: JSON.stringify({
+          receipt_url: p.driveViewUrl,
+          receipt_thumb_url: p.driveThumbUrl,
+          ocr: {
+            merchant: p.read?.merchant ?? null,
+            date: p.read?.date ?? p.date,
+            eur: p.read?.eur ?? null,
+            usd: p.read?.usd ?? null,
+          },
+          addedBy: crewName,
+        }),
+      })
+      const data = await resp.json()
+      if (!data?.ok) return { ok: false, error: data?.error || 'orphan-add failed' }
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, error: err?.message || String(err) }
+    }
+  }
+
+  const runScanFlow = async () => {
+    if (photos.length === 0) return
+    if (photos.some(p => p.uploading)) { setGlobalError('Wait for uploads to finish.'); return }
+    setReadingAll(true); setGlobalError(null)
+    setPhotos(prev => prev.map(p => ({ ...p, reading: true })))
+
+    try {
+      // 1) OCR all in one batch
+      const resp = await authFetch('/api/expense-read-receipts', {
+        method: 'POST',
+        body: JSON.stringify({ images: photos.map(p => ({ base64: p.base64, mime: 'image/jpeg' })) }),
       })
       const data = await resp.json()
       if (!data?.ok) throw new Error(data?.error || 'Read failed')
       const reads: ReceiptRead[] = data.receipts || []
 
-      // Match every read receipt against Plaid cache AND check duplicates in parallel
-      let matches: PlaidMatch[] = new Array(photos.length).fill(null)
-      let duplicates: DuplicateHit[] = new Array(photos.length).fill(null)
-      const matchQueries = photos.map((p, i) => {
-        const r = reads[i]
-        return {
-          account,
-          date: r?.date || p.date,
-          eur: r?.eur ?? null,
-          usd: r?.usd ?? null,
-          merchant: r?.merchant ?? p.merchant ?? null,
-        }
+      // 2) Apply reads and mark reading:false
+      let snapshot: Photo[] = []
+      setPhotos(prev => {
+        snapshot = prev.map((p, i) => {
+          const r = reads[i]
+          if (!r) return { ...p, reading: false }
+          return {
+            ...p,
+            reading: false,
+            read: r,
+            merchant: r.merchant || p.merchant,
+            date: r.date || p.date,
+            eur: r.eur != null ? String(r.eur) : p.eur,
+            usd: r.usd != null ? String(r.usd) : p.usd,
+          }
+        })
+        return snapshot
       })
-      const dupQueries = photos.map((p, i) => {
+
+      // 3) First-pass match against Plaid backlog (cache + live), per photo
+      let didAnyMiss = false
+      for (let i = 0; i < snapshot.length; i++) {
+        const p = snapshot[i]
         const r = reads[i]
-        return {
-          date: r?.date || p.date,
-          store: r?.merchant || p.merchant || '',
-          eur: r?.eur ?? null,
-          usd: r?.usd ?? null,
+        if (!r) continue
+        const match = await runMatchFor(p, r)
+        snapshot[i] = { ...snapshot[i], plaidMatch: match }
+        if (!match) didAnyMiss = true
+      }
+      setPhotos([...snapshot])
+
+      // 4) If any miss, auto-run a crew Plaid sync then re-match those.
+      if (didAnyMiss) {
+        setPhotos(prev => prev.map(p => p.plaidMatch ? p : { ...p, syncing: true }))
+        try {
+          await authFetch('/api/plaid/crew-sync', { method: 'POST', body: JSON.stringify({}) })
+        } catch (err: any) {
+          console.warn('crew-sync failed:', err?.message)
         }
-      })
-      try {
-        const [matchResp, dupResp] = await Promise.all([
-          fetch('/api/plaid/match', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ queries: matchQueries }),
-          }),
-          fetch('/api/expense-duplicate-check', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ queries: dupQueries }),
-          }),
-        ])
-        const matchData = await matchResp.json()
-        if (matchData?.ok && Array.isArray(matchData.matches)) matches = matchData.matches
-        const dupData = await dupResp.json()
-        if (dupData?.ok && Array.isArray(dupData.results)) duplicates = dupData.results
-      } catch (matchErr: any) {
-        console.warn('Plaid match / duplicate check failed:', matchErr?.message)
+        for (let i = 0; i < snapshot.length; i++) {
+          if (snapshot[i].plaidMatch) continue
+          const r = reads[i]
+          if (!r) continue
+          const match = await runMatchFor(snapshot[i], r)
+          snapshot[i] = { ...snapshot[i], plaidMatch: match, syncing: false }
+        }
+        setPhotos([...snapshot])
       }
 
-      // Apply per-photo; blank USD when there is no Plaid match (no ECB fallback)
-      const next: Photo[] = []
-      for (let i = 0; i < photos.length; i++) {
-        const p = photos[i]
-        const r = reads[i]
-        const m = matches[i]
-        const dup = duplicates[i]
-        if (!r) { next.push({ ...p, reading: false, plaidMatch: m, duplicate: dup }); continue }
-        const cls = autoClassify(r.category_hint, false)
-        // USD source of truth: Plaid match if any (even if it posted on the
-        // OTHER card — the amount is still authoritative), else if receipt is
-        // already printed in USD use that, else blank (per user rule).
-        let usd: number | null = null
-        if (m && Number.isFinite(m.amount_usd)) usd = m.amount_usd
-        else if (r.usd != null) usd = r.usd
-        next.push({
-          ...p,
-          reading: false,
-          read: r,
-          plaidMatch: m,
-          duplicate: dup,
-          merchant: r.merchant || p.merchant,
-          date: r.date || p.date,
-          eur: r.eur != null ? String(r.eur) : p.eur,
-          usd: usd != null ? String(usd) : '',
-          project: cls?.project || p.project,
-          expenseType: cls?.expenseType || p.expenseType,
-          category: cls?.category || p.category,
-          description: r.notes || p.description,
-        })
+      // 5) For each photo: matched → auto-submit; else → orphan-add
+      for (let i = 0; i < snapshot.length; i++) {
+        const p = snapshot[i]
+        if (p.plaidMatch) {
+          setPhotos(prev => prev.map(x => x.id === p.id ? { ...x, submitting: true } : x))
+          const r = await submitMatched(p, p.plaidMatch as NonNullable<PlaidMatch>)
+          setPhotos(prev => prev.map(x => x.id === p.id ? {
+            ...x,
+            submitting: false,
+            submitted: r.ok,
+            submittedRow: r.row,
+            submitError: r.error,
+            submittedAs: 'matched',
+          } : x))
+          snapshot[i] = { ...snapshot[i], submitted: r.ok, submittedRow: r.row, submitError: r.error, submittedAs: 'matched' }
+        } else {
+          setPhotos(prev => prev.map(x => x.id === p.id ? { ...x, submitting: true } : x))
+          const r = await addOrphan(p)
+          setPhotos(prev => prev.map(x => x.id === p.id ? {
+            ...x,
+            submitting: false,
+            submitted: r.ok,
+            submitError: r.error,
+            submittedAs: 'orphan',
+          } : x))
+          snapshot[i] = { ...snapshot[i], submitted: r.ok, submitError: r.error, submittedAs: 'orphan' }
+        }
       }
-      setPhotos(next)
     } catch (err: any) {
       setGlobalError(err?.message || String(err))
-      setPhotos(prev => prev.map(p => ({ ...p, reading: false })))
+      setPhotos(prev => prev.map(p => ({ ...p, reading: false, syncing: false })))
     } finally {
       setReadingAll(false)
     }
   }
 
-  const setPhotoField = (id: string, field: keyof Photo, value: any) => {
-    setPhotos(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
-  }
-
-  const setPhotoGuestTrip = (id: string, isGuest: boolean) => {
-    setPhotos(prev => prev.map(p => {
-      if (p.id !== id) return p
-      // Re-run auto-classify with new guest-trip flag if we have a category_hint
-      const hint = p.read?.category_hint || null
-      const cls = autoClassify(hint, isGuest)
-      return {
-        ...p,
-        guestTrip: isGuest,
-        project: cls?.project || p.project,
-        expenseType: cls?.expenseType || p.expenseType,
-        category: cls?.category || p.category,
-      }
-    }))
-  }
-
-  // Subcategories for a given photo's expenseType
-  const subsForPhoto = (p: Photo): string[] => {
-    return categoryTree.get(p.expenseType) || []
-  }
-
-  const submitAll = async () => {
-    // Validate all photos have driveViewUrl + expenseType + category + at least one amount
-    setGlobalError(null)
-    const invalid = photos.find(p => !p.driveViewUrl || !p.expenseType || !p.category || (!p.usd && !p.eur))
-    if (invalid) {
-      setGlobalError('Every receipt needs a category, subcategory and an amount before submitting.')
-      return
-    }
-    setPhotos(prev => prev.map(p => ({ ...p, submitting: true, submitError: undefined })))
-    try {
-      const payload = {
-        expenses: photos.map(p => {
-          const matched = p.plaidMatch && (p.plaidMatch as any).plaid_txn_id
-          const crosscheck = matched
-            ? `matched:${(p.plaidMatch as any).plaid_txn_id}`
-            : 'no plaid match'
-          return {
-            date: p.date,
-            account,
-            project: p.project || 'Operating',
-            expenseType: p.expenseType,
-            category: p.category,
-            guestTrip: p.guestTrip ? (p.guestTripName || 'Yes') : '',
-            store: p.merchant,
-            usd: p.usd ? Number(p.usd) : null,
-            eur: p.eur ? Number(p.eur) : null,
-            refunded: p.refunded,
-            description: p.description,
-            specificRepair: p.specificRepair,
-            statement: p.statement,
-            inputBy: crewName || 'Unknown',
-            receiptUrl: p.driveViewUrl || '',
-            crosscheck,
-          }
-        }),
-      }
-      const resp = await fetch('/api/expense-submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const data = await resp.json()
-      if (!data?.ok) {
-        // Partial success possible
-        const errs = data?.errors || []
-        setPhotos(prev => prev.map((p, i) => ({
-          ...p,
-          submitting: false,
-          submitted: !errs.find((e: any) => e.index === i),
-          submittedRow: data?.inserted?.find((r: any, idx: number) => idx === i)?.row,
-          submitError: errs.find((e: any) => e.index === i)?.error,
-        })))
-        setGlobalError(data?.error || 'Some rows failed to submit')
-        return
-      }
-      // All good
-      setPhotos(prev => prev.map((p, i) => ({
-        ...p,
-        submitting: false,
-        submitted: true,
-        submittedRow: data.inserted?.[i]?.row,
-      })))
-    } catch (err: any) {
-      setPhotos(prev => prev.map(p => ({ ...p, submitting: false, submitError: err?.message || String(err) })))
-      setGlobalError(err?.message || String(err))
-    }
-  }
-
   const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/1XBBy8ma5WmQNW2ix-K6JyBaJB7kvnXQoExGttcSu_Wk/edit#gid=734695797`
-  const allSubmitted = photos.length > 0 && photos.every(p => p.submitted)
+  const allDone = photos.length > 0 && photos.every(p => p.submitted)
+  const anyUploading = photos.some(p => p.uploading)
+  const anyBusy = readingAll || photos.some(p => p.reading || p.syncing || p.submitting)
+
+  const backHref = adminScanBack ? undefined : '/menu'
 
   return (
-    <MenuLayout title="Expense intake" showBack backHref="/menu">
+    <MenuLayout title="Scan receipts" showBack backHref={backHref || '/menu'}>
       <div className="space-y-4">
+        {adminScanBack && (
+          <button onClick={adminScanBack} className="text-xs text-red-400 hover:underline">← Hub</button>
+        )}
+
         {/* Account */}
         <div>
           <label className="text-sm font-semibold block mb-2">Card / Account</label>
@@ -463,7 +1361,7 @@ export function ExpenseIntakePage() {
                 className={`h-11 rounded-lg border font-semibold transition-colors ${
                   account === a
                     ? 'bg-red-600 border-red-600 text-white'
-                    : 'bg-card border-border text-foreground hover:bg-secondary'
+                    : 'bg-neutral-900 border-neutral-800 text-neutral-200 hover:bg-neutral-800'
                 }`}
               >
                 {a}
@@ -472,260 +1370,111 @@ export function ExpenseIntakePage() {
           </div>
         </div>
 
-        {/* Capture / Upload */}
+        {/* Capture */}
         <div>
           <label className="text-sm font-semibold block mb-2">Receipts</label>
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => cameraInputRef.current?.click()}
-              className="h-11 rounded-lg border border-border bg-card hover:bg-secondary text-sm font-semibold"
-            >
-              📷 Take picture
-            </button>
+              className="h-11 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-sm font-semibold"
+            >📷 Take picture</button>
             <button
               onClick={() => uploadInputRef.current?.click()}
-              className="h-11 rounded-lg border border-border bg-card hover:bg-secondary text-sm font-semibold"
-            >
-              📎 Upload files
-            </button>
+              className="h-11 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-sm font-semibold"
+            >📎 Upload files</button>
           </div>
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            onChange={(e) => handleFilesSelected(e.target.files)}
-          />
-          <input
-            ref={uploadInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => handleFilesSelected(e.target.files)}
-          />
+          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFilesSelected(e.target.files)} />
+          <input ref={uploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFilesSelected(e.target.files)} />
         </div>
 
-        {/* Read receipts button */}
-        {photos.length > 0 && !allSubmitted && (
+        {photos.length > 0 && !allDone && (
           <button
-            onClick={readAllReceipts}
-            disabled={readingAll || photos.some(p => p.uploading)}
+            onClick={runScanFlow}
+            disabled={readingAll || anyUploading || anyBusy}
             className="w-full h-11 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold"
           >
             {readingAll
-              ? 'Reading…'
-              : photos.some(p => p.uploading)
+              ? 'Reading receipts…'
+              : anyUploading
                 ? 'Uploading photos…'
-                : `Read ${photos.length} receipt${photos.length === 1 ? '' : 's'}`}
+                : `Process ${photos.length} receipt${photos.length === 1 ? '' : 's'}`}
           </button>
         )}
 
         {globalError && (
-          <div className="rounded-lg border border-red-500/40 bg-red-950/40 text-red-200 text-sm p-3">
-            {globalError}
-          </div>
-        )}
-
-        {defsError && (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-950/40 text-amber-200 text-sm p-3">
-            Categories failed to load: {defsError}
-          </div>
+          <div className="rounded-lg border border-red-500/40 bg-red-950/40 text-red-200 text-sm p-3">{globalError}</div>
         )}
 
         {/* Photo cards */}
-        <div className="space-y-4">
-          {photos.map((p, idx) => {
-            const subs = subsForPhoto(p)
-            const categories = Array.from(categoryTree.keys())
-            return (
-              <div key={p.id} className={`rounded-xl border p-3 space-y-3 ${p.submitted ? 'border-green-600/50 bg-green-950/20' : 'border-border bg-card'}`}>
-                <div className="flex gap-3">
-                  <a
-                    href={p.driveViewUrl || '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block flex-shrink-0"
-                    onClick={(e) => { if (!p.driveViewUrl) e.preventDefault() }}
-                  >
-                    <img src={p.thumbDataUrl} alt="receipt" className="h-24 w-24 object-cover rounded-lg border border-border" />
-                  </a>
-                  <div className="flex-1 min-w-0 text-sm">
-                    <div className="font-semibold truncate">Receipt {idx + 1}</div>
-                    {p.uploading && <div className="text-muted-foreground text-xs">Uploading to Drive…</div>}
-                    {p.uploadError && <div className="text-red-400 text-xs">Upload error: {p.uploadError}</div>}
-                    {p.driveViewUrl && <div className="text-green-400 text-xs">✓ Saved to Drive</div>}
-                    {p.reading && <div className="text-muted-foreground text-xs">Reading…</div>}
-                    {p.read && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {p.plaidMatch
-                          ? (p.plaidMatch.account_matches_selection
-                              ? <span className="text-green-400">✓ Matched {p.plaidMatch.merchant} ${p.plaidMatch.amount_usd.toFixed(2)} on {p.plaidMatch.date}</span>
-                              : <span className="text-red-400 font-semibold">⚠ Charge posted on {p.plaidMatch.account_label} (not {account}) — ${p.plaidMatch.amount_usd.toFixed(2)} at {p.plaidMatch.merchant}. Switch account above.</span>)
-                          : p.read.currency_hint === 'USD' && p.read.usd != null
-                            ? 'Priced in USD (no Plaid match)'
-                            : <span className="text-amber-400">No Plaid match — fill USD manually or reconcile later</span>}
-                      </div>
-                    )}
-                    {p.duplicate?.isDuplicate && (
-                      <div className="text-xs mt-1 rounded bg-red-950/40 border border-red-800 text-red-300 px-2 py-1">
-                        ⚠ Possible duplicate of row {p.duplicate.matchedRow} ({p.duplicate.matchedStore} · {p.duplicate.matchedDate} · {p.duplicate.matchedAccount}
-                        {p.duplicate.matchedUsd != null ? ` · $${p.duplicate.matchedUsd.toFixed(2)}` : ''}
-                        {p.duplicate.matchedEur != null ? ` · €${p.duplicate.matchedEur.toFixed(2)}` : ''}
-                        ). Confirm before submitting.
-                      </div>
-                    )}
-                    {p.submitted && <div className="text-green-400 text-xs">✓ Submitted (row {p.submittedRow})</div>}
-                    {p.submitError && <div className="text-red-400 text-xs">Submit error: {p.submitError}</div>}
-                    {!p.submitted && (
-                      <button
-                        onClick={() => removePhoto(p.id)}
-                        className="text-xs text-red-400 hover:underline mt-1"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
+        <div className="space-y-3">
+          {photos.map((p, idx) => (
+            <div
+              key={p.id}
+              className={`rounded-xl border p-3 space-y-2 ${
+                p.submitted && p.submittedAs === 'matched' ? 'border-green-600/50 bg-green-950/20'
+                : p.submitted && p.submittedAs === 'orphan' ? 'border-amber-600/50 bg-amber-950/20'
+                : p.submitError ? 'border-red-600/50 bg-red-950/30'
+                : 'border-neutral-800 bg-neutral-900'
+              }`}
+            >
+              <div className="flex gap-3">
+                <a href={p.driveViewUrl || '#'} target="_blank" rel="noreferrer" className="flex-shrink-0" onClick={(e) => { if (!p.driveViewUrl) e.preventDefault() }}>
+                  <img src={p.thumbDataUrl} alt="receipt" className="h-24 w-24 object-cover rounded-lg border border-neutral-800" />
+                </a>
+                <div className="flex-1 min-w-0 text-sm">
+                  <div className="font-semibold truncate">Receipt {idx + 1}</div>
+                  {p.uploading && <div className="text-neutral-400 text-xs">Uploading to Drive…</div>}
+                  {p.uploadError && <div className="text-red-400 text-xs">Upload error: {p.uploadError}</div>}
+                  {p.driveViewUrl && !p.uploading && <div className="text-green-400 text-xs">✓ Saved to Drive</div>}
+                  {p.reading && <div className="text-neutral-400 text-xs">Reading receipt…</div>}
+                  {p.syncing && <div className="text-neutral-400 text-xs">Syncing with credit card company…</div>}
+                  {p.submitting && !p.syncing && <div className="text-neutral-400 text-xs">Filing expense…</div>}
+                  {p.read && p.plaidMatch && (
+                    <div className="text-xs text-green-400 mt-1">
+                      ✓ Matched {p.plaidMatch.merchant} · ${p.plaidMatch.amount_usd?.toFixed?.(2)} · {p.plaidMatch.date}
+                      {p.plaidMatch.source === 'cache' && <span className="text-neutral-400"> (cached)</span>}
+                    </div>
+                  )}
+                  {p.read && !p.plaidMatch && !p.syncing && !p.submitting && (
+                    <div className="text-xs text-amber-400 mt-1">
+                      No Plaid match — will be filed as orphan for admin review.
+                    </div>
+                  )}
+                  {p.submitted && p.submittedAs === 'matched' && (
+                    <div className="text-green-400 text-xs mt-1">✓ Filed as expense (row {p.submittedRow})</div>
+                  )}
+                  {p.submitted && p.submittedAs === 'orphan' && (
+                    <div className="text-amber-300 text-xs mt-1">📥 Saved to orphan queue for admin</div>
+                  )}
+                  {p.submitError && <div className="text-red-400 text-xs mt-1">Error: {p.submitError}</div>}
+                  {!p.submitted && !p.reading && !p.syncing && !p.submitting && (
+                    <button
+                      onClick={() => removePhoto(p.id)}
+                      className="text-xs text-red-400 hover:underline mt-1"
+                    >Remove</button>
+                  )}
                 </div>
-
-                {/* Fields */}
-                {!p.submitted && (
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="col-span-2">
-                      <label className="text-xs text-muted-foreground">Merchant</label>
-                      <input
-                        type="text"
-                        value={p.merchant}
-                        onChange={(e) => setPhotoField(p.id, 'merchant', e.target.value)}
-                        className="w-full h-10 px-2 rounded border border-border bg-background"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Date</label>
-                      <input
-                        type="date"
-                        value={p.date}
-                        onChange={(e) => setPhotoField(p.id, 'date', e.target.value)}
-                        className="w-full h-10 px-2 rounded border border-border bg-background"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Guest trip?</label>
-                      <div className="flex gap-1 mt-1">
-                        <button
-                          onClick={() => setPhotoGuestTrip(p.id, false)}
-                          className={`flex-1 h-10 rounded border font-semibold ${!p.guestTrip ? 'bg-red-600 text-white border-red-600' : 'border-border bg-card'}`}
-                        >No</button>
-                        <button
-                          onClick={() => setPhotoGuestTrip(p.id, true)}
-                          className={`flex-1 h-10 rounded border font-semibold ${p.guestTrip ? 'bg-red-600 text-white border-red-600' : 'border-border bg-card'}`}
-                        >Yes</button>
-                      </div>
-                    </div>
-                    {p.guestTrip && (
-                      <div className="col-span-2">
-                        <label className="text-xs text-muted-foreground">Guest trip name</label>
-                        <input
-                          type="text"
-                          value={p.guestTripName}
-                          onChange={(e) => setPhotoField(p.id, 'guestTripName', e.target.value)}
-                          className="w-full h-10 px-2 rounded border border-border bg-background"
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <label className="text-xs text-muted-foreground">EUR</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={p.eur}
-                        onChange={(e) => setPhotoField(p.id, 'eur', e.target.value)}
-                        className="w-full h-10 px-2 rounded border border-border bg-background"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">USD</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={p.usd}
-                        onChange={(e) => setPhotoField(p.id, 'usd', e.target.value)}
-                        className="w-full h-10 px-2 rounded border border-border bg-background"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-xs text-muted-foreground">Category</label>
-                      <select
-                        value={p.expenseType}
-                        onChange={(e) => setPhotos(prev => prev.map(x => x.id === p.id ? { ...x, expenseType: e.target.value, category: '' } : x))}
-                        className="w-full h-10 px-2 rounded border border-border bg-background"
-                      >
-                        <option value="">— pick —</option>
-                        {categories.map(c => (<option key={c} value={c}>{c}</option>))}
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-xs text-muted-foreground">Subcategory</label>
-                      <select
-                        value={p.category}
-                        onChange={(e) => setPhotoField(p.id, 'category', e.target.value)}
-                        disabled={!p.expenseType}
-                        className="w-full h-10 px-2 rounded border border-border bg-background disabled:opacity-50"
-                      >
-                        <option value="">{p.expenseType ? '— pick —' : 'Pick category first'}</option>
-                        {subs.map(s => (<option key={s} value={s}>{s}</option>))}
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-xs text-muted-foreground">Description (optional)</label>
-                      <input
-                        type="text"
-                        value={p.description}
-                        onChange={(e) => setPhotoField(p.id, 'description', e.target.value)}
-                        className="w-full h-10 px-2 rounded border border-border bg-background"
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
 
-        {/* Submit */}
-        {photos.length > 0 && !allSubmitted && photos.some(p => p.read) && (
-          <button
-            onClick={submitAll}
-            disabled={photos.some(p => p.submitting || p.uploading)}
-            className="w-full h-12 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold"
-          >
-            {photos.some(p => p.submitting) ? 'Submitting…' : `Submit ${photos.length} expense${photos.length === 1 ? '' : 's'} to sheet`}
-          </button>
-        )}
-
-        {allSubmitted && (
+        {allDone && (
           <div className="rounded-lg border border-green-600/50 bg-green-950/30 p-3 space-y-2 text-sm">
-            <div className="font-semibold text-green-300">All expenses submitted ✓</div>
-            <a
-              href={spreadsheetUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="block text-red-400 hover:underline"
-            >
-              Open SD118 Expenses spreadsheet →
+            <div className="font-semibold text-green-300">All receipts processed</div>
+            <div className="text-xs text-neutral-400">
+              Matched: {photos.filter(p => p.submittedAs === 'matched').length} · Orphaned: {photos.filter(p => p.submittedAs === 'orphan').length}
+            </div>
+            <a href={spreadsheetUrl} target="_blank" rel="noreferrer" className="block text-red-400 hover:underline">
+              Open Expenses spreadsheet →
             </a>
             <button
-              onClick={() => { setPhotos([]); setLocation('/menu') }}
-              className="w-full h-10 rounded-lg border border-border bg-card hover:bg-secondary text-sm"
-            >
-              Back to menu
-            </button>
+              onClick={() => { setPhotos([]); if (adminScanBack) adminScanBack(); else setLocation('/menu') }}
+              className="w-full h-10 rounded-lg border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-sm"
+            >Done</button>
           </div>
         )}
       </div>
     </MenuLayout>
   )
 }
-
-export default ExpenseIntakePage

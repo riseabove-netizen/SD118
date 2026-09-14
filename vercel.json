@@ -13,6 +13,7 @@
   ],
   "crons": [
     { "path": "/api/anchor-notify?op=cron", "schedule": "*/5 * * * *" },
-    { "path": "/api/anchor-notify?op=deliver-scheduled", "schedule": "*/5 * * * *" }
+    { "path": "/api/anchor-notify?op=deliver-scheduled", "schedule": "*/5 * * * *" },
+    { "path": "/api/plaid/cron-pull", "schedule": "0 7 * * *" }
   ]
 }
