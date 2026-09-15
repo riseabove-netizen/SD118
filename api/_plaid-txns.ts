@@ -148,23 +148,18 @@ export async function syncPlaidTransactions(opts?: { maxDaysBack?: number }): Pr
           totalPulled++
           if (t.pending) continue
           const mask = accountMap[t.account_id] || ''
-          // Gate strictly on account_id being explicitly labeled in Plaid_Items.
-          // A shared institution item (e.g. Bilt) can return multiple account_ids
-          // with the SAME mask when a partner is on the account — mask alone would
-          // let those charges leak into the queue. Only labeled accounts sync.
-          const label = labels[t.account_id]
-          if (!label) continue
           if (!GABRIEL_MASKS.has(mask)) continue
           if (cutoff && t.date < cutoff) continue
           if (seenIds.has(t.transaction_id)) continue
           seenIds.add(t.transaction_id)
+          const label = labels[t.account_id] || maskToSheetAccount(mask)
           toAppend.push({
             txn_id: t.transaction_id,
             date: t.date,
             merchant: t.merchant_name || t.name || '',
             amount_usd: Math.abs(t.amount),
             currency: t.iso_currency_code || t.unofficial_currency_code || 'USD',
-            account: label,  // exact label from Plaid_Items.account_labels
+            account: label,
             account_mask: mask,
             category: (t.personal_finance_category?.primary as string) || '',
             payment_channel: (t.payment_channel as string) || '',
