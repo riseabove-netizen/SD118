@@ -636,6 +636,21 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
+        {/* Submit button — top of page, submits every card the admin has filled in */}
+        {!loading && txns.length > 0 && (
+          <button
+            onClick={submitFilled}
+            disabled={submittingBatch || filled.length === 0}
+            className="w-full h-11 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-semibold"
+          >
+            {submittingBatch
+              ? 'Submitting…'
+              : filled.length === 0
+                ? 'Submit — fill category first'
+                : `Submit ${filled.length} of ${txns.length}`}
+          </button>
+        )}
+
         {/* Bulk edit toolbar — shown when queue has rows */}
         {!loading && txns.length > 0 && (() => {
           const bulkCats = Array.from(catTree.keys())
@@ -721,26 +736,15 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
                   </div>
                   {t.category && <div className="text-xs text-neutral-500">{t.category}</div>}
                 </div>
-                <div className="flex flex-col gap-1 items-end">
-                  <label className="text-xs flex items-center gap-1 select-none">
-                    <input
-                      type="checkbox"
-                      checked={!!c.selectedForBulk}
-                      onChange={(e) => setCard(t.txn_id, { selectedForBulk: e.target.checked })}
-                      className="accent-red-600"
-                    />
-                    Bulk
-                  </label>
-                  <label className="text-xs flex items-center gap-1 select-none">
-                    <input
-                      type="checkbox"
-                      checked={c.selectedForSkip}
-                      onChange={(e) => setCard(t.txn_id, { selectedForSkip: e.target.checked })}
-                      className="accent-red-600"
-                    />
-                    Skip
-                  </label>
-                </div>
+                <label className="text-xs flex items-center gap-1 select-none">
+                  <input
+                    type="checkbox"
+                    checked={!!c.selectedForBulk}
+                    onChange={(e) => setCard(t.txn_id, { selectedForBulk: e.target.checked })}
+                    className="accent-red-600"
+                  />
+                  Bulk
+                </label>
               </div>
 
               {!c.selectedForSkip && (
@@ -866,24 +870,6 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
           )
         })}
 
-        {!loading && (filled.length > 0 || selectedForSkip.length > 0) && (
-          <div className="sticky bottom-0 -mx-4 px-4 py-3 bg-neutral-950/95 border-t border-neutral-800 flex gap-2">
-            <button
-              onClick={submitFilled}
-              disabled={submittingBatch || filled.length === 0}
-              className="flex-1 h-11 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold"
-            >
-              {submittingBatch ? 'Submitting…' : `Submit ${filled.length} filled`}
-            </button>
-            <button
-              onClick={skipSelected}
-              disabled={skippingBatch || selectedForSkip.length === 0}
-              className="flex-1 h-11 rounded-lg border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 font-semibold"
-            >
-              {skippingBatch ? 'Skipping…' : `Skip ${selectedForSkip.length}`}
-            </button>
-          </div>
-        )}
       </div>
     </MenuLayout>
   )
@@ -1806,8 +1792,20 @@ function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
         const p = snapshot[i]
         if (p.plaidMatch?.already_submitted) {
           // Admin already categorized this charge from the Plaid queue —
-          // don't create a duplicate expense row. Mark as duplicate so the UI
-          // shows the user the charge was already logged.
+          // don't create a duplicate expense row. Keep admin edits intact but
+          // attach the crew photo to the existing row if col O is empty.
+          const plaidTxnId = p.plaidMatch.plaid_txn_id || p.plaidMatch.txn_id
+          const receiptUrl = p.driveViewUrl || ''
+          if (plaidTxnId && receiptUrl) {
+            try {
+              await authFetch('/api/expense-attach-receipt', {
+                method: 'POST',
+                body: JSON.stringify({ plaid_txn_id: plaidTxnId, receiptUrl }),
+              })
+            } catch (err: any) {
+              console.warn('attach-receipt failed:', err?.message)
+            }
+          }
           setPhotos(prev => prev.map(x => x.id === p.id ? {
             ...x,
             submitting: false,
