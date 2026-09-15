@@ -148,11 +148,16 @@ export async function syncPlaidTransactions(opts?: { maxDaysBack?: number }): Pr
           totalPulled++
           if (t.pending) continue
           const mask = accountMap[t.account_id] || ''
+          // Gate strictly on account_id being explicitly labeled in Plaid_Items.
+          // A shared Bilt item can carry a partner card that reuses the same mask,
+          // so mask alone is not a safe filter — only accounts we've explicitly
+          // labeled here belong to Gabriel and should sync.
+          const label = labels[t.account_id]
+          if (!label) continue
           if (!GABRIEL_MASKS.has(mask)) continue
           if (cutoff && t.date < cutoff) continue
           if (seenIds.has(t.transaction_id)) continue
           seenIds.add(t.transaction_id)
-          const label = labels[t.account_id] || maskToSheetAccount(mask)
           toAppend.push({
             txn_id: t.transaction_id,
             date: t.date,
