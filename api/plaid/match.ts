@@ -38,6 +38,10 @@ type MatchResult = {
   account_matches_selection: boolean
   source: 'cache' | 'live'
   cache_row?: number
+  // Set when the matched Plaid row has already been categorized by the admin
+  // (queue_status='submitted'). Crew UI uses this to skip duplicate submits.
+  already_submitted?: boolean
+  submitted_at?: string
 } | null
 
 const DATE_WINDOW_DAYS = 3
@@ -73,7 +77,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (queries.length > 25) return res.status(400).json({ error: 'max 25 queries per request' })
 
     // ── Pass 1: check the Plaid_Transactions backlog ────────────────────
-    const backlog = (await readAllPlaidTxns()).filter(r => r.queue_status === 'pending' || r.queue_status === 'historical')
+    // Include SUBMITTED rows too so crew scans can detect a receipt the admin
+    // already categorized and short-circuit (no duplicate expense row).
+    const backlog = (await readAllPlaidTxns()).filter(r =>
+      r.queue_status === 'pending' || r.queue_status === 'historical' || r.queue_status === 'submitted'
+    )
 
     const matches: MatchResult[] = queries.map((q) => {
       const targetLabel = q.account || ''  // '' → any card (crew scan flow)
@@ -100,6 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
       if (!best) return null
+      const isSubmitted = best.queue_status === 'submitted'
       return {
         plaid_txn_id: best.txn_id,
         txn_id: best.txn_id,
@@ -107,6 +116,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         usd: best.amount_usd,
         amount_account: best.amount_usd,
         currency: best.currency || 'USD',
+        already_submitted: isSubmitted,
+        submitted_at: best.submitted_at || '',
         merchant: best.merchant,
         date: best.date,
         category: best.category || '',

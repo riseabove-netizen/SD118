@@ -46,6 +46,10 @@ type PlaidMatch = {
   account_label: string
   account_matches_selection: boolean
   source?: 'cache' | 'live'
+  // True when this Plaid txn was already categorized by admin. Crew flow
+  // shows a 'already logged' state and does NOT create a duplicate expense.
+  already_submitted?: boolean
+  submitted_at?: string
 } | null
 
 type Photo = {
@@ -79,7 +83,7 @@ type Photo = {
   submitted?: boolean
   submitError?: string
   submittedRow?: number
-  submittedAs?: 'matched' | 'orphan'
+  submittedAs?: 'matched' | 'orphan' | 'duplicate'
 }
 
 type PendingQueueTxn = {
@@ -139,6 +143,9 @@ type CardEdit = {
   uploading?: boolean
   uploadError?: string
   selectedForSkip: boolean
+  // Marked for admin bulk edit: apply the same category/subcategory/project/guest-trip
+  // to every card with this flag. Independent from selectedForSkip.
+  selectedForBulk?: boolean
   submitting?: boolean
   submitted?: boolean
   submitError?: string
@@ -217,7 +224,7 @@ export default ExpenseIntakePage
 // ══════════════════════════════════════════════════════════════════════
 // Admin — hub + Plaid queue + Orphan queue + Scan (my own)
 // ══════════════════════════════════════════════════════════════════════
-type AdminView = 'hub' | 'plaid' | 'orphan' | 'scan'
+type AdminView = 'hub' | 'plaid' | 'orphan' | 'scan' | 'oneoff'
 
 function AdminIntake() {
   const [view, setView] = useState<AdminView>('hub')
@@ -267,6 +274,7 @@ function AdminIntake() {
   if (view === 'plaid') return <AdminPlaidQueue onBack={() => setView('hub')} />
   if (view === 'orphan') return <AdminOrphanQueue onBack={() => setView('hub')} />
   if (view === 'scan') return <CrewIntake adminScanBack={() => setView('hub')} />
+  if (view === 'oneoff') return <AdminOneOff onBack={() => setView('hub')} />
 
   return (
     <MenuLayout title="Expense intake" showBack backHref="/menu">
@@ -308,6 +316,16 @@ function AdminIntake() {
           <div>
             <div className="font-semibold">Scan receipt (my own)</div>
             <div className="text-xs opacity-80">Same flow crew uses</div>
+          </div>
+        </button>
+        <button
+          onClick={() => setView('oneoff')}
+          className="w-full h-16 rounded-xl border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-left px-4 flex items-center gap-3"
+        >
+          <span className="text-2xl">➕</span>
+          <div>
+            <div className="font-semibold">One-off expense</div>
+            <div className="text-xs text-neutral-400">Any account — Gabe’s Visa, Wise, Cash…</div>
           </div>
         </button>
 
@@ -380,6 +398,10 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
   const [globalError, setGlobalError] = useState<string | null>(null)
   const [submittingBatch, setSubmittingBatch] = useState(false)
   const [skippingBatch, setSkippingBatch] = useState(false)
+  // Bulk-edit state (admin selects several rows, picks one category, applies to all)
+  const [bulkExpenseType, setBulkExpenseType] = useState('')
+  const [bulkCategory, setBulkCategory] = useState('')
+  const [bulkGuestTrip, setBulkGuestTrip] = useState<'none' | 'no' | 'yes'>('none')
 
   const load = async () => {
     setLoading(true); setLoadError(null)
@@ -428,6 +450,57 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
 
   const setCard = (key: string, patch: Partial<CardEdit>) => {
     setCards(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }))
+  }
+
+  const bulkSelectedIds = useMemo(
+    () => txns.filter(t => cards[t.txn_id]?.selectedForBulk).map(t => t.txn_id),
+    [txns, cards],
+  )
+  const applyBulk = () => {
+    if (bulkSelectedIds.length === 0) return
+    setCards(prev => {
+      const next = { ...prev }
+      for (const id of bulkSelectedIds) {
+        if (!next[id]) continue
+        const patch: Partial<CardEdit> = {}
+        if (bulkExpenseType) {
+          patch.expenseType = bulkExpenseType
+          // Clear subcategory when the category changes, unless we're also setting it
+          patch.category = bulkCategory || ''
+        } else if (bulkCategory) {
+          patch.category = bulkCategory
+        }
+        if (bulkGuestTrip === 'yes') {
+          patch.guestTrip = true
+          if (!bulkExpenseType) patch.expenseType = 'Guest trip'
+        } else if (bulkGuestTrip === 'no') {
+          patch.guestTrip = false
+          patch.guestTripName = ''
+        }
+        next[id] = { ...next[id], ...patch }
+      }
+      return next
+    })
+  }
+  const clearBulkSelection = () => {
+    setCards(prev => {
+      const next = { ...prev }
+      for (const id of Object.keys(next)) {
+        if (next[id].selectedForBulk) next[id] = { ...next[id], selectedForBulk: false }
+      }
+      return next
+    })
+  }
+  const selectAllForBulk = () => {
+    setCards(prev => {
+      const next = { ...prev }
+      for (const t of txns) {
+        if (next[t.txn_id] && !next[t.txn_id].selectedForSkip) {
+          next[t.txn_id] = { ...next[t.txn_id], selectedForBulk: true }
+        }
+      }
+      return next
+    })
   }
 
   const attachReceipt = async (card: CardEdit, file: File) => {
@@ -563,6 +636,66 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
+        {/* Bulk edit toolbar — shown when queue has rows */}
+        {!loading && txns.length > 0 && (() => {
+          const bulkCats = Array.from(catTree.keys())
+          const bulkSubs = catTree.get(bulkExpenseType) || []
+          const n = bulkSelectedIds.length
+          return (
+            <div className={`rounded-xl border p-3 space-y-2 ${n > 0 ? 'border-red-600/60 bg-red-950/20' : 'border-neutral-800 bg-neutral-900/60'}`}>
+              <div className="flex items-center justify-between text-xs">
+                <div className="font-semibold text-neutral-200">Bulk edit · {n} selected</div>
+                <div className="flex gap-2">
+                  <button onClick={selectAllForBulk} className="text-red-400 hover:underline">Select all</button>
+                  {n > 0 && <button onClick={clearBulkSelection} className="text-neutral-400 hover:underline">Clear</button>}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="col-span-2">
+                  <label className="text-xs text-neutral-400">Category</label>
+                  <select
+                    value={bulkExpenseType}
+                    onChange={(e) => { setBulkExpenseType(e.target.value); setBulkCategory('') }}
+                    className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                  >
+                    <option value="">— leave unchanged —</option>
+                    {bulkCats.map(x => <option key={x} value={x}>{x}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-neutral-400">Subcategory</label>
+                  <select
+                    value={bulkCategory}
+                    onChange={(e) => setBulkCategory(e.target.value)}
+                    disabled={!bulkExpenseType}
+                    className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950 disabled:opacity-50"
+                  >
+                    <option value="">{bulkExpenseType ? '— pick —' : 'Pick category first'}</option>
+                    {bulkSubs.map(x => <option key={x} value={x}>{x}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-neutral-400">Guest trip?</label>
+                  <div className="flex gap-1 mt-1">
+                    {(['none','no','yes'] as const).map(v => (
+                      <button
+                        key={v}
+                        onClick={() => setBulkGuestTrip(v)}
+                        className={`flex-1 h-9 rounded border font-semibold text-xs capitalize ${bulkGuestTrip === v ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
+                      >{v === 'none' ? 'unchanged' : v}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={applyBulk}
+                disabled={n === 0 || (!bulkExpenseType && !bulkCategory && bulkGuestTrip === 'none')}
+                className="w-full h-9 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-semibold"
+              >Apply to {n} selected</button>
+            </div>
+          )
+        })()}
+
         {txns.map(t => {
           const c = cards[t.txn_id]
           if (!c) return null
@@ -588,15 +721,26 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
                   </div>
                   {t.category && <div className="text-xs text-neutral-500">{t.category}</div>}
                 </div>
-                <label className="text-xs flex items-center gap-1 select-none">
-                  <input
-                    type="checkbox"
-                    checked={c.selectedForSkip}
-                    onChange={(e) => setCard(t.txn_id, { selectedForSkip: e.target.checked })}
-                    className="accent-red-600"
-                  />
-                  Skip
-                </label>
+                <div className="flex flex-col gap-1 items-end">
+                  <label className="text-xs flex items-center gap-1 select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!c.selectedForBulk}
+                      onChange={(e) => setCard(t.txn_id, { selectedForBulk: e.target.checked })}
+                      className="accent-red-600"
+                    />
+                    Bulk
+                  </label>
+                  <label className="text-xs flex items-center gap-1 select-none">
+                    <input
+                      type="checkbox"
+                      checked={c.selectedForSkip}
+                      onChange={(e) => setCard(t.txn_id, { selectedForSkip: e.target.checked })}
+                      className="accent-red-600"
+                    />
+                    Skip
+                  </label>
+                </div>
               </div>
 
               {!c.selectedForSkip && (
@@ -645,7 +789,13 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
                         className={`flex-1 h-9 rounded border font-semibold text-xs ${!c.guestTrip ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
                       >No</button>
                       <button
-                        onClick={() => setCard(t.txn_id, { guestTrip: true })}
+                        onClick={() => setCard(t.txn_id, {
+                          guestTrip: true,
+                          // Auto-fill category to 'Guest trip' when the guest
+                          // trip flag is turned on (blank subcategory so admin picks one).
+                          expenseType: 'Guest trip',
+                          category: c.expenseType === 'Guest trip' ? c.category : '',
+                        })}
                         className={`flex-1 h-9 rounded border font-semibold text-xs ${c.guestTrip ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
                       >Yes</button>
                     </div>
@@ -1029,7 +1179,11 @@ function AdminOrphanQueue({ onBack }: { onBack: () => void }) {
                         className={`flex-1 h-9 rounded border font-semibold text-xs ${!c.guestTrip ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
                       >No</button>
                       <button
-                        onClick={() => setCard(o.id, { guestTrip: true })}
+                        onClick={() => setCard(o.id, {
+                          guestTrip: true,
+                          expenseType: 'Guest trip',
+                          category: c.expenseType === 'Guest trip' ? c.category : '',
+                        })}
                         className={`flex-1 h-9 rounded border font-semibold text-xs ${c.guestTrip ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
                       >Yes</button>
                     </div>
@@ -1110,6 +1264,311 @@ function AdminOrphanQueue({ onBack }: { onBack: () => void }) {
 // ══════════════════════════════════════════════════════════════════════
 // Crew — scan flow (also used by admin "scan my own")
 // ══════════════════════════════════════════════════════════════════════
+function AdminOneOff({ onBack }: { onBack: () => void }) {
+  const { definitions, error: defsError } = useDefinitions()
+  const catTree = useCategoryTree(definitions, true)
+  const crewName = getCrewName() || 'Admin'
+  const cats = Array.from(catTree.keys())
+
+  // Preset accounts + free-form 'Other' for anything not in the list.
+  const presetAccounts = ['Gabe’s Visa', 'Gabe’s Wise', 'Amex 3240', 'Bilt', 'Cash', 'Enrico’s Bilt', 'Other']
+
+  const [account, setAccount] = useState<string>('Gabe’s Visa')
+  const [accountOther, setAccountOther] = useState('')
+  const [date, setDate] = useState(todayISO())
+  const [merchant, setMerchant] = useState('')
+  const [usd, setUsd] = useState('')
+  const [eur, setEur] = useState('')
+  const [expenseType, setExpenseType] = useState('')
+  const [category, setCategory] = useState('')
+  const [guestTrip, setGuestTrip] = useState(false)
+  const [guestTripName, setGuestTripName] = useState('')
+  const [description, setDescription] = useState('')
+
+  const [photoBase64, setPhotoBase64] = useState<string>('')
+  const [photoThumb, setPhotoThumb] = useState<string>('')
+  const [receiptUrl, setReceiptUrl] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
+  const [reading, setReading] = useState(false)
+  const [readError, setReadError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  const [submittedRow, setSubmittedRow] = useState<number | null>(null)
+
+  const subs = catTree.get(expenseType) || []
+  const finalAccount = account === 'Other' ? (accountOther.trim() || 'Other') : account
+
+  const resetAll = () => {
+    setMerchant(''); setUsd(''); setEur(''); setExpenseType(''); setCategory('')
+    setGuestTrip(false); setGuestTripName(''); setDescription('')
+    setPhotoBase64(''); setPhotoThumb(''); setReceiptUrl('')
+    setSubmittedRow(null); setSubmitError(''); setReadError(''); setUploadError('')
+  }
+
+  const attachFile = async (file: File) => {
+    setUploading(true); setUploadError('')
+    try {
+      const b64 = await compressImageToJpegBase64(file, { maxDim: 1800, quality: 0.85 })
+      setPhotoBase64(b64)
+      setPhotoThumb(`data:image/jpeg;base64,${b64}`)
+      // Upload to Drive. Server-side folder routing accepts free-form account.
+      const resp = await authFetch('/api/expense-drive-upload', {
+        method: 'POST',
+        body: JSON.stringify({ base64: b64, account: finalAccount, date }),
+      })
+      const data = await resp.json()
+      if (!data?.ok) throw new Error(data?.error || data?.detail || 'Upload failed')
+      setReceiptUrl(data.viewUrl || '')
+    } catch (err: any) {
+      setUploadError(err?.message || String(err))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const readReceipt = async () => {
+    if (!photoBase64) return
+    setReading(true); setReadError('')
+    try {
+      const resp = await authFetch('/api/expense-read-receipts', {
+        method: 'POST',
+        body: JSON.stringify({ images: [{ base64: photoBase64, mime: 'image/jpeg' }] }),
+      })
+      const data = await resp.json()
+      if (!data?.ok) throw new Error(data?.error || 'Read failed')
+      const r = (data.receipts || [])[0]
+      if (r) {
+        if (r.merchant) setMerchant(r.merchant)
+        if (r.date) setDate(r.date)
+        if (r.eur != null) setEur(String(r.eur))
+        if (r.usd != null) setUsd(String(r.usd))
+        const cls = autoClassify(r.category_hint || null, guestTrip)
+        if (cls) {
+          setExpenseType(cls.expenseType)
+          setCategory(cls.category)
+        }
+      }
+    } catch (err: any) {
+      setReadError(err?.message || String(err))
+    } finally {
+      setReading(false)
+    }
+  }
+
+  const canSubmit = !!(finalAccount && date && merchant && (usd || eur) && expenseType && category)
+
+  const submit = async () => {
+    if (!canSubmit || submitting) return
+    setSubmitting(true); setSubmitError('')
+    try {
+      const expense = {
+        date,
+        account: finalAccount,
+        project: 'Operating',
+        expenseType,
+        category,
+        guestTrip: guestTrip ? (guestTripName || 'Yes') : '',
+        store: merchant,
+        usd: usd ? Number(usd) : null,
+        eur: eur ? Number(eur) : null,
+        refunded: '',
+        description,
+        specificRepair: '',
+        statement: '',
+        inputBy: crewName,
+        receiptUrl,
+        driveViewUrl: receiptUrl,
+        crosscheck: 'one-off',
+      }
+      const resp = await authFetch('/api/expense-submit', {
+        method: 'POST',
+        body: JSON.stringify({ expenses: [expense] }),
+      })
+      const data = await resp.json()
+      const errors: Array<{ index: number; error: string }> = data?.errors || []
+      const inserted: Array<{ row: number }> = data?.inserted || []
+      if (errors.length > 0) throw new Error(errors[0].error)
+      const row = inserted[0]?.row ?? null
+      setSubmittedRow(row)
+    } catch (err: any) {
+      setSubmitError(err?.message || String(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <MenuLayout title="One-off expense" showBack backHref="/expenses">
+      <div className="space-y-3">
+        <button onClick={onBack} className="text-xs text-red-400 hover:underline">← Hub</button>
+        {defsError && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-950/40 text-amber-200 text-sm p-3">
+            Categories failed to load: {defsError}
+          </div>
+        )}
+
+        {submittedRow != null ? (
+          <div className="rounded-xl border border-green-600/50 bg-green-950/30 p-4 space-y-3 text-sm">
+            <div className="font-semibold text-green-300">✓ Filed as expense (row {submittedRow})</div>
+            <div className="text-xs text-neutral-300">{merchant} · {date} · {finalAccount}</div>
+            <button
+              onClick={resetAll}
+              className="w-full h-10 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold"
+            >Enter another one-off</button>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-3 space-y-3">
+            <div>
+              <label className="text-xs text-neutral-400">Account</label>
+              <div className="grid grid-cols-3 gap-1 mt-1">
+                {presetAccounts.map(a => (
+                  <button
+                    key={a}
+                    onClick={() => setAccount(a)}
+                    className={`h-9 px-2 rounded border text-xs font-semibold ${account === a ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950 text-neutral-200'}`}
+                  >{a}</button>
+                ))}
+              </div>
+              {account === 'Other' && (
+                <input
+                  type="text"
+                  placeholder="Type account name (e.g. Iridium prepaid)"
+                  value={accountOther}
+                  onChange={(e) => setAccountOther(e.target.value)}
+                  className="mt-2 w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950 text-sm"
+                />
+              )}
+              <div className="text-[11px] text-neutral-500 mt-1">Writes ‘{finalAccount}’ to the Expenses sheet.</div>
+            </div>
+
+            <div>
+              <label className="text-xs text-neutral-400">Receipt photo (optional)</label>
+              <div className="flex items-center gap-2 mt-1">
+                {photoThumb && (
+                  <img src={photoThumb} alt="receipt" className="h-12 w-12 object-cover rounded border border-neutral-800" />
+                )}
+                <label className="text-xs px-3 h-9 flex items-center rounded border border-neutral-800 bg-neutral-950 hover:bg-neutral-900 cursor-pointer">
+                  {uploading ? 'Uploading…' : receiptUrl ? '✓ Attached — replace' : '+ Attach'}
+                  <input
+                    type="file" accept="image/*" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) attachFile(f) }}
+                  />
+                </label>
+                {photoBase64 && !reading && (
+                  <button
+                    onClick={readReceipt}
+                    disabled={reading}
+                    className="text-xs px-3 h-9 rounded border border-neutral-800 bg-neutral-950 hover:bg-neutral-900"
+                  >{reading ? 'Reading…' : 'Auto-fill from photo'}</button>
+                )}
+              </div>
+              {uploadError && <div className="text-xs text-red-400 mt-1">{uploadError}</div>}
+              {readError && <div className="text-xs text-red-400 mt-1">{readError}</div>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="col-span-2">
+                <label className="text-xs text-neutral-400">Store / merchant</label>
+                <input
+                  type="text" value={merchant} onChange={(e) => setMerchant(e.target.value)}
+                  className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-neutral-400">Date</label>
+                <input
+                  type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                  className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-neutral-400">USD</label>
+                <input
+                  type="number" step="0.01" value={usd} onChange={(e) => setUsd(e.target.value)}
+                  className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs text-neutral-400">EUR (optional)</label>
+                <input
+                  type="number" step="0.01" value={eur} onChange={(e) => setEur(e.target.value)}
+                  className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs text-neutral-400">Guest trip?</label>
+                <div className="flex gap-1 mt-1">
+                  <button
+                    onClick={() => { setGuestTrip(false); setGuestTripName('') }}
+                    className={`flex-1 h-9 rounded border font-semibold text-xs ${!guestTrip ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
+                  >No</button>
+                  <button
+                    onClick={() => {
+                      setGuestTrip(true)
+                      if (expenseType !== 'Guest trip') { setExpenseType('Guest trip'); setCategory('') }
+                    }}
+                    className={`flex-1 h-9 rounded border font-semibold text-xs ${guestTrip ? 'bg-red-600 border-red-600 text-white' : 'border-neutral-800 bg-neutral-950'}`}
+                  >Yes</button>
+                </div>
+              </div>
+              {guestTrip && (
+                <div className="col-span-2">
+                  <label className="text-xs text-neutral-400">Guest trip name</label>
+                  <input
+                    type="text" value={guestTripName} onChange={(e) => setGuestTripName(e.target.value)}
+                    className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                  />
+                </div>
+              )}
+              <div className="col-span-2">
+                <label className="text-xs text-neutral-400">Category</label>
+                <select
+                  value={expenseType}
+                  onChange={(e) => { setExpenseType(e.target.value); setCategory('') }}
+                  className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                >
+                  <option value="">— pick —</option>
+                  {cats.map(x => <option key={x} value={x}>{x}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs text-neutral-400">Subcategory</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  disabled={!expenseType}
+                  className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950 disabled:opacity-50"
+                >
+                  <option value="">{expenseType ? '— pick —' : 'Pick category first'}</option>
+                  {subs.map(x => <option key={x} value={x}>{x}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs text-neutral-400">Description (optional)</label>
+                <input
+                  type="text" value={description} onChange={(e) => setDescription(e.target.value)}
+                  className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                />
+              </div>
+            </div>
+
+            {submitError && (
+              <div className="rounded-lg border border-red-500/40 bg-red-950/40 text-red-200 text-xs p-2">{submitError}</div>
+            )}
+            <button
+              onClick={submit}
+              disabled={!canSubmit || submitting}
+              className="w-full h-11 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-semibold"
+            >{submitting ? 'Filing…' : 'File expense'}</button>
+          </div>
+        )}
+      </div>
+    </MenuLayout>
+  )
+}
+
 function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
   const [, setLocation] = useLocation()
   // Card is auto-detected from the Plaid match — no picker.
@@ -1342,10 +1801,21 @@ function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
         setPhotos([...snapshot])
       }
 
-      // 5) For each photo: matched → auto-submit; else → orphan-add
+      // 5) For each photo: matched → auto-submit; already-logged → skip (no duplicate); else → orphan-add
       for (let i = 0; i < snapshot.length; i++) {
         const p = snapshot[i]
-        if (p.plaidMatch) {
+        if (p.plaidMatch?.already_submitted) {
+          // Admin already categorized this charge from the Plaid queue —
+          // don't create a duplicate expense row. Mark as duplicate so the UI
+          // shows the user the charge was already logged.
+          setPhotos(prev => prev.map(x => x.id === p.id ? {
+            ...x,
+            submitting: false,
+            submitted: true,
+            submittedAs: 'duplicate',
+          } : x))
+          snapshot[i] = { ...snapshot[i], submitted: true, submittedAs: 'duplicate' }
+        } else if (p.plaidMatch) {
           setPhotos(prev => prev.map(x => x.id === p.id ? { ...x, submitting: true } : x))
           const r = await submitMatched(p, p.plaidMatch as NonNullable<PlaidMatch>)
           setPhotos(prev => prev.map(x => x.id === p.id ? {
@@ -1439,6 +1909,7 @@ function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
               key={p.id}
               className={`rounded-xl border p-3 space-y-2 ${
                 p.submitted && p.submittedAs === 'matched' ? 'border-green-600/50 bg-green-950/20'
+                : p.submitted && p.submittedAs === 'duplicate' ? 'border-blue-500/50 bg-blue-950/20'
                 : p.submitted && p.submittedAs === 'orphan' ? 'border-amber-600/50 bg-amber-950/20'
                 : p.submitError ? 'border-red-600/50 bg-red-950/30'
                 : 'border-neutral-800 bg-neutral-900'
@@ -1470,6 +1941,14 @@ function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
                   {p.submitted && p.submittedAs === 'matched' && (
                     <div className="text-green-400 text-xs mt-1">✓ Filed as expense (row {p.submittedRow})</div>
                   )}
+                  {p.submitted && p.submittedAs === 'duplicate' && (
+                    <div className="text-blue-300 text-xs mt-1">
+                      ℹ️ Already logged by admin — no duplicate created.
+                      {p.plaidMatch?.submitted_at && (
+                        <span className="text-neutral-400"> ({String(p.plaidMatch.submitted_at).slice(0,10)})</span>
+                      )}
+                    </div>
+                  )}
                   {p.submitted && p.submittedAs === 'orphan' && (
                     <div className="text-amber-300 text-xs mt-1">📥 Saved to orphan queue for admin</div>
                   )}
@@ -1490,7 +1969,7 @@ function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
           <div className="rounded-lg border border-green-600/50 bg-green-950/30 p-3 space-y-2 text-sm">
             <div className="font-semibold text-green-300">All receipts processed</div>
             <div className="text-xs text-neutral-400">
-              Matched: {photos.filter(p => p.submittedAs === 'matched').length} · Orphaned: {photos.filter(p => p.submittedAs === 'orphan').length}
+              Matched: {photos.filter(p => p.submittedAs === 'matched').length} · Already logged: {photos.filter(p => p.submittedAs === 'duplicate').length} · Orphaned: {photos.filter(p => p.submittedAs === 'orphan').length}
             </div>
             <a href={spreadsheetUrl} target="_blank" rel="noreferrer" className="block text-red-400 hover:underline">
               Open Expenses spreadsheet →
