@@ -538,7 +538,7 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
     if (filled.length === 0) return
     setSubmittingBatch(true); setGlobalError(null)
     try {
-      const submissions = filled.map(t => {
+      const allSubmissions = filled.map(t => {
         const c = cards[t.txn_id]
         return {
           txn_id: t.txn_id,
@@ -560,28 +560,35 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
           driveViewUrl: c.receiptUrl || '',
         }
       })
-      const resp = await authFetch('/api/plaid/queue-submit', {
-        method: 'POST',
-        body: JSON.stringify({ submissions }),
-      })
-      const data = await resp.json()
-      if (!resp.ok || (!data?.ok && !Array.isArray(data?.results))) {
-        throw new Error(data?.error || 'Submit failed')
-      }
-      const results: Array<{ txn_id: string; ok: boolean; error?: string; row?: number }> = data.results || []
-      const okIds = new Set(results.filter(r => r.ok).map(r => r.txn_id))
-      // Remove filled+ok txns from the queue view; keep errors for retry.
-      setTxns(prev => prev.filter(t => !okIds.has(t.txn_id)))
-      setCards(prev => {
-        const next = { ...prev }
-        for (const r of results) {
-          if (r.ok) delete next[r.txn_id]
-          else if (r.error && next[r.txn_id]) next[r.txn_id] = { ...next[r.txn_id], submitError: r.error }
+      // Server caps at 100 per POST; chunk to 25 to stay well under Vercel's 45s function timeout on wide batches.
+      const CHUNK = 25
+      const allResults: Array<{ txn_id: string; ok: boolean; error?: string; row?: number }> = []
+      for (let i = 0; i < allSubmissions.length; i += CHUNK) {
+        const submissions = allSubmissions.slice(i, i + CHUNK)
+        const resp = await authFetch('/api/plaid/queue-submit', {
+          method: 'POST',
+          body: JSON.stringify({ submissions }),
+        })
+        const data = await resp.json()
+        if (!resp.ok || (!data?.ok && !Array.isArray(data?.results))) {
+          throw new Error(data?.error || `Submit failed on batch ${Math.floor(i / CHUNK) + 1}`)
         }
-        return next
-      })
-      const failed = results.filter(r => !r.ok)
-      if (failed.length > 0) setGlobalError(`${failed.length} of ${results.length} failed. Fix the highlighted cards and retry.`)
+        const batchResults: Array<{ txn_id: string; ok: boolean; error?: string; row?: number }> = data.results || []
+        allResults.push(...batchResults)
+        // Flush each batch's successes to the UI so the queue shrinks live.
+        const batchOkIds = new Set(batchResults.filter(r => r.ok).map(r => r.txn_id))
+        setTxns(prev => prev.filter(t => !batchOkIds.has(t.txn_id)))
+        setCards(prev => {
+          const next = { ...prev }
+          for (const r of batchResults) {
+            if (r.ok) delete next[r.txn_id]
+            else if (r.error && next[r.txn_id]) next[r.txn_id] = { ...next[r.txn_id], submitError: r.error }
+          }
+          return next
+        })
+      }
+      const failed = allResults.filter(r => !r.ok)
+      if (failed.length > 0) setGlobalError(`${failed.length} of ${allResults.length} failed. Fix the highlighted cards and retry.`)
     } catch (err: any) {
       setGlobalError(err?.message || String(err))
     } finally {
@@ -976,13 +983,21 @@ function AdminOrphanQueue({ onBack }: { onBack: () => void }) {
           crosscheck: 'orphan-resolved',
         }
       })
-      const resp = await authFetch('/api/expense-submit', {
-        method: 'POST',
-        body: JSON.stringify({ expenses }),
-      })
-      const data = await resp.json()
-      const errors: Array<{ index: number; error: string }> = data?.errors || []
-      const inserted: Array<{ row: number }> = data?.inserted || []
+      // Server caps at 100/POST; chunk to 25 to stay well under function timeout.
+      const CHUNK = 25
+      const errors: Array<{ index: number; error: string }> = []
+      for (let i = 0; i < expenses.length; i += CHUNK) {
+        const slice = expenses.slice(i, i + CHUNK)
+        const resp = await authFetch('/api/expense-submit', {
+          method: 'POST',
+          body: JSON.stringify({ expenses: slice }),
+        })
+        const data = await resp.json()
+        if (!resp.ok) throw new Error(data?.error || `Submit failed on batch ${Math.floor(i / CHUNK) + 1}`)
+        const batchErrs: Array<{ index: number; error: string }> = data?.errors || []
+        // Re-index batch errors to the outer array index.
+        for (const e of batchErrs) errors.push({ index: i + e.index, error: e.error })
+      }
       const okIds: string[] = []
       const nextCards: Record<string, CardEdit> = { ...cards }
       for (let i = 0; i < filled.length; i++) {

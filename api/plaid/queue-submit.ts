@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = req.body as { submissions?: Submission[] }
   const subs = Array.isArray(body?.submissions) ? body!.submissions! : []
   if (subs.length === 0) return res.status(400).json({ error: 'submissions[] required' })
-  if (subs.length > 25) return res.status(400).json({ error: 'Max 25 submissions per request' })
+  if (subs.length > 100) return res.status(400).json({ error: 'Max 100 submissions per request' })
 
   try {
     // Attach crosscheck (matched:<txn_id>) so the Expenses sheet's audit col S captures the link.

@@ -76,7 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'expenses[] required' })
   }
-  if (items.length > 25) return res.status(400).json({ error: 'Max 25 expenses per submit' })
+  if (items.length > 100) return res.status(400).json({ error: 'Max 100 expenses per submit' })
 
   try {
     const auth = getAuth()
