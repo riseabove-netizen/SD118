@@ -16,6 +16,13 @@ import { useLocation } from 'wouter'
 
 type Account = 'Amex 3240' | 'Bilt'
 
+type Trip = {
+  name: string
+  start_date: string  // '' or YYYY-MM-DD, inclusive
+  end_date: string    // '' or YYYY-MM-DD, inclusive
+  active: boolean
+}
+
 type DefRow = {
   project: string
   category: string
@@ -402,6 +409,62 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
   const [bulkExpenseType, setBulkExpenseType] = useState('')
   const [bulkCategory, setBulkCategory] = useState('')
   const [bulkGuestTrip, setBulkGuestTrip] = useState<'none' | 'no' | 'yes'>('none')
+  // Bulk-edit trip: '' means unchanged, '__auto__' means pre-fill each card from its date, '__none__' means clear.
+  const [bulkTrip, setBulkTrip] = useState<string>('')
+  const [trips, setTrips] = useState<Trip[]>([])
+  const [showCreateTrip, setShowCreateTrip] = useState(false)
+  const [creatingTrip, setCreatingTrip] = useState(false)
+  const [newTripName, setNewTripName] = useState('')
+  const [newTripStart, setNewTripStart] = useState('')
+  const [newTripEnd, setNewTripEnd] = useState('')
+  const [newTripError, setNewTripError] = useState<string | null>(null)
+
+  const loadTrips = async () => {
+    try {
+      const r = await authFetch('/api/expenses/trips')
+      const d = await r.json()
+      if (d?.ok) setTrips(d.trips || [])
+    } catch {
+      // Non-fatal — dropdown will just show the current selection with no options.
+    }
+  }
+  useEffect(() => { loadTrips() }, [])
+
+  const tripForDate = (isoDate: string): string => {
+    if (!isoDate) return ''
+    const active = trips.filter(t => t.active !== false)
+    // Prefer the most-recent-start trip whose window contains the date.
+    const matches = active.filter(t => {
+      if (t.start_date && isoDate < t.start_date) return false
+      if (t.end_date && isoDate > t.end_date) return false
+      return true
+    })
+    matches.sort((a, b) => (b.start_date || '').localeCompare(a.start_date || ''))
+    return matches[0]?.name || ''
+  }
+
+  const createTrip = async () => {
+    setNewTripError(null)
+    const name = newTripName.trim()
+    if (!name) { setNewTripError('Name is required'); return }
+    setCreatingTrip(true)
+    try {
+      const r = await authFetch('/api/expenses/trips', {
+        method: 'POST',
+        body: JSON.stringify({ name, start_date: newTripStart, end_date: newTripEnd }),
+      })
+      const d = await r.json()
+      if (!d?.ok) throw new Error(d?.error || 'create failed')
+      setTrips(prev => [...prev, d.trip])
+      setBulkTrip(d.trip.name)
+      setNewTripName(''); setNewTripStart(''); setNewTripEnd('')
+      setShowCreateTrip(false)
+    } catch (err: any) {
+      setNewTripError(err?.message || String(err))
+    } finally {
+      setCreatingTrip(false)
+    }
+  }
 
   const load = async () => {
     setLoading(true); setLoadError(null)
@@ -476,6 +539,22 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
         } else if (bulkGuestTrip === 'no') {
           patch.guestTrip = false
           patch.guestTripName = ''
+        }
+        // Trip name: '' = leave unchanged, '__auto__' = date-lookup per card,
+        // '__none__' = clear, anything else = literal name.
+        if (bulkTrip === '__auto__') {
+          const auto = tripForDate(next[id].date)
+          if (auto) {
+            patch.guestTripName = auto
+            patch.guestTrip = true
+            if (!patch.expenseType && !next[id].expenseType) patch.expenseType = 'Guest trip'
+          }
+        } else if (bulkTrip === '__none__') {
+          patch.guestTripName = ''
+        } else if (bulkTrip) {
+          patch.guestTripName = bulkTrip
+          patch.guestTrip = true
+          if (!patch.expenseType && !next[id].expenseType) patch.expenseType = 'Guest trip'
         }
         next[id] = { ...next[id], ...patch }
       }
@@ -561,9 +640,12 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
         }
       })
       // Server caps at 100 per POST; chunk to 25 to stay well under Vercel's 45s function timeout on wide batches.
+      // Wait between batches to stay under the Sheets 60-writes/min/user quota (each batch does append+status updates).
       const CHUNK = 25
+      const BATCH_DELAY_MS = 5000
       const allResults: Array<{ txn_id: string; ok: boolean; error?: string; row?: number }> = []
       for (let i = 0; i < allSubmissions.length; i += CHUNK) {
+        if (i > 0) await new Promise(res => setTimeout(res, BATCH_DELAY_MS))
         const submissions = allSubmissions.slice(i, i + CHUNK)
         const resp = await authFetch('/api/plaid/queue-submit', {
           method: 'POST',
@@ -719,12 +801,61 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
                     ))}
                   </div>
                 </div>
+                <div className="col-span-2">
+                  <label className="text-xs text-neutral-400">Trip name</label>
+                  <select
+                    value={bulkTrip}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === '__new__') { setShowCreateTrip(true); return }
+                      setBulkTrip(v)
+                    }}
+                    className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                  >
+                    <option value="">— leave unchanged —</option>
+                    <option value="__auto__">Auto (match trip by date)</option>
+                    <option value="__none__">Clear (no trip)</option>
+                    {trips.length > 0 && <option disabled>──────────</option>}
+                    {trips.filter(t => t.active !== false).map(t => (
+                      <option key={t.name} value={t.name}>{t.name}</option>
+                    ))}
+                    <option value="__new__">+ Create new trip…</option>
+                  </select>
+                </div>
               </div>
               <button
                 onClick={applyBulk}
-                disabled={n === 0 || (!bulkExpenseType && !bulkCategory && bulkGuestTrip === 'none')}
+                disabled={n === 0 || (!bulkExpenseType && !bulkCategory && bulkGuestTrip === 'none' && !bulkTrip)}
                 className="w-full h-9 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-semibold"
               >Apply to {n} selected</button>
+              {showCreateTrip && (
+                <div className="rounded-lg border border-red-600/60 bg-neutral-950 p-3 space-y-2 mt-2">
+                  <div className="text-xs font-semibold text-neutral-200">New guest trip</div>
+                  <input
+                    value={newTripName}
+                    onChange={e => setNewTripName(e.target.value)}
+                    placeholder="Trip name (e.g. Enrico's Med Summer)"
+                    className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950 text-sm"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-neutral-400 uppercase">Start</label>
+                      <input type="date" value={newTripStart} onChange={e => setNewTripStart(e.target.value)} className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-neutral-400 uppercase">End</label>
+                      <input type="date" value={newTripEnd} onChange={e => setNewTripEnd(e.target.value)} className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950 text-sm" />
+                    </div>
+                  </div>
+                  {newTripError && <div className="text-xs text-red-400">{newTripError}</div>}
+                  <div className="flex gap-2">
+                    <button onClick={createTrip} disabled={creatingTrip} className="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-semibold">
+                      {creatingTrip ? 'Creating…' : 'Create'}
+                    </button>
+                    <button onClick={() => { setShowCreateTrip(false); setNewTripError(null) }} className="px-3 h-9 rounded-lg border border-neutral-800 text-sm">Cancel</button>
+                  </div>
+                </div>
+              )}
             </div>
           )
         })()}
