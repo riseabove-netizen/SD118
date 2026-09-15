@@ -625,6 +625,17 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
     <MenuLayout title="Plaid queue" showBack backHref="/expenses">
       <div className="space-y-3">
         <button onClick={onBack} className="text-xs text-red-400 hover:underline">← Hub</button>
+        {/* Floating scroll-to-top: appears whenever any cards are bulk-selected. */}
+        {bulkSelectedIds.length > 0 && (
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            aria-label="Scroll to top"
+            className="fixed bottom-4 right-4 z-50 h-11 px-4 rounded-full bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-lg shadow-black/50 flex items-center gap-1"
+          >
+            <span aria-hidden="true">↑</span> Top
+          </button>
+        )}
         {defsError && (
           <div className="rounded-lg border border-amber-500/40 bg-amber-950/40 text-amber-200 text-sm p-3">
             Categories failed to load: {defsError}
