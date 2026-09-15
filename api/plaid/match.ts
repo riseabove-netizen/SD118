@@ -20,7 +20,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { plaidClient, readPlaidItems, buildAccountLabelMap } from '../_plaid.js'
 import { readAllPlaidTxns } from '../_plaid-txns.js'
 
-type MatchQuery = { account: string; date: string; eur?: number; usd?: number; merchant?: string }
+// account is optional: when omitted, the match runs across ALL cards (used by
+// the crew scan flow, which doesn't ask the user which card was used).
+type MatchQuery = { account?: string; date: string; eur?: number; usd?: number; merchant?: string }
 type MatchResult = {
   plaid_txn_id: string
   txn_id: string
@@ -74,7 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const backlog = (await readAllPlaidTxns()).filter(r => r.queue_status === 'pending' || r.queue_status === 'historical')
 
     const matches: MatchResult[] = queries.map((q) => {
-      const targetLabel = q.account
+      const targetLabel = q.account || ''  // '' → any card (crew scan flow)
       const targetDate = q.date
       const receiptUsd = parseAmount(q.usd)
       const receiptEur = parseAmount(q.eur)
@@ -86,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (receiptAmount == null) return null
 
       const cands = backlog.filter(r =>
-        r.account === targetLabel &&
+        (!targetLabel || r.account === targetLabel) &&
         daysBetween(r.date, targetDate) <= DATE_WINDOW_DAYS
       )
       let best: (typeof cands[number] & { _score: number }) | null = null
@@ -190,13 +192,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         liveScanned = allTxns.length
 
         for (const { q, i } of missing) {
-          const targetLabel = q.account
+          const targetLabel = q.account || ''  // '' → any card
           const targetDate = q.date
           const receiptAmount = parseAmount(q.usd) ?? parseAmount(q.eur)
           if (receiptAmount == null) continue
 
           const cands = allTxns.filter(t =>
-            t.account_label === targetLabel &&
+            (!targetLabel || t.account_label === targetLabel) &&
             daysBetween(t.date, targetDate) <= DATE_WINDOW_DAYS
           )
           let best: (typeof cands[number] & { _score: number }) | null = null

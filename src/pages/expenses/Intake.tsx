@@ -224,6 +224,27 @@ function AdminIntake() {
   const [pendingCount, setPendingCount] = useState<number | null>(null)
   const [orphanCount, setOrphanCount] = useState<number | null>(null)
   const [countsError, setCountsError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState<string | null>(null)
+
+  const syncFromPlaid = async () => {
+    setSyncing(true); setSyncMsg(null)
+    try {
+      const resp = await authFetch('/api/plaid/cron-pull', { method: 'POST', body: JSON.stringify({}) })
+      const data = await resp.json()
+      if (!data?.ok) throw new Error(data?.error || 'Sync failed')
+      const added = data.new ?? data.added ?? 0
+      const pulled = data.pulled ?? 0
+      setSyncMsg(added > 0
+        ? `Synced — ${added} new charge${added === 1 ? '' : 's'} added (${pulled} scanned).`
+        : `Synced — no new charges (${pulled} scanned).`)
+      await loadCounts()
+    } catch (err: any) {
+      setSyncMsg(`Sync failed: ${err?.message || String(err)}`)
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const loadCounts = async () => {
     setCountsError(null)
@@ -289,6 +310,23 @@ function AdminIntake() {
             <div className="text-xs opacity-80">Same flow crew uses</div>
           </div>
         </button>
+
+        <button
+          onClick={syncFromPlaid}
+          disabled={syncing}
+          className="w-full h-12 rounded-xl border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-wait text-neutral-200 text-left px-4 flex items-center gap-3"
+        >
+          <span className={`text-lg ${syncing ? 'animate-spin' : ''}`}>↻</span>
+          <div className="flex-1">
+            <div className="font-semibold text-sm">{syncing ? 'Syncing with credit card company…' : 'Sync from Plaid now'}</div>
+            <div className="text-xs text-neutral-400">Pull latest charges without waiting for daily cron</div>
+          </div>
+        </button>
+        {syncMsg && (
+          <div className={`text-xs px-3 py-2 rounded-lg border ${syncMsg.startsWith('Sync failed') ? 'border-red-500/40 bg-red-950/40 text-red-200' : 'border-neutral-800 bg-neutral-900 text-neutral-300'}`}>
+            {syncMsg}
+          </div>
+        )}
       </div>
     </MenuLayout>
   )
@@ -1074,7 +1112,9 @@ function AdminOrphanQueue({ onBack }: { onBack: () => void }) {
 // ══════════════════════════════════════════════════════════════════════
 function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
   const [, setLocation] = useLocation()
-  const [account, setAccount] = useState<Account>('Amex 3240')
+  // Card is auto-detected from the Plaid match — no picker.
+  // Drive uploads before match happens, so we tag them with a neutral folder.
+  const uploadAccount: Account = 'Amex 3240'
   const [photos, setPhotos] = useState<Photo[]>([])
   const [readingAll, setReadingAll] = useState(false)
   const [globalError, setGlobalError] = useState<string | null>(null)
@@ -1127,7 +1167,7 @@ function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
     try {
       const resp = await authFetch('/api/expense-drive-upload', {
         method: 'POST',
-        body: JSON.stringify({ base64: photo.base64, account, date: photo.date }),
+        body: JSON.stringify({ base64: photo.base64, account: uploadAccount, date: photo.date }),
       })
       const data = await resp.json()
       if (!data?.ok) throw new Error(data?.error || data?.detail || 'Upload failed')
@@ -1147,11 +1187,11 @@ function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
   // Try to match a single receipt against the Plaid backlog (cache + live).
   const runMatchFor = async (p: Photo, r: ReceiptRead): Promise<PlaidMatch> => {
     try {
+      // Do NOT send account — match across all cards, let Plaid identify it.
       const resp = await authFetch('/api/plaid/match', {
         method: 'POST',
         body: JSON.stringify({
           queries: [{
-            account,
             date: r.date || p.date,
             eur: r.eur ?? null,
             usd: r.usd ?? null,
@@ -1174,9 +1214,11 @@ function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
       // Use the receipt EUR when we have it; otherwise blank.
       const eur = p.read?.eur ?? (p.eur ? Number(p.eur) : null)
       const cls = autoClassify(p.read?.category_hint || null, p.guestTrip)
+      // Account comes from the Plaid match — no more manual selection.
+      const resolvedAccount = m.account_label || 'Amex 3240'
       const expense = {
         date: m.date,
-        account,
+        account: resolvedAccount,
         project: cls?.project || 'Operating',
         expenseType: cls?.expenseType || 'Recurrent',
         category: cls?.category || '',
@@ -1350,24 +1392,9 @@ function CrewIntake({ adminScanBack }: { adminScanBack?: () => void }) {
           <button onClick={adminScanBack} className="text-xs text-red-400 hover:underline">← Hub</button>
         )}
 
-        {/* Account */}
-        <div>
-          <label className="text-sm font-semibold block mb-2">Card / Account</label>
-          <div className="grid grid-cols-2 gap-2">
-            {(['Amex 3240', 'Bilt'] as Account[]).map(a => (
-              <button
-                key={a}
-                onClick={() => setAccount(a)}
-                className={`h-11 rounded-lg border font-semibold transition-colors ${
-                  account === a
-                    ? 'bg-red-600 border-red-600 text-white'
-                    : 'bg-neutral-900 border-neutral-800 text-neutral-200 hover:bg-neutral-800'
-                }`}
-              >
-                {a}
-              </button>
-            ))}
-          </div>
+        {/* Card auto-detected from Plaid match — no picker */}
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-3 text-xs text-neutral-400">
+          Card is auto-detected from the Plaid match — just scan the receipt.
         </div>
 
         {/* Capture */}
