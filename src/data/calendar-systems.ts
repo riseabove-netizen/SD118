@@ -328,6 +328,7 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
       { id: 'uv-left',       label: 'UV lamp — left',          group: 'UV sterilizer' },
       { id: 'uv-right',      label: 'UV lamp — right',         group: 'UV sterilizer' },
       { id: 'silver-ion',    label: 'Silver-ion dosing pump',  group: 'Silver-ion doser' },
+      { id: 'selfizz',       label: 'Galley water filter / Selfizz box', group: 'Galley filter' },
     ],
     items: [
       {
@@ -362,6 +363,32 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
         interval: { kind: 'monthly' },
         // "3 weeks ago" seed relative to app introduction (Aug 14 2026)
         seedLastDone: '2026-07-24',
+      },
+      {
+        id: 'selfizz-drip-pan-condenser',
+        label: 'Empty & wash drip pan, clean condenser',
+        detail: 'Applies to the Selfizz box only. Every 3 months.',
+        interval: { kind: 'months', every: 3 },
+      },
+      {
+        id: 'selfizz-carbon-filter',
+        label: 'Replace carbon block filter',
+        detail: 'Applies to the Selfizz box only. Yearly.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2025-01-15',
+      },
+      {
+        id: 'selfizz-full-sanitizing',
+        label: 'Full machine sanitizing (Culligan dealer)',
+        detail: 'Applies to the Selfizz box only. Yearly full sanitizing — recommended to be performed by a Culligan dealer.',
+        interval: { kind: 'yearly' },
+        seedLastDone: '2025-01-15',
+      },
+      {
+        id: 'selfizz-co2-refill',
+        label: 'Refill CO2 cartridge',
+        detail: 'Applies to the Selfizz box only. As needed — swap when carbonation drops.',
+        interval: { kind: 'as-needed' },
       },
     ],
   },
@@ -405,12 +432,17 @@ export function itemAppliesToUnit(system: CalendarSystem, itemId: string, unitId
   const isPump = unitId === 'pump-ac' || unitId === 'pump-dc'
   const isUv   = unitId === 'uv-left' || unitId === 'uv-right'
   const isSilver = unitId === 'silver-ion'
+  const isSelfizz = unitId === 'selfizz'
   switch (itemId) {
-    case 'tank-test-empty-clean': return isTank
-    case 'seal-kit':              return isPump
-    case 'motor-replace':         return isPump
-    case 'uv-lamp-replace':       return isUv
-    case 'silver-ion-refill':     return isSilver
+    case 'tank-test-empty-clean':     return isTank
+    case 'seal-kit':                  return isPump
+    case 'motor-replace':             return isPump
+    case 'uv-lamp-replace':           return isUv
+    case 'silver-ion-refill':         return isSilver
+    case 'selfizz-drip-pan-condenser': return isSelfizz
+    case 'selfizz-carbon-filter':     return isSelfizz
+    case 'selfizz-full-sanitizing':   return isSelfizz
+    case 'selfizz-co2-refill':        return isSelfizz
     default: return true
   }
 }
