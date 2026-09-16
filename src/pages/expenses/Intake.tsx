@@ -159,6 +159,131 @@ type CardEdit = {
   submittedRow?: number
 }
 
+// ---- Shared trips hook & picker (used by admin queues, orphan queue, and crew intake) --------
+// The Guest_Trips sheet-tab is the source of truth. `useTrips` fetches it once, exposes a helper
+// that resolves a trip name from a transaction date, and `createTrip` for inline creation.
+function useTrips() {
+  const [trips, setTrips] = useState<Trip[]>([])
+  const load = async () => {
+    try {
+      const r = await authFetch('/api/expenses/trips')
+      const d = await r.json()
+      if (d?.ok) setTrips(d.trips || [])
+    } catch { /* dropdown just shows fewer options */ }
+  }
+  useEffect(() => { load() }, [])
+  const tripForDate = (isoDate: string): string => {
+    if (!isoDate) return ''
+    const active = trips.filter(t => t.active !== false)
+    const matches = active.filter(t => {
+      if (t.start_date && isoDate < t.start_date) return false
+      if (t.end_date && isoDate > t.end_date) return false
+      return true
+    })
+    matches.sort((a, b) => (b.start_date || '').localeCompare(a.start_date || ''))
+    return matches[0]?.name || ''
+  }
+  const createTrip = async (name: string, start_date: string, end_date: string): Promise<Trip> => {
+    const r = await authFetch('/api/expenses/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: name.trim(), start_date, end_date }),
+    })
+    const d = await r.json()
+    if (!d?.ok) throw new Error(d?.error || 'create failed')
+    setTrips(prev => [...prev, d.trip])
+    return d.trip
+  }
+  return { trips, tripForDate, createTrip }
+}
+
+// A dropdown for picking / clearing / creating a guest trip on ONE expense.
+// - `value` is the current trip name (or '' for none).
+// - `date` optional: when the user picks "Match by date", we resolve the trip from that date.
+type TripPickerProps = {
+  value: string
+  date?: string
+  trips: Trip[]
+  tripForDate: (iso: string) => string
+  createTrip: (name: string, start: string, end: string) => Promise<Trip>
+  onChange: (name: string) => void
+}
+function TripPicker({ value, date, trips, tripForDate, createTrip, onChange }: TripPickerProps) {
+  const [showNew, setShowNew] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newStart, setNewStart] = useState('')
+  const [newEnd, setNewEnd] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const activeTrips = trips.filter(t => t.active !== false)
+  // The selected value may not be in the trip list (custom name typed earlier);
+  // include it in the options so it stays selected instead of appearing blank.
+  const hasSelected = !!value && activeTrips.some(t => t.name === value)
+
+  return (
+    <div className="space-y-2">
+      <select
+        value={value}
+        onChange={(e) => {
+          const v = e.target.value
+          if (v === '__new__') { setShowNew(true); return }
+          if (v === '__auto__') { onChange(tripForDate(date || '')); return }
+          onChange(v)
+        }}
+        className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+      >
+        <option value="">— no trip —</option>
+        {date && <option value="__auto__">Match trip by date ({date})</option>}
+        {activeTrips.length > 0 && <option disabled>──────────</option>}
+        {activeTrips.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+        {!hasSelected && value && <option value={value}>{value} (custom)</option>}
+        <option value="__new__">+ Create new trip…</option>
+      </select>
+      {showNew && (
+        <div className="rounded-lg border border-red-600/60 bg-neutral-950 p-3 space-y-2">
+          <div className="text-xs font-semibold text-neutral-200">New guest trip</div>
+          <input value={newName} onChange={e => setNewName(e.target.value)}
+            placeholder="Trip name"
+            className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950 text-sm" />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-neutral-400 uppercase">Start</label>
+              <input type="date" value={newStart} onChange={e => setNewStart(e.target.value)}
+                className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950 text-sm" />
+            </div>
+            <div>
+              <label className="text-[10px] text-neutral-400 uppercase">End</label>
+              <input type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)}
+                className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950 text-sm" />
+            </div>
+          </div>
+          {err && <div className="text-xs text-red-400">{err}</div>}
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                setErr(null)
+                if (!newName.trim()) { setErr('Name is required'); return }
+                setBusy(true)
+                try {
+                  const t = await createTrip(newName, newStart, newEnd)
+                  onChange(t.name)
+                  setNewName(''); setNewStart(''); setNewEnd('')
+                  setShowNew(false)
+                } catch (e: any) { setErr(e?.message || String(e)) }
+                finally { setBusy(false) }
+              }}
+              disabled={busy}
+              className="flex-1 h-9 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-semibold"
+            >{busy ? 'Creating…' : 'Create'}</button>
+            <button onClick={() => { setShowNew(false); setErr(null) }}
+              className="px-3 h-9 rounded-lg border border-neutral-800 text-sm">Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function newPhotoId(): string {
   return `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
@@ -411,7 +536,7 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
   const [bulkGuestTrip, setBulkGuestTrip] = useState<'none' | 'no' | 'yes'>('none')
   // Bulk-edit trip: '' means unchanged, '__auto__' means pre-fill each card from its date, '__none__' means clear.
   const [bulkTrip, setBulkTrip] = useState<string>('')
-  const [trips, setTrips] = useState<Trip[]>([])
+  const { trips, tripForDate, createTrip: createTripBase } = useTrips()
   const [showCreateTrip, setShowCreateTrip] = useState(false)
   const [creatingTrip, setCreatingTrip] = useState(false)
   const [newTripName, setNewTripName] = useState('')
@@ -419,44 +544,14 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
   const [newTripEnd, setNewTripEnd] = useState('')
   const [newTripError, setNewTripError] = useState<string | null>(null)
 
-  const loadTrips = async () => {
-    try {
-      const r = await authFetch('/api/expenses/trips')
-      const d = await r.json()
-      if (d?.ok) setTrips(d.trips || [])
-    } catch {
-      // Non-fatal — dropdown will just show the current selection with no options.
-    }
-  }
-  useEffect(() => { loadTrips() }, [])
-
-  const tripForDate = (isoDate: string): string => {
-    if (!isoDate) return ''
-    const active = trips.filter(t => t.active !== false)
-    // Prefer the most-recent-start trip whose window contains the date.
-    const matches = active.filter(t => {
-      if (t.start_date && isoDate < t.start_date) return false
-      if (t.end_date && isoDate > t.end_date) return false
-      return true
-    })
-    matches.sort((a, b) => (b.start_date || '').localeCompare(a.start_date || ''))
-    return matches[0]?.name || ''
-  }
-
   const createTrip = async () => {
     setNewTripError(null)
     const name = newTripName.trim()
     if (!name) { setNewTripError('Name is required'); return }
     setCreatingTrip(true)
     try {
-      const r = await authFetch('/api/expenses/trips', {
-        method: 'POST',
-        body: JSON.stringify({ name, start_date: newTripStart, end_date: newTripEnd }),
-      })
-      const d = await r.json()
-      if (!d?.ok) throw new Error(d?.error || 'create failed')
-      setTrips(prev => [...prev, d.trip])
-      setBulkTrip(d.trip.name)
+      const t = await createTripBase(name, newTripStart, newTripEnd)
+      setBulkTrip(t.name)
       setNewTripName(''); setNewTripStart(''); setNewTripEnd('')
       setShowCreateTrip(false)
     } catch (err: any) {
@@ -956,11 +1051,13 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
                   {c.guestTrip && (
                     <div className="col-span-2">
                       <label className="text-xs text-neutral-400">Guest trip name</label>
-                      <input
-                        type="text"
+                      <TripPicker
                         value={c.guestTripName}
-                        onChange={(e) => setCard(t.txn_id, { guestTripName: e.target.value })}
-                        className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                        date={c.date}
+                        trips={trips}
+                        tripForDate={tripForDate}
+                        createTrip={createTripBase}
+                        onChange={(name) => setCard(t.txn_id, { guestTripName: name })}
                       />
                     </div>
                   )}
@@ -1038,6 +1135,7 @@ function AdminOrphanQueue({ onBack }: { onBack: () => void }) {
   const [globalError, setGlobalError] = useState<string | null>(null)
   const [submittingBatch, setSubmittingBatch] = useState(false)
   const [skippingBatch, setSkippingBatch] = useState(false)
+  const { trips, tripForDate, createTrip } = useTrips()
 
   const load = async () => {
     setLoading(true); setLoadError(null)
@@ -1334,11 +1432,13 @@ function AdminOrphanQueue({ onBack }: { onBack: () => void }) {
                   {c.guestTrip && (
                     <div className="col-span-2">
                       <label className="text-xs text-neutral-400">Guest trip name</label>
-                      <input
-                        type="text"
+                      <TripPicker
                         value={c.guestTripName}
-                        onChange={(e) => setCard(o.id, { guestTripName: e.target.value })}
-                        className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                        date={c.date}
+                        trips={trips}
+                        tripForDate={tripForDate}
+                        createTrip={createTrip}
+                        onChange={(name) => setCard(o.id, { guestTripName: name })}
                       />
                     </div>
                   )}
@@ -1412,6 +1512,7 @@ function AdminOneOff({ onBack }: { onBack: () => void }) {
   const catTree = useCategoryTree(definitions, true)
   const crewName = getCrewName() || 'Admin'
   const cats = Array.from(catTree.keys())
+  const { trips, tripForDate, createTrip } = useTrips()
 
   // Preset accounts + free-form 'Other' for anything not in the list.
   const presetAccounts = ['Gabe’s Visa', 'Gabe’s Wise', 'Amex 3240', 'Bilt', 'Cash', 'Enrico’s Bilt', 'Other']
@@ -1659,9 +1760,13 @@ function AdminOneOff({ onBack }: { onBack: () => void }) {
               {guestTrip && (
                 <div className="col-span-2">
                   <label className="text-xs text-neutral-400">Guest trip name</label>
-                  <input
-                    type="text" value={guestTripName} onChange={(e) => setGuestTripName(e.target.value)}
-                    className="w-full h-9 px-2 rounded border border-neutral-800 bg-neutral-950"
+                  <TripPicker
+                    value={guestTripName}
+                    date={date}
+                    trips={trips}
+                    tripForDate={tripForDate}
+                    createTrip={createTrip}
+                    onChange={setGuestTripName}
                   />
                 </div>
               )}
