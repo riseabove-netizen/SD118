@@ -755,12 +755,16 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
     // Flush successes to the UI so the queue shrinks live.
     const batchOkIds = new Set(batchResults.filter(r => r.ok).map(r => r.txn_id))
     // Preserve the admin's scroll position across the list-shrink so
-    // auto-drain doesn't yank the page back to the top mid-edit. We measure
-    // the top of a still-visible card, apply the state changes, then adjust
-    // the scroll to keep that same card in the same viewport position.
+    // auto-drain doesn't yank the page mid-edit. We pick a still-visible
+    // remaining card, remember its viewport y, and after React commits we
+    // read the SAME element's new viewport y and scroll by the difference
+    // so it stays in exactly the same place on screen. Using scrollTo with
+    // the pre-commit scrollY as the base avoids drift from browser scroll
+    // anchoring firing at the same time.
     const remainingIds = txns.filter(t => !batchOkIds.has(t.txn_id)).map(t => t.txn_id)
     let anchorEl: HTMLElement | null = null
     let anchorTopBefore = 0
+    const scrollYBefore = window.scrollY
     for (const id of remainingIds) {
       const el = document.querySelector(`[data-txn-id="${id}"]`) as HTMLElement | null
       if (el) {
@@ -772,6 +776,11 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
         }
       }
     }
+    // Suspend the browser's own scroll-anchoring on the list container so it
+    // doesn't fight our manual restore. We flip it back on after the commit.
+    const listEl = anchorEl?.parentElement as HTMLElement | null
+    const prevOverflowAnchor = listEl?.style.overflowAnchor
+    if (listEl) listEl.style.overflowAnchor = 'none'
     setTxns(prev => prev.filter(t => !batchOkIds.has(t.txn_id)))
     setCards(prev => {
       const next = { ...prev }
@@ -782,13 +791,23 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
       return next
     })
     if (anchorEl) {
-      // After React commits, the anchor card sits in a new viewport y; add
-      // the delta to the current scrollY so it visually stays put.
+      // After React commits (two rAFs to be sure paint has happened), read
+      // the anchor's new viewport y and correct scrollY so it stays put.
       requestAnimationFrame(() => {
-        const rect = anchorEl!.getBoundingClientRect()
-        const delta = rect.top - anchorTopBefore
-        if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: 'auto' })
+        requestAnimationFrame(() => {
+          const el = document.querySelector(`[data-txn-id="${anchorEl!.getAttribute('data-txn-id')}"]`) as HTMLElement | null
+          if (el) {
+            const rect = el.getBoundingClientRect()
+            const delta = rect.top - anchorTopBefore
+            if (Math.abs(delta) > 1) {
+              window.scrollTo({ top: scrollYBefore + delta, behavior: 'auto' })
+            }
+          }
+          if (listEl) listEl.style.overflowAnchor = prevOverflowAnchor || ''
+        })
       })
+    } else if (listEl) {
+      listEl.style.overflowAnchor = prevOverflowAnchor || ''
     }
     // Enrich with merchant for the undo toast label.
     const merchantOf = new Map(candidates.map(t => [t.txn_id, cards[t.txn_id]?.merchant || t.merchant || t.txn_id]))
