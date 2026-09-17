@@ -754,6 +754,24 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
     const batchResults: Array<{ txn_id: string; ok: boolean; error?: string; row?: number }> = data.results || []
     // Flush successes to the UI so the queue shrinks live.
     const batchOkIds = new Set(batchResults.filter(r => r.ok).map(r => r.txn_id))
+    // Preserve the admin's scroll position across the list-shrink so
+    // auto-drain doesn't yank the page back to the top mid-edit. We measure
+    // the top of a still-visible card, apply the state changes, then adjust
+    // the scroll to keep that same card in the same viewport position.
+    const remainingIds = txns.filter(t => !batchOkIds.has(t.txn_id)).map(t => t.txn_id)
+    let anchorEl: HTMLElement | null = null
+    let anchorTopBefore = 0
+    for (const id of remainingIds) {
+      const el = document.querySelector(`[data-txn-id="${id}"]`) as HTMLElement | null
+      if (el) {
+        const rect = el.getBoundingClientRect()
+        if (rect.top >= 0 && rect.top <= window.innerHeight) {
+          anchorEl = el
+          anchorTopBefore = rect.top
+          break
+        }
+      }
+    }
     setTxns(prev => prev.filter(t => !batchOkIds.has(t.txn_id)))
     setCards(prev => {
       const next = { ...prev }
@@ -763,6 +781,15 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
       }
       return next
     })
+    if (anchorEl) {
+      // After React commits, the anchor card sits in a new viewport y; add
+      // the delta to the current scrollY so it visually stays put.
+      requestAnimationFrame(() => {
+        const rect = anchorEl!.getBoundingClientRect()
+        const delta = rect.top - anchorTopBefore
+        if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: 'auto' })
+      })
+    }
     // Enrich with merchant for the undo toast label.
     const merchantOf = new Map(candidates.map(t => [t.txn_id, cards[t.txn_id]?.merchant || t.merchant || t.txn_id]))
     return batchResults.map(r => ({ ...r, merchant: merchantOf.get(r.txn_id) || r.txn_id }))
@@ -895,13 +922,14 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
     <MenuLayout title="Plaid queue" showBack backHref="/expenses">
       <div className="space-y-3">
         <button onClick={onBack} className="text-xs text-red-400 hover:underline">← Hub</button>
-        {/* Floating scroll-to-top: appears whenever any cards are bulk-selected. */}
-        {bulkSelectedIds.length > 0 && (
+        {/* Floating scroll-to-top: always available while queue has cards.
+         * Bottom-LEFT so it doesn't collide with the undo-toast stack on the right. */}
+        {!loading && txns.length > 0 && (
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             aria-label="Scroll to top"
-            className="fixed bottom-4 right-4 z-50 h-11 px-4 rounded-full bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-lg shadow-black/50 flex items-center gap-1"
+            className="fixed bottom-4 left-4 z-50 h-11 px-4 rounded-full bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-lg shadow-black/50 flex items-center gap-1"
           >
             <span aria-hidden="true">↑</span> Top
           </button>
@@ -1074,6 +1102,7 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
           return (
             <div
               key={t.txn_id}
+              data-txn-id={t.txn_id}
               className={`rounded-xl border p-3 space-y-3 ${
                 c.submitError
                   ? 'border-red-600/60 bg-red-950/30'
