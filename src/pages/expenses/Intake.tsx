@@ -664,6 +664,89 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
       return next
     })
   }
+  // Apply the bulk edit AND immediately submit the selected rows in one shot.
+  // Removes them from the queue on success so they can't be picked up again
+  // by the auto-drain (the main source of the duplicate-in-Expenses bug when
+  // the user bulk-applied and then kept working). Ineligible rows (missing
+  // required fields after the patch) are skipped, kept in the queue, and
+  // reported in the global error banner.
+  const applyBulkAndSubmit = async () => {
+    if (bulkSelectedIds.length === 0) return
+    // Compute the patched-card view synchronously so we can decide eligibility
+    // and submit without waiting a React commit.
+    const patched: Record<string, CardEdit> = { ...cards }
+    const selectedIds = [...bulkSelectedIds]
+    for (const id of selectedIds) {
+      if (!patched[id]) continue
+      const patch: Partial<CardEdit> = {}
+      if (bulkExpenseType) {
+        patch.expenseType = bulkExpenseType
+        patch.category = bulkCategory || ''
+      } else if (bulkCategory) {
+        patch.category = bulkCategory
+      }
+      if (bulkGuestTrip === 'yes') {
+        patch.guestTrip = true
+        if (!bulkExpenseType) patch.expenseType = 'Guest trip'
+      } else if (bulkGuestTrip === 'no') {
+        patch.guestTrip = false
+        patch.guestTripName = ''
+      }
+      if (bulkTrip === '__auto__') {
+        const auto = tripForDate(patched[id].date)
+        if (auto) {
+          patch.guestTripName = auto
+          patch.guestTrip = true
+          if (!patch.expenseType && !patched[id].expenseType) patch.expenseType = 'Guest trip'
+        }
+      } else if (bulkTrip === '__none__') {
+        patch.guestTripName = ''
+      } else if (bulkTrip) {
+        patch.guestTripName = bulkTrip
+        patch.guestTrip = true
+        if (!patch.expenseType && !patched[id].expenseType) patch.expenseType = 'Guest trip'
+      }
+      // Also drop the bulk-selection flag so the checkbox clears with the submit.
+      patch.selectedForBulk = false
+      patched[id] = { ...patched[id], ...patch }
+    }
+    // Commit the patch to state so the UI reflects it if any row can't submit.
+    setCards(patched)
+    // Pick the txns whose patched cards satisfy the ready-to-submit contract.
+    const submittable = txns.filter(t => {
+      if (!selectedIds.includes(t.txn_id)) return false
+      const c = patched[t.txn_id]
+      return !!(c && !c.selectedForSkip && c.expenseType && c.category && (c.usd || c.eur))
+    })
+    if (submittable.length === 0) {
+      setGlobalError('Nothing to submit — selected rows still need Category, Subcategory, and Amount.')
+      return
+    }
+    setSubmittingBatch(true)
+    setGlobalError('')
+    try {
+      const allResults: Array<{ txn_id: string; ok: boolean; error?: string; row?: number; merchant: string }> = []
+      // Reuse the CHUNK size + server pacing already in submitOneBatch.
+      let cursor = 0
+      while (cursor < submittable.length) {
+        const batch = submittable.slice(cursor, cursor + CHUNK)
+        // Pass `patched` explicitly so submitOneBatch reads the freshly-bulk-
+        // edited values without waiting for React to commit setCards.
+        const results = await submitOneBatch(batch, patched)
+        allResults.push(...results)
+        pushToUndoStack(results)
+        cursor += CHUNK
+      }
+      const failed = allResults.filter(r => !r.ok)
+      if (failed.length > 0) {
+        setGlobalError(`${failed.length} of ${allResults.length} failed. Fix the highlighted cards and retry.`)
+      }
+    } catch (err: any) {
+      setGlobalError(err?.message || String(err))
+    } finally {
+      setSubmittingBatch(false)
+    }
+  }
   const clearBulkSelection = () => {
     setCards(prev => {
       const next = { ...prev }
@@ -720,10 +803,28 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
   // auto-drain can push them onto the undo stack. Server pacing + retry-on-429
   // means we no longer need a client-side inter-batch delay.
   const CHUNK = 10
-  const submitOneBatch = async (candidates: PendingQueueTxn[]): Promise<Array<{ txn_id: string; ok: boolean; error?: string; row?: number; merchant: string }>> => {
+  // Global in-flight guard: any txn_id currently being submitted (by manual
+  // submit, bulk submit, or auto-drain) is added here for the duration of the
+  // request. This blocks a second concurrent submit for the same row and
+  // eliminates the duplicate-in-Expenses bug when the user bulk-applies +
+  // manually submits while auto-drain is running.
+  const submittingIdsRef = useRef<Set<string>>(new Set())
+  const submitOneBatch = async (
+    candidates: PendingQueueTxn[],
+    // Optional override so the caller can submit against a synchronously-
+    // computed card state (e.g. right after a bulk patch) without waiting for
+    // React to commit setCards.
+    cardsOverride?: Record<string, CardEdit>,
+  ): Promise<Array<{ txn_id: string; ok: boolean; error?: string; row?: number; merchant: string }>> => {
     if (candidates.length === 0) return []
-    const submissions = candidates.slice(0, CHUNK).map(t => {
-      const c = cards[t.txn_id]
+    const source = cardsOverride || cards
+    // Drop anything already in flight. This is what prevents the double-submit.
+    const eligible = candidates.filter(t => !submittingIdsRef.current.has(t.txn_id))
+    if (eligible.length === 0) return []
+    for (const t of eligible) submittingIdsRef.current.add(t.txn_id)
+    try {
+    const submissions = eligible.slice(0, CHUNK).map(t => {
+      const c = source[t.txn_id]
       return {
         txn_id: t.txn_id,
         date: c.date,
@@ -805,8 +906,14 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
       rootEl.style.overflowAnchor = prevOverflowAnchor || ''
     })
     // Enrich with merchant for the undo toast label.
-    const merchantOf = new Map(candidates.map(t => [t.txn_id, cards[t.txn_id]?.merchant || t.merchant || t.txn_id]))
+    const merchantOf = new Map(eligible.map(t => [t.txn_id, source[t.txn_id]?.merchant || t.merchant || t.txn_id]))
     return batchResults.map(r => ({ ...r, merchant: merchantOf.get(r.txn_id) || r.txn_id }))
+    } finally {
+      // Release the in-flight guard whether the request succeeded, errored
+      // out at the network layer, or threw mid-flight. Without this a failed
+      // batch would leave those txn_ids permanently blocked.
+      for (const t of eligible) submittingIdsRef.current.delete(t.txn_id)
+    }
   }
 
   // Push successful submissions onto the undo stack (10s window).
@@ -883,9 +990,11 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
     const tick = async () => {
       if (cancelled || autoDrainRef.current.inflight) return
       const now = Date.now()
-      // Find the first filled card that has been ready for >= 90s.
+      // Find the first filled card that has been ready for >= 90s and is
+      // not currently mid-submit from a manual/bulk submit.
       const dueTxn = txns.find(t => {
         if (!filledIds.has(t.txn_id)) return false
+        if (submittingIdsRef.current.has(t.txn_id)) return false
         const at = readyAtRef.current.get(t.txn_id)
         return typeof at === 'number' && now - at >= AUTO_DRAIN_DELAY_MS
       })
@@ -1100,11 +1209,20 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
                   </select>
                 </div>
               </div>
-              <button
-                onClick={applyBulk}
-                disabled={n === 0 || (!bulkExpenseType && !bulkCategory && bulkGuestTrip === 'none' && !bulkTrip)}
-                className="w-full h-9 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-semibold"
-              >Apply to {n} selected</button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={applyBulk}
+                  disabled={n === 0 || submittingBatch || (!bulkExpenseType && !bulkCategory && bulkGuestTrip === 'none' && !bulkTrip)}
+                  className="h-9 rounded-lg border border-red-600/60 bg-neutral-950 hover:border-red-500 disabled:opacity-40 text-red-200 text-sm font-semibold"
+                  title="Apply the bulk settings to the selected cards, then let the 90s auto-drain submit them."
+                >Apply to {n}</button>
+                <button
+                  onClick={applyBulkAndSubmit}
+                  disabled={n === 0 || submittingBatch || (!bulkExpenseType && !bulkCategory && bulkGuestTrip === 'none' && !bulkTrip)}
+                  className="h-9 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-semibold"
+                  title="Apply the bulk settings AND submit the selected cards immediately — they disappear from the queue so auto-drain can't touch them again."
+                >{submittingBatch ? 'Submitting…' : `Apply & Submit ${n}`}</button>
+              </div>
               {showCreateTrip && (
                 <div className="rounded-lg border border-red-600/60 bg-neutral-950 p-3 space-y-2 mt-2">
                   <div className="text-xs font-semibold text-neutral-200">New guest trip</div>

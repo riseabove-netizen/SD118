@@ -4,7 +4,7 @@
 // mark each Plaid_Transactions row as 'submitted'.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireAdmin } from '../_plaid.js'
-import { findRowByTxnId, updatePlaidTxnStatus } from '../_plaid-txns.js'
+import { findRowByTxnId, readAllPlaidTxns, updatePlaidTxnStatus } from '../_plaid-txns.js'
 import expenseSubmitHandler, { SubmitExpense } from '../expense-submit.js'
 
 export const config = { maxDuration: 60 }
@@ -38,8 +38,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (subs.length > 100) return res.status(400).json({ error: 'Max 100 submissions per request' })
 
   try {
+    // Server-side dedupe: read current Plaid_Transactions rows once and drop
+    // any submission whose txn is already marked 'submitted'. This is the
+    // definitive fix for the duplicate-in-Expenses bug when a bulk-submit
+    // and an auto-drain race on the same txn_id. Duplicates are returned as
+    // ok:true, duplicate:true so the client still removes them from the queue.
+    const allTxns = await readAllPlaidTxns()
+    const statusByTxn = new Map(allTxns.map(r => [r.txn_id, r.queue_status]))
+    const dupResults: Array<{ txn_id: string; ok: boolean; row?: number; duplicate?: boolean; error?: string }> = []
+    const subsFresh: Submission[] = []
+    for (const s of subs) {
+      const prev = statusByTxn.get(s.txn_id)
+      if (prev === 'submitted') {
+        dupResults.push({ txn_id: s.txn_id, ok: true, duplicate: true })
+      } else {
+        subsFresh.push(s)
+      }
+    }
+    if (subsFresh.length === 0) {
+      return res.status(200).json({ ok: true, results: dupResults, duplicates: dupResults.length })
+    }
     // Attach crosscheck (matched:<txn_id>) so the Expenses sheet's audit col S captures the link.
-    const expenses: SubmitExpense[] = subs.map(s => ({
+    const expenses: SubmitExpense[] = subsFresh.map(s => ({
       date: s.date,
       account: s.account,
       project: s.project,
@@ -66,9 +86,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const innerErrors: Array<{ index: number; error: string }> = inner.body?.errors || []
 
     const nowIso = new Date().toISOString()
-    const results: Array<{ txn_id: string; ok: boolean; error?: string; row?: number }> = []
-    for (let i = 0; i < subs.length; i++) {
-      const s = subs[i]
+    const results: Array<{ txn_id: string; ok: boolean; error?: string; row?: number; duplicate?: boolean }> = []
+    for (let i = 0; i < subsFresh.length; i++) {
+      const s = subsFresh[i]
       const errHit = innerErrors.find(e => e.index === i)
       if (errHit) {
         results.push({ txn_id: s.txn_id, ok: false, error: errHit.error })
@@ -83,8 +103,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       results.push({ txn_id: s.txn_id, ok: true, row })
     }
-
-    return res.status(200).json({ ok: results.every(r => r.ok), results, spreadsheetUrl: inner.body?.spreadsheetUrl })
+    // Merge in the duplicates (already-submitted rows) so the client removes them.
+    const merged = [...results, ...dupResults]
+    return res.status(200).json({
+      ok: merged.every(r => r.ok),
+      results: merged,
+      duplicates: dupResults.length,
+      spreadsheetUrl: inner.body?.spreadsheetUrl,
+    })
   } catch (e: any) {
     return res.status(500).json({ error: e?.message || String(e) })
   }
