@@ -847,25 +847,55 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
     }
   }
 
-  // Auto-drain: when the toggle is ON, wait 45s after the last queue edit
-  // before submitting the first CHUNK ready cards. The 45s tick
-  // + server-side row pacing (~1s per row) + retry-on-429 keeps us safely
-  // under the 60 writes/min Sheets quota.
+  // Auto-drain: per-card 90-second delay. When a card becomes "filled"
+  // (category + subcategory + amount) AND auto-drain is ON, we start a 90s
+  // timer for THAT card. If the card is still filled and still in the queue
+  // 90s later, it submits (alone). This means the user has moved well past
+  // the card by the time it disappears, so the list-shrink never happens
+  // near the card the user is currently editing.
+  //
+  // `readyAt` is a per-card timestamp: the ms since epoch when the card
+  // first became filled. We recompute it whenever `filled` changes. On
+  // every second we look for cards whose readyAt is >= 90s old and submit
+  // them one at a time (in-flight guard prevents overlap).
+  const AUTO_DRAIN_DELAY_MS = 90_000
+  const readyAtRef = useRef<Map<string, number>>(new Map())
   const autoDrainRef = useRef<{ inflight: boolean }>({ inflight: false })
+  // Track which cards are currently "filled" so the timer starts once and
+  // resets if the card falls back out of filled state (e.g. admin edits it).
+  const filledIds = useMemo(() => new Set(filled.map(t => t.txn_id)), [filled])
+  useEffect(() => {
+    const now = Date.now()
+    const map = readyAtRef.current
+    // Start a timer for any newly-filled card.
+    for (const id of filledIds) {
+      if (!map.has(id)) map.set(id, now)
+    }
+    // Clear the timer for any card that is no longer filled (edited or gone).
+    for (const id of Array.from(map.keys())) {
+      if (!filledIds.has(id)) map.delete(id)
+    }
+  }, [filledIds])
+
   useEffect(() => {
     if (!autoDrain) return
     let cancelled = false
     const tick = async () => {
       if (cancelled || autoDrainRef.current.inflight) return
-      // Snapshot ready cards synchronously to avoid racing with the admin's edits.
-      const ready = txns.filter(t => {
-        const c = cards[t.txn_id]
-        return c && !c.selectedForSkip && c.expenseType && c.category && (c.usd || c.eur)
-      }).slice(0, CHUNK)
-      if (ready.length === 0) return
+      const now = Date.now()
+      // Find the first filled card that has been ready for >= 90s.
+      const dueTxn = txns.find(t => {
+        if (!filledIds.has(t.txn_id)) return false
+        const at = readyAtRef.current.get(t.txn_id)
+        return typeof at === 'number' && now - at >= AUTO_DRAIN_DELAY_MS
+      })
+      if (!dueTxn) return
       autoDrainRef.current.inflight = true
       try {
-        const results = await submitOneBatch(ready)
+        // Submit exactly ONE card at a time so the removal is at most a
+        // single card's height — the scroll-preservation code already keeps
+        // that invisible, and per-card feels calmer than batches of 10.
+        const results = await submitOneBatch([dueTxn])
         pushToUndoStack(results)
       } catch (err: any) {
         setGlobalError(err?.message || 'Auto-drain failed')
@@ -873,11 +903,11 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
         autoDrainRef.current.inflight = false
       }
     }
-    // Wait before the first submission too; edits restart the grace period.
-    const iv = setInterval(tick, 45_000)
+    // Check every second. Each due card is submitted separately.
+    const iv = setInterval(tick, 1_000)
     return () => { cancelled = true; clearInterval(iv) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoDrain, txns, cards])
+  }, [autoDrain, txns, cards, filledIds])
 
   // Prune expired undo entries every second.
   useEffect(() => {
@@ -994,7 +1024,7 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
         )}
         {autoDrain && !loading && txns.length > 0 && (
           <div className="text-[11px] text-neutral-400 -mt-1">
-            Ready cards submit automatically 45 seconds after your last edit. Further edits restart the timer.
+            Each filled card submits 90s after you finish it. Keep filling — no need to press Submit.
           </div>
         )}
 
