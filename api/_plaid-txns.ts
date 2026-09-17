@@ -89,12 +89,24 @@ export async function appendPlaidTxns(rows: Array<Omit<PlaidTxnRow, 'rowIndex'>>
 export async function updatePlaidTxnStatus(rowIndex: number, status: string, submittedAt: string = ''): Promise<void> {
   const auth = sheetsAuth(true)
   const sheets = google.sheets({ version: 'v4', auth })
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${PLAID_TXNS_TAB}!K${rowIndex}:L${rowIndex}`,
-    valueInputOption: 'RAW',
-    requestBody: { values: [[status, submittedAt]] },
-  })
+  // Same retry logic as expense-submit: on 429 or 503 back off exponentially.
+  let delay = 1000
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${PLAID_TXNS_TAB}!K${rowIndex}:L${rowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[status, submittedAt]] },
+      })
+      return
+    } catch (err: any) {
+      const status_code = err?.code || err?.response?.status
+      if ((status_code !== 429 && status_code !== 503 && status_code !== 500) || attempt === 6) throw err
+      await new Promise(r => setTimeout(r, delay + Math.random() * 500))
+      delay = Math.min(delay * 2, 16000)
+    }
+  }
 }
 
 // Look up a row index by txn_id (one round trip; O(n)).

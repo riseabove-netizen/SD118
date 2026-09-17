@@ -530,6 +530,13 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
   const [globalError, setGlobalError] = useState<string | null>(null)
   const [submittingBatch, setSubmittingBatch] = useState(false)
   const [skippingBatch, setSkippingBatch] = useState(false)
+  // Auto-drain: when ON, background loop submits ready cards in small chunks
+  // every N seconds so the admin can keep filling cards without ever pausing
+  // and without hitting the Sheets 60 writes/min quota wall.
+  const [autoDrain, setAutoDrain] = useState(false)
+  // Undo queue: each entry stays for 10s; clicking undo reverses the submit.
+  type UndoEntry = { id: string; txn_id: string; merchant: string; expensesRow?: number; expiresAt: number }
+  const [undoStack, setUndoStack] = useState<UndoEntry[]>([])
   // Bulk-edit state (admin selects several rows, picks one category, applies to all)
   const [bulkExpenseType, setBulkExpenseType] = useState('')
   const [bulkCategory, setBulkCategory] = useState('')
@@ -708,61 +715,87 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
     [txns, cards],
   )
 
+  // Submit one batch (up to CHUNK cards). Returns the ok'd txn results so
+  // auto-drain can push them onto the undo stack. Server pacing + retry-on-429
+  // means we no longer need a client-side inter-batch delay.
+  const CHUNK = 10
+  const submitOneBatch = async (candidates: PendingQueueTxn[]): Promise<Array<{ txn_id: string; ok: boolean; error?: string; row?: number; merchant: string }>> => {
+    if (candidates.length === 0) return []
+    const submissions = candidates.slice(0, CHUNK).map(t => {
+      const c = cards[t.txn_id]
+      return {
+        txn_id: t.txn_id,
+        date: c.date,
+        account: c.account,
+        project: c.project || 'Operating',
+        expenseType: c.expenseType,
+        category: c.category,
+        guestTrip: c.guestTrip ? (c.guestTripName || 'Yes') : '',
+        store: c.merchant,
+        usd: c.usd ? Number(c.usd) : null,
+        eur: c.eur ? Number(c.eur) : null,
+        refunded: '',
+        description: c.description,
+        specificRepair: '',
+        statement: '',
+        inputBy: crewName,
+        receiptUrl: c.receiptUrl || '',
+        driveViewUrl: c.receiptUrl || '',
+      }
+    })
+    const resp = await authFetch('/api/plaid/queue-submit', {
+      method: 'POST',
+      body: JSON.stringify({ submissions }),
+    })
+    const data = await resp.json()
+    if (!resp.ok || (!data?.ok && !Array.isArray(data?.results))) {
+      throw new Error(data?.error || `Submit failed`)
+    }
+    const batchResults: Array<{ txn_id: string; ok: boolean; error?: string; row?: number }> = data.results || []
+    // Flush successes to the UI so the queue shrinks live.
+    const batchOkIds = new Set(batchResults.filter(r => r.ok).map(r => r.txn_id))
+    setTxns(prev => prev.filter(t => !batchOkIds.has(t.txn_id)))
+    setCards(prev => {
+      const next = { ...prev }
+      for (const r of batchResults) {
+        if (r.ok) delete next[r.txn_id]
+        else if (r.error && next[r.txn_id]) next[r.txn_id] = { ...next[r.txn_id], submitError: r.error }
+      }
+      return next
+    })
+    // Enrich with merchant for the undo toast label.
+    const merchantOf = new Map(candidates.map(t => [t.txn_id, cards[t.txn_id]?.merchant || t.merchant || t.txn_id]))
+    return batchResults.map(r => ({ ...r, merchant: merchantOf.get(r.txn_id) || r.txn_id }))
+  }
+
+  // Push successful submissions onto the undo stack (10s window).
+  const pushToUndoStack = (rows: Array<{ txn_id: string; ok: boolean; row?: number; merchant: string }>) => {
+    const now = Date.now()
+    const entries: UndoEntry[] = rows
+      .filter(r => r.ok)
+      .map(r => ({
+        id: `${r.txn_id}-${now}`,
+        txn_id: r.txn_id,
+        merchant: r.merchant,
+        expensesRow: r.row,
+        expiresAt: now + 10_000,
+      }))
+    if (entries.length === 0) return
+    setUndoStack(prev => [...prev, ...entries])
+  }
+
   const submitFilled = async () => {
     if (filled.length === 0) return
     setSubmittingBatch(true); setGlobalError(null)
     try {
-      const allSubmissions = filled.map(t => {
-        const c = cards[t.txn_id]
-        return {
-          txn_id: t.txn_id,
-          date: c.date,
-          account: c.account,
-          project: c.project || 'Operating',
-          expenseType: c.expenseType,
-          category: c.category,
-          guestTrip: c.guestTrip ? (c.guestTripName || 'Yes') : '',
-          store: c.merchant,
-          usd: c.usd ? Number(c.usd) : null,
-          eur: c.eur ? Number(c.eur) : null,
-          refunded: '',
-          description: c.description,
-          specificRepair: '',
-          statement: '',
-          inputBy: crewName,
-          receiptUrl: c.receiptUrl || '',
-          driveViewUrl: c.receiptUrl || '',
-        }
-      })
-      // Server caps at 100 per POST; chunk to 25 to stay well under Vercel's 45s function timeout on wide batches.
-      // Wait between batches to stay under the Sheets 60-writes/min/user quota (each batch does append+status updates).
-      const CHUNK = 25
-      const BATCH_DELAY_MS = 5000
-      const allResults: Array<{ txn_id: string; ok: boolean; error?: string; row?: number }> = []
-      for (let i = 0; i < allSubmissions.length; i += CHUNK) {
-        if (i > 0) await new Promise(res => setTimeout(res, BATCH_DELAY_MS))
-        const submissions = allSubmissions.slice(i, i + CHUNK)
-        const resp = await authFetch('/api/plaid/queue-submit', {
-          method: 'POST',
-          body: JSON.stringify({ submissions }),
-        })
-        const data = await resp.json()
-        if (!resp.ok || (!data?.ok && !Array.isArray(data?.results))) {
-          throw new Error(data?.error || `Submit failed on batch ${Math.floor(i / CHUNK) + 1}`)
-        }
-        const batchResults: Array<{ txn_id: string; ok: boolean; error?: string; row?: number }> = data.results || []
-        allResults.push(...batchResults)
-        // Flush each batch's successes to the UI so the queue shrinks live.
-        const batchOkIds = new Set(batchResults.filter(r => r.ok).map(r => r.txn_id))
-        setTxns(prev => prev.filter(t => !batchOkIds.has(t.txn_id)))
-        setCards(prev => {
-          const next = { ...prev }
-          for (const r of batchResults) {
-            if (r.ok) delete next[r.txn_id]
-            else if (r.error && next[r.txn_id]) next[r.txn_id] = { ...next[r.txn_id], submitError: r.error }
-          }
-          return next
-        })
+      let cursor = 0
+      const allResults: Array<{ txn_id: string; ok: boolean; error?: string; row?: number; merchant: string }> = []
+      while (cursor < filled.length) {
+        const batch = filled.slice(cursor, cursor + CHUNK)
+        const results = await submitOneBatch(batch)
+        allResults.push(...results)
+        pushToUndoStack(results)
+        cursor += CHUNK
       }
       const failed = allResults.filter(r => !r.ok)
       if (failed.length > 0) setGlobalError(`${failed.length} of ${allResults.length} failed. Fix the highlighted cards and retry.`)
@@ -770,6 +803,66 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
       setGlobalError(err?.message || String(err))
     } finally {
       setSubmittingBatch(false)
+    }
+  }
+
+  // Auto-drain: when the toggle is ON, every 30s submit the first CHUNK ready
+  // cards. Runs in the background while the admin keeps editing. The 30s tick
+  // + server-side row pacing (~1s per row) + retry-on-429 keeps us safely
+  // under the 60 writes/min Sheets quota.
+  const autoDrainRef = useRef<{ inflight: boolean }>({ inflight: false })
+  useEffect(() => {
+    if (!autoDrain) return
+    let cancelled = false
+    const tick = async () => {
+      if (cancelled || autoDrainRef.current.inflight) return
+      // Snapshot ready cards synchronously to avoid racing with the admin's edits.
+      const ready = txns.filter(t => {
+        const c = cards[t.txn_id]
+        return c && !c.selectedForSkip && c.expenseType && c.category && (c.usd || c.eur)
+      }).slice(0, CHUNK)
+      if (ready.length === 0) return
+      autoDrainRef.current.inflight = true
+      try {
+        const results = await submitOneBatch(ready)
+        pushToUndoStack(results)
+      } catch (err: any) {
+        setGlobalError(err?.message || 'Auto-drain failed')
+      } finally {
+        autoDrainRef.current.inflight = false
+      }
+    }
+    // Kick immediately, then every 30s.
+    tick()
+    const iv = setInterval(tick, 30_000)
+    return () => { cancelled = true; clearInterval(iv) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoDrain, txns, cards])
+
+  // Prune expired undo entries every second.
+  useEffect(() => {
+    if (undoStack.length === 0) return
+    const iv = setInterval(() => {
+      const now = Date.now()
+      setUndoStack(prev => prev.filter(e => e.expiresAt > now))
+    }, 500)
+    return () => clearInterval(iv)
+  }, [undoStack.length])
+
+  const undoOne = async (entry: UndoEntry) => {
+    // Optimistically remove from the stack; if server undo fails, restore it.
+    setUndoStack(prev => prev.filter(e => e.id !== entry.id))
+    try {
+      const resp = await authFetch('/api/plaid/queue-undo', {
+        method: 'POST',
+        body: JSON.stringify({ txn_id: entry.txn_id, expensesRow: entry.expensesRow }),
+      })
+      const data = await resp.json()
+      if (!data?.ok) throw new Error(data?.error || 'undo failed')
+      // Reload the queue so the restored row reappears.
+      load()
+    } catch (err: any) {
+      setGlobalError(`Undo failed for ${entry.merchant}: ${err?.message || String(err)}`)
     }
   }
 
@@ -831,19 +924,37 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        {/* Submit button — top of page, submits every card the admin has filled in */}
+        {/* Submit button + auto-drain toggle */}
         {!loading && txns.length > 0 && (
-          <button
-            onClick={submitFilled}
-            disabled={submittingBatch || filled.length === 0}
-            className="w-full h-11 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-semibold"
-          >
-            {submittingBatch
-              ? 'Submitting…'
-              : filled.length === 0
-                ? 'Submit — fill category first'
-                : `Submit ${filled.length} of ${txns.length}`}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={submitFilled}
+              disabled={submittingBatch || filled.length === 0}
+              className="flex-1 h-11 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-semibold"
+            >
+              {submittingBatch
+                ? 'Submitting…'
+                : filled.length === 0
+                  ? 'Submit — fill category first'
+                  : `Submit ${filled.length} of ${txns.length}`}
+            </button>
+            <button
+              onClick={() => setAutoDrain(v => !v)}
+              title="Auto-drain submits ready cards every 30 seconds in the background so you can keep filling. Stays under the Sheets 60-writes/min quota."
+              className={`h-11 px-3 rounded-lg border font-semibold text-xs whitespace-nowrap ${
+                autoDrain
+                  ? 'bg-red-600/30 border-red-500 text-red-100'
+                  : 'bg-neutral-950 border-neutral-800 text-neutral-300 hover:border-neutral-600'
+              }`}
+            >
+              Auto-drain: {autoDrain ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        )}
+        {autoDrain && !loading && txns.length > 0 && (
+          <div className="text-[11px] text-neutral-400 -mt-1">
+            Ready cards submit automatically every 30s. Keep filling — no need to press Submit.
+          </div>
         )}
 
         {/* Bulk edit toolbar — shown when queue has rows */}
@@ -1117,6 +1228,30 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
         })}
 
       </div>
+
+      {/* Undo toast stack — bottom-right, 10-second window per submitted card. */}
+      {undoStack.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-xs">
+          {undoStack.slice(-4).map(e => {
+            const remaining = Math.max(0, Math.ceil((e.expiresAt - Date.now()) / 1000))
+            return (
+              <div key={e.id} className="rounded-lg border border-red-600/60 bg-neutral-950 shadow-lg p-2 flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-neutral-300 truncate">Submitted <span className="font-semibold text-neutral-100">{e.merchant}</span></div>
+                  <div className="text-[10px] text-neutral-500">Row {e.expensesRow || '?'} · {remaining}s</div>
+                </div>
+                <button
+                  onClick={() => undoOne(e)}
+                  className="h-8 px-3 rounded bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
+                >Undo</button>
+              </div>
+            )
+          })}
+          {undoStack.length > 4 && (
+            <div className="text-[10px] text-neutral-500 text-right">+{undoStack.length - 4} more</div>
+          )}
+        </div>
+      )}
     </MenuLayout>
   )
 }

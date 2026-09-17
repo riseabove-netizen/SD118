@@ -12,7 +12,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
 
-export const config = { maxDuration: 45 }
+export const config = { maxDuration: 60 }
 
 const SPREADSHEET_ID = '1XBBy8ma5WmQNW2ix-K6JyBaJB7kvnXQoExGttcSu_Wk'
 const EXPENSES_SHEET_TITLE = 'Expenses'
@@ -69,6 +69,25 @@ function ymdToSheetDate(ymd: string): string {
   return m ? `${m[1]}/${m[2]}/${m[3]}` : ymd
 }
 
+// Retry a Sheets write on 429 / 503 with exponential backoff.
+// Google's quota is a sliding 60/min per user; brief bursts get retried in ~1-8s.
+async function withRetry<T>(op: () => Promise<T>, opName: string, maxAttempts = 6): Promise<T> {
+  let delay = 1000
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await op()
+    } catch (err: any) {
+      const status = err?.code || err?.response?.status
+      const retryable = status === 429 || status === 503 || status === 500
+      if (!retryable || attempt === maxAttempts) throw err
+      console.warn(`[expense-submit] ${opName} attempt ${attempt} got ${status}, retrying in ${delay}ms`)
+      await new Promise(r => setTimeout(r, delay + Math.random() * 500))
+      delay = Math.min(delay * 2, 16000)
+    }
+  }
+  throw new Error(`${opName} exhausted retries`)
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   const body = req.body as { expenses: SubmitExpense[] }
@@ -98,13 +117,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const ex = items[idx]
       try {
         // 1) Reserve row by appending column A only.
-        const appendRes = await sheets.spreadsheets.values.append({
+        const appendRes = await withRetry(() => sheets.spreadsheets.values.append({
           spreadsheetId: SPREADSHEET_ID,
           range: `${EXPENSES_SHEET_TITLE}!A:A`,
           valueInputOption: 'USER_ENTERED',
           insertDataOption: 'INSERT_ROWS',
           requestBody: { values: [[ymdToSheetDate(ex.date)]] },
-        })
+        }), 'append')
         const updatedRange = appendRes.data.updates?.updatedRange || ''
         // updatedRange like "Expenses!A441"
         const m = updatedRange.match(/!A(\d+)/)
@@ -159,22 +178,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         rowValues[13] = ex.inputBy || ''                 // N Input by
         rowValues[14] = ex.receiptUrl || ''              // O Receipt
 
-        await sheets.spreadsheets.values.update({
+        await withRetry(() => sheets.spreadsheets.values.update({
           spreadsheetId: SPREADSHEET_ID,
           range: `${EXPENSES_SHEET_TITLE}!A${rowNum}:O${rowNum}`,
           valueInputOption: 'USER_ENTERED',
           requestBody: { values: [rowValues] },
-        })
+        }), 'row-fill')
 
         // Also write Crosscheck (col S) if provided — do not touch P/Q/R.
         if (ex.crosscheck && ex.crosscheck.trim()) {
           try {
-            await sheets.spreadsheets.values.update({
+            await withRetry(() => sheets.spreadsheets.values.update({
               spreadsheetId: SPREADSHEET_ID,
               range: `${EXPENSES_SHEET_TITLE}!S${rowNum}`,
               valueInputOption: 'USER_ENTERED',
-              requestBody: { values: [[ex.crosscheck]] },
-            })
+              requestBody: { values: [[ex.crosscheck!]] },
+            }), 'crosscheck')
           } catch (ccErr: any) {
             console.warn('Could not write Crosscheck for row', rowNum, ccErr?.message)
           }
@@ -183,7 +202,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 4) Write the Dropdown1 / Dropdown2 formulas on the mapped row.
         const dropdown1Formula = `=if(Expenses!C${rowNum}="","",transpose(unique(FILTER(Definitions!B:B,Definitions!A:A=Expenses!C${rowNum}))))`
         const dropdown2Formula = `=if(Expenses!C${rowNum}="","",transpose(unique(FILTER(Definitions!C:C,Definitions!A:A=Expenses!C${rowNum},Definitions!B:B=Expenses!D${rowNum}))))`
-        await sheets.spreadsheets.values.batchUpdate({
+        await withRetry(() => sheets.spreadsheets.values.batchUpdate({
           spreadsheetId: SPREADSHEET_ID,
           requestBody: {
             valueInputOption: 'USER_ENTERED',
@@ -192,11 +211,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               { range: `Dropdown2!A${dropdownRow}`, values: [[dropdown2Formula]] },
             ],
           },
-        })
+        }), 'dropdown-formulas')
 
         // 5) Set data validation on D and E of the new row (in case the append
         //    landed on a row without validation extended from the sheet).
-        await sheets.spreadsheets.batchUpdate({
+        await withRetry(() => sheets.spreadsheets.batchUpdate({
           spreadsheetId: SPREADSHEET_ID,
           requestBody: {
             requests: [
@@ -259,9 +278,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               },
             ],
           },
-        })
+        }), 'validation')
 
         inserted.push({ row: rowNum, receiptUrl: ex.receiptUrl })
+
+        // Pacing between rows: each row does 5 writes; at 60 writes/min we can
+        // safely do ~12 rows/min. 200ms between rows gives ~5 rows/sec upper bound
+        // but the retry-on-429 backs us off when we start hitting quota.
+        if (idx < items.length - 1) await new Promise(r => setTimeout(r, 200))
       } catch (err: any) {
         errors.push({ index: idx, error: err?.message || String(err) })
       }
