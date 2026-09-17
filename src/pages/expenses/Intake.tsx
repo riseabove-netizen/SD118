@@ -847,8 +847,8 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
     }
   }
 
-  // Auto-drain: when the toggle is ON, every 30s submit the first CHUNK ready
-  // cards. Runs in the background while the admin keeps editing. The 30s tick
+  // Auto-drain: when the toggle is ON, wait 45s after the last queue edit
+  // before submitting the first CHUNK ready cards. The 45s tick
   // + server-side row pacing (~1s per row) + retry-on-429 keeps us safely
   // under the 60 writes/min Sheets quota.
   const autoDrainRef = useRef<{ inflight: boolean }>({ inflight: false })
@@ -873,9 +873,8 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
         autoDrainRef.current.inflight = false
       }
     }
-    // Kick immediately, then every 30s.
-    tick()
-    const iv = setInterval(tick, 30_000)
+    // Wait before the first submission too; edits restart the grace period.
+    const iv = setInterval(tick, 45_000)
     return () => { cancelled = true; clearInterval(iv) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoDrain, txns, cards])
@@ -982,7 +981,7 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
             </button>
             <button
               onClick={() => setAutoDrain(v => !v)}
-              title="Auto-drain submits ready cards every 30 seconds in the background so you can keep filling. Stays under the Sheets 60-writes/min quota."
+              title="Auto-drain waits 45 seconds after your last edit before submitting ready cards. Further edits restart the timer."
               className={`h-11 px-3 rounded-lg border font-semibold text-xs whitespace-nowrap ${
                 autoDrain
                   ? 'bg-red-600/30 border-red-500 text-red-100'
@@ -995,7 +994,7 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
         )}
         {autoDrain && !loading && txns.length > 0 && (
           <div className="text-[11px] text-neutral-400 -mt-1">
-            Ready cards submit automatically every 30s. Keep filling — no need to press Submit.
+            Ready cards submit automatically 45 seconds after your last edit. Further edits restart the timer.
           </div>
         )}
 
