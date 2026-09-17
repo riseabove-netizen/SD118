@@ -9,6 +9,7 @@
 // try to match against the Plaid backlog. If no match, automatically trigger a
 // crew-scoped 14-day Plaid sync and re-match. Still no match → orphan queue.
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { MenuLayout } from '@/components/MenuLayout'
 import { getCrewName, getRole, canWrite, getToken } from '@/lib/auth'
 import { compressImageToJpegBase64 } from '@/lib/imageCompress'
@@ -755,60 +756,54 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
     // Flush successes to the UI so the queue shrinks live.
     const batchOkIds = new Set(batchResults.filter(r => r.ok).map(r => r.txn_id))
     // Preserve the admin's scroll position across the list-shrink so
-    // auto-drain doesn't yank the page mid-edit. We pick a still-visible
-    // remaining card, remember its viewport y, and after React commits we
-    // read the SAME element's new viewport y and scroll by the difference
-    // so it stays in exactly the same place on screen. Using scrollTo with
-    // the pre-commit scrollY as the base avoids drift from browser scroll
-    // anchoring firing at the same time.
-    const remainingIds = txns.filter(t => !batchOkIds.has(t.txn_id)).map(t => t.txn_id)
-    let anchorEl: HTMLElement | null = null
-    let anchorTopBefore = 0
-    const scrollYBefore = window.scrollY
-    for (const id of remainingIds) {
+    // auto-drain doesn't yank the page mid-edit.
+    //
+    // Strategy: measure the total height of the cards ABOVE the viewport
+    // that are about to be removed. That's exactly how much everything is
+    // about to shift up. Wrap the state updates in flushSync so React
+    // commits synchronously, then correct scrollY in the same task —
+    // before the browser paints, so there is no visible jump.
+    let scrollAdjustment = 0
+    for (const id of batchOkIds) {
       const el = document.querySelector(`[data-txn-id="${id}"]`) as HTMLElement | null
-      if (el) {
-        const rect = el.getBoundingClientRect()
-        if (rect.top >= 0 && rect.top <= window.innerHeight) {
-          anchorEl = el
-          anchorTopBefore = rect.top
-          break
+      if (!el) continue
+      const rect = el.getBoundingClientRect()
+      // Card is entirely above the viewport top → its full height will shrink space above.
+      if (rect.bottom <= 0) {
+        // Card height plus the row gap between cards (space-y-3 → 12px).
+        scrollAdjustment += rect.height + 12
+      } else if (rect.top < 0) {
+        // Card straddles the viewport top → only the offscreen portion counts.
+        scrollAdjustment += -rect.top + 12
+      }
+      // Cards fully in or below the viewport contribute 0 — the anchor stays visually put.
+    }
+    // Suspend the browser's own scroll-anchoring on documentElement so it
+    // doesn't try to "help" and fight our manual scroll correction.
+    const rootEl = document.documentElement
+    const prevOverflowAnchor = rootEl.style.overflowAnchor
+    rootEl.style.overflowAnchor = 'none'
+    const scrollYBefore = window.scrollY
+    flushSync(() => {
+      setTxns(prev => prev.filter(t => !batchOkIds.has(t.txn_id)))
+      setCards(prev => {
+        const next = { ...prev }
+        for (const r of batchResults) {
+          if (r.ok) delete next[r.txn_id]
+          else if (r.error && next[r.txn_id]) next[r.txn_id] = { ...next[r.txn_id], submitError: r.error }
         }
-      }
-    }
-    // Suspend the browser's own scroll-anchoring on the list container so it
-    // doesn't fight our manual restore. We flip it back on after the commit.
-    const listEl = anchorEl?.parentElement as HTMLElement | null
-    const prevOverflowAnchor = listEl?.style.overflowAnchor
-    if (listEl) listEl.style.overflowAnchor = 'none'
-    setTxns(prev => prev.filter(t => !batchOkIds.has(t.txn_id)))
-    setCards(prev => {
-      const next = { ...prev }
-      for (const r of batchResults) {
-        if (r.ok) delete next[r.txn_id]
-        else if (r.error && next[r.txn_id]) next[r.txn_id] = { ...next[r.txn_id], submitError: r.error }
-      }
-      return next
-    })
-    if (anchorEl) {
-      // After React commits (two rAFs to be sure paint has happened), read
-      // the anchor's new viewport y and correct scrollY so it stays put.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const el = document.querySelector(`[data-txn-id="${anchorEl!.getAttribute('data-txn-id')}"]`) as HTMLElement | null
-          if (el) {
-            const rect = el.getBoundingClientRect()
-            const delta = rect.top - anchorTopBefore
-            if (Math.abs(delta) > 1) {
-              window.scrollTo({ top: scrollYBefore + delta, behavior: 'auto' })
-            }
-          }
-          if (listEl) listEl.style.overflowAnchor = prevOverflowAnchor || ''
-        })
+        return next
       })
-    } else if (listEl) {
-      listEl.style.overflowAnchor = prevOverflowAnchor || ''
+    })
+    if (scrollAdjustment > 0) {
+      // Move up by the height that just disappeared above us. Same task as
+      // the commit, before paint → no visible jump.
+      window.scrollTo({ top: Math.max(0, scrollYBefore - scrollAdjustment), behavior: 'auto' })
     }
+    // Restore browser scroll-anchoring on the next frame (after paint).
+    requestAnimationFrame(() => {
+      rootEl.style.overflowAnchor = prevOverflowAnchor || ''
+    })
     // Enrich with merchant for the undo toast label.
     const merchantOf = new Map(candidates.map(t => [t.txn_id, cards[t.txn_id]?.merchant || t.merchant || t.txn_id]))
     return batchResults.map(r => ({ ...r, merchant: merchantOf.get(r.txn_id) || r.txn_id }))
