@@ -64,10 +64,12 @@ const ENGINE_LOG_COLUMNS: { col: string; key: string; formula?: (row: number) =>
   { col: 'Q',  key: 'stbd_rpm' },                    // RPM STBD
   { col: 'R',  key: 'port_fuel_rate' },              // Fuel Rate Port
   { col: 'S',  key: 'stbd_fuel_rate' },              // Fuel Rate STBD
-  { col: 'T',  key: '',                              // Gal/hr total — converts fuel-rate sum + 4 gal/hr gen to gal
-    formula: (r) => `=O${r}/(((left(S${r},2)+left(R${r},2)+4))/3.78541)` },
-  { col: 'U',  key: '',                              // L/NM — litres consumed per nautical mile
-    formula: (r) => `=(left(S${r},2)+left(R${r},2)+4)/O${r}` },
+  { col: 'T',  key: '',                              // NMPG — nautical miles per US gallon. Blank when O is blank
+    // to avoid #DIV/0. Matches the manual formula used on rows ≤356.
+    formula: (r) => `=if(O${r}="","",O${r}/(((S${r}+R${r}+4))/3.78541))` },
+  { col: 'U',  key: '',                              // L/NM — litres consumed per nautical mile. Blank when O is blank
+    // to avoid #DIV/0. Matches the manual formula used on rows ≤356.
+    formula: (r) => `=if(O${r}="","",(S${r}+R${r}+4)/O${r})` },
   { col: 'V',  key: 'port_coolant_temp' },           // Coolant Temp Port
   { col: 'W',  key: 'stbd_coolant_temp' },           // Coolant Temp STBD
   { col: 'X',  key: 'port_trans_oil_temp' },         // Trans Oil Temp Port
