@@ -139,6 +139,7 @@ export function buildCustomPickerGroups(): PickerGroup[] {
 
   // Then every calendar system, each in its own group.
   for (const cs of CALENDAR_SYSTEMS) {
+    if (cs.mergedInto) continue // surfaced under its hour-based system
     groups.push(toCalendarGroup(cs))
   }
 

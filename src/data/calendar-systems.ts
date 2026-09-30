@@ -39,6 +39,10 @@ export interface CalendarSystem {
   tileBlurb: string
   units: CalendarUnit[]      // must have at least one; use a single "unit" for singletons
   items: CalendarServiceItem[]
+  // When set, the system has no hub tile / picker group of its own — its
+  // items are surfaced on the hour-based pages listed here instead
+  // (e.g. watermaker pre-filters live on Watermaker — Top / Bottom).
+  mergedInto?: Record<string, string> // unitId -> MaintenanceSystem id
 }
 
 // ---------- Intervals ----------
@@ -378,6 +382,7 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
   {
     id: 'watermakers',
     label: 'Watermakers',
+    mergedInto: { top: 'watermaker-top', bottom: 'watermaker-bottom' },
     tileEmoji: '💧',
     tileBlurb: 'Top & bottom units · as-needed pre-filter swaps',
     units: [
@@ -467,6 +472,22 @@ export function itemAppliesToUnit(system: CalendarSystem, itemId: string, unitId
     case 'silver-ion-refill':     return isSilver
     default: return true
   }
+}
+
+// Calendar systems that get their own hub tile / picker group.
+export function standaloneCalendarSystems(): CalendarSystem[] {
+  return CALENDAR_SYSTEMS.filter(s => !s.mergedInto)
+}
+
+// Calendar (system, unit) pairs merged into a given hour-based system.
+export function mergedCalendarUnitsFor(maintenanceSystemId: string): { system: CalendarSystem; unitId: string }[] {
+  const out: { system: CalendarSystem; unitId: string }[] = []
+  for (const cs of CALENDAR_SYSTEMS) {
+    for (const [unitId, msId] of Object.entries(cs.mergedInto || {})) {
+      if (msId === maintenanceSystemId) out.push({ system: cs, unitId })
+    }
+  }
+  return out
 }
 
 export function findSystem(id: string): CalendarSystem | undefined {

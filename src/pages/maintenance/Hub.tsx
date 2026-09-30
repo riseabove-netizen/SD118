@@ -111,7 +111,7 @@ export function MaintenanceHubPage() {
 
       await Promise.all([
         allP,
-        ...CALENDAR_SYSTEMS.map(async s => {
+        ...CALENDAR_SYSTEMS.filter(s => !s.mergedInto).map(async s => {
           try {
             calResults[s.id] = await fetchCalendarServiceEvents(s.id)
           } catch {
@@ -251,7 +251,7 @@ export function MaintenanceHubPage() {
               onClick={() => setLocation('/maintenance/air-handlers')}
             />
           )}
-          {CALENDAR_SYSTEMS.map(s => {
+          {CALENDAR_SYSTEMS.filter(s => !s.mergedInto).map(s => {
             const daysUntilDue = calendarTileDays(s)
             if (!passesFilter(daysUntilDue)) return null
             const nextDate = soonestDueDate(s, calEvents[s.id] || [])

@@ -22,6 +22,7 @@ import { ZincRodsGuide, isZincRodItem } from '@/components/ZincRodsGuide'
 import { EQUIPMENT_DATA } from '@/data/equipment-data'
 import { TransientBanner } from '@/components/TransientBanner'
 import { EquipmentCard } from '@/components/EquipmentCard'
+import { MergedCalendarItemsCard } from '@/components/MergedCalendarItemsCard'
 import { oilSampleLinksForSystem } from '@/data/oil-sample-units'
 
 export function GeneratorDetailPage() {
@@ -242,6 +243,8 @@ export function GeneratorDetailPage() {
             </ul>
           )}
         </div>
+
+        <MergedCalendarItemsCard maintenanceSystemId={system.id} />
 
         {/* Kit reference (checklist preview) */}
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
