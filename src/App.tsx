@@ -64,6 +64,9 @@ import { WatchDutiesPage } from '@/pages/watch/Duties'
 // Maintenance
 import { MaintenanceHubPage } from '@/pages/maintenance/Hub'
 import { GeneratorDetailPage } from '@/pages/maintenance/GeneratorDetail'
+import { OilSamplesPage } from '@/pages/maintenance/OilSamples'
+import { AlfaLavalPartsPage } from '@/pages/maintenance/AlfaLavalParts'
+import { AlfaLavalManualPage } from '@/pages/maintenance/AlfaLavalManual'
 import { PerformMaintenancePage } from '@/pages/maintenance/Perform'
 import { AirHandlersPage } from '@/pages/maintenance/AirHandlers'
 import { PerformAirHandlersPage } from '@/pages/maintenance/PerformAirHandlers'
@@ -283,6 +286,15 @@ function AppRoutes() {
       </Route>
       <Route path="/maintenance/system/:systemId">
         <AuthGuard><GeneratorDetailPage /></AuthGuard>
+      </Route>
+      <Route path="/maintenance/oil-samples/:unitId">
+        <AuthGuard><OilSamplesPage /></AuthGuard>
+      </Route>
+      <Route path="/maintenance/alfa-laval/parts">
+        <AuthGuard><AlfaLavalPartsPage /></AuthGuard>
+      </Route>
+      <Route path="/maintenance/alfa-laval/manual">
+        <AuthGuard><AlfaLavalManualPage /></AuthGuard>
       </Route>
 
       {/* Operational Guides */}

@@ -28,6 +28,8 @@ import {
   type CellStatus,
 } from '@/lib/calendar-service-api'
 import { fetchSystemState, type MaintenanceEvent } from '@/lib/maintenance-api'
+import { EQUIPMENT_DATA } from '@/data/equipment-data'
+import { EquipmentCard } from '@/components/EquipmentCard'
 
 function cellKey(unitId: string, itemId: string) { return `${unitId}|${itemId}` }
 
@@ -184,6 +186,8 @@ export function CalendarSystemPage() {
             <p className="text-sm text-muted-foreground">{system.tileBlurb}</p>
           </div>
         </div>
+
+        {EQUIPMENT_DATA[system.id] && <EquipmentCard equip={EQUIPMENT_DATA[system.id]} />}
 
         {error && (
           <div className="rounded-md border border-red-500/40 bg-red-500/10 text-red-300 text-xs p-2">

@@ -996,6 +996,135 @@ async function handleLog(req: VercelRequest, res: VercelResponse) {
   })
 }
 
+// ---------------- oil sampling results ----------------
+//
+// One row per uploaded lab report. PDFs live in
+// Maintenance/Oil Samples/<unit folder>. Deleted rows are soft-deleted
+// (Deleted column = TRUE) and their Drive file is moved to trash.
+
+const OIL_HEADERS = [
+  'SampleId', 'UploadedAt', 'UnitId', 'UnitLabel', 'SampleDate', 'RunningHours',
+  'Lab', 'Notes', 'FileName', 'DriveFileId', 'DriveLink', 'UploadedBy', 'Deleted',
+]
+
+const OIL_UNIT_FOLDERS: Record<string, string> = {
+  'generator-port': 'Generator Port',
+  'generator-starboard': 'Generator Starboard',
+  'main-engine-port': 'Main Engine Port',
+  'main-engine-starboard': 'Main Engine Starboard',
+  'transmission-port': 'Transmission Port',
+  'transmission-starboard': 'Transmission Starboard',
+}
+
+function rowToOilSample(r: any[], rowNumber: number) {
+  return {
+    rowNumber,
+    SampleId: r[0] || '',
+    UploadedAt: r[1] || '',
+    UnitId: r[2] || '',
+    UnitLabel: r[3] || '',
+    SampleDate: r[4] || '',
+    RunningHours: r[5] === undefined || r[5] === '' ? null : Number(r[5]),
+    Lab: r[6] || '',
+    Notes: r[7] || '',
+    FileName: r[8] || '',
+    DriveFileId: r[9] || '',
+    DriveLink: r[10] || '',
+    UploadedBy: r[11] || '',
+    Deleted: String(r[12] || '').toUpperCase() === 'TRUE',
+  }
+}
+
+async function readOilRows(sheets: any) {
+  await ensureSheet(sheets, 'OilSamples', OIL_HEADERS)
+  const cur = await withSheetsRetry(() => sheets.spreadsheets.values.get({
+    spreadsheetId: INVENTORY_ID,
+    range: 'OilSamples!A:M',
+  }), 'oil-samples read') as any
+  const rows: any[][] = cur.data.values || []
+  return rows.slice(1).map((r, i) => rowToOilSample(r, i + 2))
+}
+
+async function handleOilSamples(req: VercelRequest, res: VercelResponse) {
+  const unitId = String(req.query.unitId || '').trim()
+  if (!OIL_UNIT_FOLDERS[unitId]) return res.status(400).json({ error: 'unknown unitId' })
+  const auth = getAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  const all = await readOilRows(sheets)
+  const samples = all.filter(s => s.UnitId === unitId && !s.Deleted)
+  return res.status(200).json({ unitId, samples })
+}
+
+async function handleOilSampleUpload(req: VercelRequest, res: VercelResponse) {
+  const body = (req.body || {}) as {
+    unitId?: string; unitLabel?: string; sampleDate?: string; runningHours?: number | string
+    lab?: string; notes?: string; fileName?: string; pdfBase64?: string; uploadedBy?: string
+  }
+  const unitId = String(body.unitId || '').trim()
+  const folderName = OIL_UNIT_FOLDERS[unitId]
+  if (!folderName) return res.status(400).json({ error: 'unknown unitId' })
+  if (!body.pdfBase64) return res.status(400).json({ error: 'pdfBase64 required' })
+  const sampleDate = String(body.sampleDate || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sampleDate)) return res.status(400).json({ error: 'sampleDate (YYYY-MM-DD) required' })
+  const hoursNum = body.runningHours === '' || body.runningHours == null ? null : Number(body.runningHours)
+  if (hoursNum != null && (!Number.isFinite(hoursNum) || hoursNum < 0)) return res.status(400).json({ error: 'runningHours must be a positive number' })
+
+  const bytes = Buffer.from(body.pdfBase64, 'base64')
+  if (bytes.slice(0, 4).toString('binary') !== '%PDF') return res.status(400).json({ error: 'file is not a PDF' })
+
+  const auth = getAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  const drive = google.drive({ version: 'v3', auth })
+  await ensureSheet(sheets, 'OilSamples', OIL_HEADERS)
+
+  const folderId = await resolveFolderPath(drive, ['Maintenance', 'Oil Samples', folderName])
+  const sampleId = 'OIL-' + Date.now().toString(36)
+  const hoursPart = hoursNum != null ? `_${Math.round(hoursNum)}h` : ''
+  const fileName = `${sampleDate}${hoursPart}_${unitId}_oil-sample.pdf`
+  const up = await drive.files.create({
+    requestBody: { name: fileName, parents: [folderId], description: body.fileName ? `Original: ${body.fileName}` : undefined },
+    media: { mimeType: 'application/pdf', body: Readable.from(bytes) },
+    fields: 'id, webViewLink',
+    supportsAllDrives: true,
+  })
+  const row = [
+    sampleId, new Date().toISOString(), unitId, body.unitLabel || unitId, sampleDate,
+    hoursNum != null ? String(hoursNum) : '', body.lab || '', body.notes || '',
+    fileName, up.data.id || '', up.data.webViewLink || '', body.uploadedBy || '', '',
+  ]
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: INVENTORY_ID,
+    range: 'OilSamples!A:M',
+    valueInputOption: 'RAW',
+    requestBody: { values: [row] },
+  })
+  return res.status(200).json({ ok: true, sample: rowToOilSample(row, -1) })
+}
+
+async function handleOilSampleDelete(req: VercelRequest, res: VercelResponse) {
+  const body = (req.body || {}) as { sampleId?: string }
+  const sampleId = String(body.sampleId || '').trim()
+  if (!sampleId) return res.status(400).json({ error: 'sampleId required' })
+  const auth = getAuth()
+  const sheets = google.sheets({ version: 'v4', auth })
+  const drive = google.drive({ version: 'v3', auth })
+  const all = await readOilRows(sheets)
+  const hit = all.find(s => s.SampleId === sampleId)
+  if (!hit) return res.status(404).json({ error: 'not found' })
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: INVENTORY_ID,
+    range: `OilSamples!M${hit.rowNumber}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [['TRUE']] },
+  })
+  if (hit.DriveFileId) {
+    try {
+      await drive.files.update({ fileId: hit.DriveFileId, requestBody: { trashed: true }, supportsAllDrives: true })
+    } catch { /* file may already be gone */ }
+  }
+  return res.status(200).json({ ok: true })
+}
+
 // ---------------- dispatcher ----------------
 
 export const config = {
@@ -1030,7 +1159,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
       return await handleLog(req, res)
     }
-    return res.status(400).json({ error: 'op required: list | system | hours | log' })
+    if (op === 'oilSamples') {
+      if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' })
+      return await handleOilSamples(req, res)
+    }
+    if (op === 'oilSampleUpload') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+      return await handleOilSampleUpload(req, res)
+    }
+    if (op === 'oilSampleDelete') {
+      if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+      return await handleOilSampleDelete(req, res)
+    }
+    return res.status(400).json({ error: 'op required: list | system | hours | log | oilSamples | oilSampleUpload | oilSampleDelete' })
   } catch (e: any) {
     console.error('maintenance error', e)
     return res.status(500).json({ error: 'internal', detail: e?.message || String(e) })

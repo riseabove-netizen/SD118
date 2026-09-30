@@ -393,6 +393,60 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
       },
     ],
   },
+
+  // ------------------------------------------------------------------
+  // Alfa Laval MIB 303 — fuel separator (purifier)
+  //
+  // Schedule from the MIB 303 system manual, chapter 5:
+  //   5.1 Bowl cleaning — interval depends on sludge load but never
+  //       more than 72 operating hours (3 days).
+  //   5.2 Once per year — O-ring service kit + disc inspection.
+  //   5.3 Every second year — disc stack (yearly if separation temp
+  //       > 60 °C) and vibration dampers.
+  // Bowl cleaning is tied to operating hours, not the calendar, so it
+  // is listed as-needed with the 72 h ceiling spelled out.
+  // ------------------------------------------------------------------
+  {
+    id: 'alfa-laval-mib303',
+    label: 'Alfa Laval Fuel Separator',
+    tileEmoji: '🛢',
+    tileBlurb: 'MIB 303 · bowl clean ≤72 op h · yearly O-rings · 2-yearly discs & dampers',
+    units: [
+      { id: 'unit', label: 'MIB 303 separator' },
+    ],
+    items: [
+      {
+        id: 'bowl-clean',
+        label: 'Clean bowl / remove sludge',
+        detail: 'Manual sludge removal. Never exceed 72 operating hours (3 days) between cleanings. Do not use cleaning agents below pH 6 or above pH 9.',
+        interval: { kind: 'as-needed' },
+      },
+      {
+        id: 'o-ring-kit',
+        label: 'Replace O-rings (service kit)',
+        detail: 'Once per year. Fit all O-rings from the O-ring service kit and lubricate with the supplied silicone grease.',
+        interval: { kind: 'yearly' },
+      },
+      {
+        id: 'disc-inspect',
+        label: 'Inspect disc condition',
+        detail: 'Once per year. Check the discs and replace if necessary.',
+        interval: { kind: 'yearly' },
+      },
+      {
+        id: 'disc-stack',
+        label: 'Replace disc stack',
+        detail: 'Every two years at separation temperature ≤ 60 °C. Above 60 °C, replace every year or at any sign of brittleness. Available as a set.',
+        interval: { kind: 'months', every: 24 },
+      },
+      {
+        id: 'vibration-dampers',
+        label: 'Replace vibration dampers',
+        detail: 'Every two years. Inspect the stop flanges and replace if damaged. Available as a set.',
+        interval: { kind: 'months', every: 24 },
+      },
+    ],
+  },
 ]
 
 // Which items apply to which unit? Some items only apply to certain

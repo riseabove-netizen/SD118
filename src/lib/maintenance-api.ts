@@ -178,3 +178,58 @@ export function fileToBase64(file: File): Promise<string> {
     reader.readAsDataURL(file)
   })
 }
+
+// ---- Oil sampling results ----
+
+export interface OilSample {
+  SampleId: string
+  UploadedAt: string
+  UnitId: string
+  UnitLabel: string
+  SampleDate: string
+  RunningHours: number | null
+  Lab: string
+  Notes: string
+  FileName: string
+  DriveFileId: string
+  DriveLink: string
+  UploadedBy: string
+}
+
+export async function fetchOilSamples(unitId: string): Promise<OilSample[]> {
+  const r = await authFetch(`/api/maintenance?op=oilSamples&unitId=${encodeURIComponent(unitId)}`)
+  if (!r.ok) throw new Error(`Could not load oil samples (${r.status})`)
+  const data = await r.json()
+  return (data.samples || []) as OilSample[]
+}
+
+export async function uploadOilSample(input: {
+  unitId: string
+  unitLabel: string
+  sampleDate: string
+  runningHours: number | null
+  lab: string
+  notes: string
+  fileName: string
+  pdfBase64: string
+  uploadedBy: string
+}): Promise<OilSample> {
+  const r = await authFetch('/api/maintenance?op=oilSampleUpload', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(data?.error || data?.detail || `Upload failed (${r.status})`)
+  return data.sample as OilSample
+}
+
+export async function deleteOilSample(sampleId: string): Promise<void> {
+  const r = await authFetch('/api/maintenance?op=oilSampleDelete', {
+    method: 'POST',
+    body: JSON.stringify({ sampleId }),
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error(data?.error || `Delete failed (${r.status})`)
+  }
+}

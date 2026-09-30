@@ -19,6 +19,9 @@ export interface EquipmentDataEntry {
   // Renders as an internal link → /guides/<id>.
   procedureGuideId?: string
   procedureLabel?: string
+  // Extra in-app links (sub-pages such as Oil sampling, Parts list,
+  // Operation manual). Rendered as red link chips under the table.
+  links?: { label: string; href: string; icon?: string }[]
 }
 
 export const EQUIPMENT_DATA: Record<string, EquipmentDataEntry> = {
@@ -48,6 +51,7 @@ export const EQUIPMENT_DATA: Record<string, EquipmentDataEntry> = {
     title: 'Kohler 70EFOZDJ — Port',
     rows: [
       { label: 'Model', value: '70EFOZDJ' },
+      { label: 'Serial number', value: '33J9GMHK0001' },
       { label: 'Oil capacity', value: '18 L · 15W-40' },
       { label: 'Output', value: '230 / 400 V · 3-ph · 50 Hz · 126 A' },
       { label: 'Battery', value: '24 V' },
@@ -60,6 +64,25 @@ export const EQUIPMENT_DATA: Record<string, EquipmentDataEntry> = {
       { label: 'Oil capacity', value: '18 L · 15W-40' },
       { label: 'Output', value: '230 / 400 V · 3-ph · 50 Hz · 126 A' },
       { label: 'Battery', value: '24 V' },
+    ],
+  },
+  'fresh-water-system': {
+    title: 'Fresh water system',
+    rows: [
+      { label: 'UV sterilizer (UV light filter)', value: 'IDROMAR UV SH 5000' },
+    ],
+  },
+  'alfa-laval-mib303': {
+    title: 'Alfa Laval MIB 303 — Fuel separator',
+    rows: [
+      { label: 'Model', value: 'MIB 303' },
+      { label: 'Separator', value: 'MIB 303 S-13/S-33 · 881176-11-02' },
+      { label: 'System reference', value: 'MIB 303 AC · Ref. 9000768 Rev. 1' },
+      { label: 'System manual', value: '59999580' },
+    ],
+    links: [
+      { label: 'Operation manual', href: '/maintenance/alfa-laval/manual', icon: '📘' },
+      { label: 'Parts list', href: '/maintenance/alfa-laval/parts', icon: '🔩' },
     ],
   },
   'hamann': {
