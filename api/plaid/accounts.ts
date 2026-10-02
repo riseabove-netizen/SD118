@@ -7,6 +7,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
   if (!requireAdmin(req, res)) return
 
+  // Diagnostic: raw Plaid transactions (all fields) for a date range,
+  // used to find which fields separate cardholders on a shared account.
+  if (req.query.op === 'raw') {
+    try {
+      const start = String(req.query.start || '')
+      const end = String(req.query.end || '')
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
+        return res.status(400).json({ error: 'start and end (YYYY-MM-DD) required' })
+      }
+      const items = await readPlaidItems()
+      const plaid = plaidClient()
+      const out: any[] = []
+      for (const it of items) {
+        if ((it.status && it.status !== 'active') || !it.access_token) continue
+        try {
+          const r = await plaid.transactionsGet({
+            access_token: it.access_token,
+            start_date: start,
+            end_date: end,
+            options: { count: 500, include_original_description: true } as any,
+          })
+          out.push({ item_id: it.item_id, institution_name: it.institution_name, accounts: r.data.accounts, transactions: r.data.transactions })
+        } catch (e: any) {
+          out.push({ item_id: it.item_id, error: e?.response?.data?.error_message || e?.message || String(e) })
+        }
+      }
+      return res.status(200).json({ items: out })
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.response?.data?.error_message || e?.message || String(e) })
+    }
+  }
+
   try {
     const items = await readPlaidItems()
     const labels = buildAccountLabelMap(items)
