@@ -11,6 +11,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAdmin(req, res)) return
   try {
     const all = await readAllPlaidTxns()
+    // Plaid's Bilt feed merges every cardholder (Gabriel + Enrico's
+    // authorized-user cards) into ONE account (mask 0540) and returns no
+    // account_owner, so there is no Plaid field that separates them.
+    // Instead we learn from the admin: any merchant the admin has marked
+    // as Enrico's ('enrico' status) flags future Bilt charges from the
+    // same merchant as "Likely Enrico" so they are held back from
+    // auto-submit until the admin decides.
+    const norm = (m: string) => (m || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+    const enricoMerchants = new Set(
+      all.filter(r => r.queue_status === 'enrico' && r.account_mask === '0540').map(r => norm(r.merchant)).filter(Boolean),
+    )
     const pending = all
       .filter(r => r.queue_status === 'pending')
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
@@ -25,6 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         account_queue_label: maskToQueueLabel(r.account_mask),
         category: r.category,
         currency: r.currency,
+        likely_enrico: r.account_mask === '0540' && enricoMerchants.has(norm(r.merchant)),
       }))
     return res.status(200).json({ ok: true, pending, count: pending.length })
   } catch (e: any) {

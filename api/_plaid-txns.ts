@@ -37,7 +37,7 @@ export type PlaidTxnRow = {
   category: string
   payment_channel: string
   updated_at: string
-  queue_status: string  // 'pending' | 'submitted' | 'skipped' | 'deleted' | 'historical'
+  queue_status: string  // 'pending' | 'submitted' | 'skipped' | 'deleted' | 'enrico' | 'historical'
   submitted_at: string
 }
 

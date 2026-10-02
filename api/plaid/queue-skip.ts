@@ -12,7 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!requireAdmin(req, res)) return
   const body = req.body as { txn_ids?: string[]; status?: string }
-  const status = body?.status === 'deleted' ? 'deleted' : 'skipped'
+  const status = body?.status === 'deleted' ? 'deleted' : body?.status === 'enrico' ? 'enrico' : 'skipped'
   const ids = Array.isArray(body?.txn_ids) ? body!.txn_ids! : []
   if (ids.length === 0) return res.status(400).json({ error: 'txn_ids[] required' })
   try {
