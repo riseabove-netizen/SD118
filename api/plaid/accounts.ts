@@ -22,13 +22,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       for (const it of items) {
         if ((it.status && it.status !== 'active') || !it.access_token) continue
         try {
-          const r = await plaid.transactionsGet({
-            access_token: it.access_token,
-            start_date: start,
-            end_date: end,
-            options: { count: 500, include_original_description: true } as any,
-          })
-          out.push({ item_id: it.item_id, institution_name: it.institution_name, accounts: r.data.accounts, transactions: r.data.transactions })
+          // Full re-sync from an empty cursor (read-only — the stored
+          // cursor is NOT updated), filtered to the requested window.
+          let cursor: string | undefined = undefined
+          let hasMore = true
+          const txns: any[] = []
+          let accounts: any[] = []
+          let pages = 0
+          while (hasMore && pages < 40) {
+            const r: any = await plaid.transactionsSync({ access_token: it.access_token, cursor, count: 500, options: { include_original_description: true } as any })
+            accounts = r.data.accounts
+            for (const t of r.data.added) if (t.date >= start && t.date <= end) txns.push(t)
+            cursor = r.data.next_cursor
+            hasMore = r.data.has_more
+            pages++
+          }
+          out.push({ item_id: it.item_id, institution_name: it.institution_name, accounts, transactions: txns })
         } catch (e: any) {
           out.push({ item_id: it.item_id, error: e?.response?.data?.error_message || e?.message || String(e) })
         }

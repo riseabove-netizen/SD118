@@ -1045,6 +1045,36 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
     }
   }
 
+  // Admin: delete a single Plaid card instead of inserting it into the
+  // Expenses sheet. The row is kept in Plaid_Transactions as 'deleted' so
+  // the same txn is never re-imported.
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
+  const deleteOne = async (t: { txn_id: string; merchant: string; date: string; amount_usd: number }) => {
+    if (deletingIds.has(t.txn_id) || submittingIdsRef.current.has(t.txn_id)) return
+    const amt = `${t.amount_usd < 0 ? '−' : ''}$${Math.abs(t.amount_usd).toFixed(2)}`
+    if (!window.confirm(`Delete ${t.merchant || 'this charge'} (${t.date}, ${amt})?\n\nIt will NOT be added to the Expenses sheet.`)) return
+    setDeletingIds(prev => new Set(prev).add(t.txn_id))
+    setGlobalError(null)
+    try {
+      const resp = await authFetch('/api/plaid/queue-skip', {
+        method: 'POST',
+        body: JSON.stringify({ txn_ids: [t.txn_id], status: 'deleted' }),
+      })
+      const data = await resp.json()
+      if (!data?.ok) throw new Error(data?.error || data?.results?.[0]?.error || 'Delete failed')
+      setTxns(prev => prev.filter(x => x.txn_id !== t.txn_id))
+      setCards(prev => {
+        const next = { ...prev }
+        delete next[t.txn_id]
+        return next
+      })
+    } catch (err: any) {
+      setGlobalError(`Delete failed for ${t.merchant}: ${err?.message || String(err)}`)
+    } finally {
+      setDeletingIds(prev => { const n = new Set(prev); n.delete(t.txn_id); return n })
+    }
+  }
+
   const skipSelected = async () => {
     if (selectedForSkip.length === 0) return
     setSkippingBatch(true); setGlobalError(null)
@@ -1276,20 +1306,42 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-semibold text-sm truncate">{t.merchant || '(no merchant)'}</div>
-                  <div className="text-xs text-neutral-400">
-                    {t.date} · ${t.amount_usd?.toFixed?.(2) ?? t.amount_usd} · {t.account_queue_label}
+                  <div className="text-xs text-neutral-400 flex items-center gap-1.5 flex-wrap">
+                    <span>{t.date}</span>
+                    <span>·</span>
+                    {t.amount_usd < 0 ? (
+                      <>
+                        <span className="text-emerald-400 font-semibold">−${Math.abs(t.amount_usd).toFixed(2)}</span>
+                        <span className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border border-emerald-500/50 bg-emerald-500/10 text-emerald-300">Refund</span>
+                      </>
+                    ) : (
+                      <span>${t.amount_usd?.toFixed?.(2) ?? t.amount_usd}</span>
+                    )}
+                    <span>·</span>
+                    <span>{t.account_queue_label}</span>
                   </div>
                   {t.category && <div className="text-xs text-neutral-500">{t.category}</div>}
                 </div>
-                <label className="text-xs flex items-center gap-1 select-none">
-                  <input
-                    type="checkbox"
-                    checked={!!c.selectedForBulk}
-                    onChange={(e) => setCard(t.txn_id, { selectedForBulk: e.target.checked })}
-                    className="accent-red-600"
-                  />
-                  Bulk
-                </label>
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <label className="text-xs flex items-center gap-1 select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!c.selectedForBulk}
+                      onChange={(e) => setCard(t.txn_id, { selectedForBulk: e.target.checked })}
+                      className="accent-red-600"
+                    />
+                    Bulk
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => deleteOne(t)}
+                    disabled={deletingIds.has(t.txn_id)}
+                    className="text-[11px] px-2 py-1 rounded border border-red-600/50 text-red-300 hover:bg-red-600/15 disabled:opacity-40"
+                    title="Delete this charge — it will not be added to the Expenses sheet"
+                  >
+                    {deletingIds.has(t.txn_id) ? 'Deleting…' : '🗑 Delete'}
+                  </button>
+                </div>
               </div>
 
               {!c.selectedForSkip && (

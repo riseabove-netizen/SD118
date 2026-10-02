@@ -37,7 +37,7 @@ export type PlaidTxnRow = {
   category: string
   payment_channel: string
   updated_at: string
-  queue_status: string  // 'pending' | 'submitted' | 'skipped' | 'historical'
+  queue_status: string  // 'pending' | 'submitted' | 'skipped' | 'deleted' | 'historical'
   submitted_at: string
 }
 
@@ -168,13 +168,19 @@ export async function syncPlaidTransactions(opts?: { maxDaysBack?: number }): Pr
           if (!label) continue
           if (!GABRIEL_MASKS.has(mask)) continue
           if (cutoff && t.date < cutoff) continue
+          // Card payments ("Payment" / autopay) are not expenses or refunds.
+          if ((t.personal_finance_category?.primary as string) === 'LOAN_PAYMENTS') continue
           if (seenIds.has(t.transaction_id)) continue
           seenIds.add(t.transaction_id)
           toAppend.push({
             txn_id: t.transaction_id,
             date: t.date,
             merchant: t.merchant_name || t.name || '',
-            amount_usd: Math.abs(t.amount),
+            // Plaid sign convention: positive = purchase (money out),
+            // negative = refund / credit back to the card. Keep the sign so
+            // refunds land in Expenses as negative amounts (matches the
+            // existing manual rows, e.g. Amazon returns at -48.14).
+            amount_usd: t.amount,
             currency: t.iso_currency_code || t.unofficial_currency_code || 'USD',
             account: label,
             account_mask: mask,

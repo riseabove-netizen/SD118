@@ -1,5 +1,7 @@
 // POST /api/plaid/queue-skip — admin only.
-// Marks the listed txn_ids as 'skipped' so they drop out of the queue.
+// Marks the listed txn_ids as 'skipped' (or 'deleted' when the admin
+// deletes a single card) so they drop out of the queue. The row stays in
+// Plaid_Transactions so the txn_id is never re-imported.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireAdmin } from '../_plaid.js'
 import { readAllPlaidTxns, updatePlaidTxnStatus } from '../_plaid-txns.js'
@@ -9,7 +11,8 @@ export const config = { maxDuration: 30 }
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   if (!requireAdmin(req, res)) return
-  const body = req.body as { txn_ids?: string[] }
+  const body = req.body as { txn_ids?: string[]; status?: string }
+  const status = body?.status === 'deleted' ? 'deleted' : 'skipped'
   const ids = Array.isArray(body?.txn_ids) ? body!.txn_ids! : []
   if (ids.length === 0) return res.status(400).json({ error: 'txn_ids[] required' })
   try {
@@ -20,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const row = byId.get(id)
       if (!row) { results.push({ txn_id: id, ok: false, error: 'not found' }); continue }
       try {
-        await updatePlaidTxnStatus(row.rowIndex, 'skipped', '')
+        await updatePlaidTxnStatus(row.rowIndex, status, new Date().toISOString())
         results.push({ txn_id: id, ok: true })
       } catch (e: any) {
         results.push({ txn_id: id, ok: false, error: e?.message || String(e) })
