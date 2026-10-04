@@ -31,10 +31,11 @@ export async function login(code: string): Promise<{ token: string; role?: 'admi
   })
 }
 
-export async function extractFromImages(images: string[]): Promise<Record<string, unknown>> {
+export async function extractFromImages(images: string[], instructions?: string): Promise<Record<string, unknown>> {
+  const extra = (instructions || '').trim()
   return request('/api/extract', {
     method: 'POST',
-    body: JSON.stringify({ images }),
+    body: JSON.stringify(extra ? { images, instructions: extra } : { images }),
   })
 }
 

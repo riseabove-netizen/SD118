@@ -168,7 +168,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set on the server' })
   }
 
-  const { images } = req.body as { images?: string[] }
+  const { images, instructions: rawInstructions } = req.body as { images?: string[]; instructions?: string }
+  // Optional free-text instructions typed by the crew on the upload page.
+  // Capped so a runaway paste can't blow the prompt budget.
+  const instructions = typeof rawInstructions === 'string' ? rawInstructions.trim().slice(0, 2000) : ''
 
   if (!images || images.length === 0) {
     return res.status(400).json({ error: 'No images provided' })
@@ -211,7 +214,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 ...imageContent,
                 {
                   type: 'text',
-                  text: EXTRACTION_PROMPT,
+                  text: instructions
+                    ? `${EXTRACTION_PROMPT}
+
+ADDITIONAL INSTRUCTIONS FROM THE CREW (follow them, but still return ONLY the JSON object above):
+"""
+${instructions}
+"""
+If these instructions ask for a description, note, or summary (or describe something that is not a gauge reading), write it as a concise plain-English string in a TOP-LEVEL "comments" field of the JSON object. Do not invent readings. If no description is needed, omit "comments".`
+                    : EXTRACTION_PROMPT,
                 },
               ],
             },

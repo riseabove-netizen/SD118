@@ -47,6 +47,8 @@ export function UploadPage() {
   const [, setLocation] = useLocation()
   const [files, setFiles] = useState<File[]>([])
   const [dragOver, setDragOver] = useState(false)
+  // Optional instructions sent to Claude along with the photos.
+  const [instructions, setInstructions] = useState('')
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const libraryInputRef = useRef<HTMLInputElement>(null)
 
@@ -91,7 +93,7 @@ export function UploadPage() {
 
       const results: Record<string, unknown>[] = []
       for (const c of chunks) {
-        results.push(await extractFromImages(c))
+        results.push(await extractFromImages(c, instructions))
       }
       return mergeExtractions(results)
     },
@@ -103,7 +105,10 @@ export function UploadPage() {
 
   const handleFiles = (newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return
-    setFiles(prev => [...prev, ...Array.from(newFiles)])
+    // Copy synchronously: the <input> is reset right after this call, which
+    // empties the live FileList before a deferred state updater would run.
+    const picked = Array.from(newFiles)
+    setFiles(prev => [...prev, ...picked])
   }
 
   const removeFile = (idx: number) => {
@@ -228,6 +233,25 @@ export function UploadPage() {
             </div>
           </div>
         )}
+
+        <div className="space-y-1.5">
+          <label htmlFor="ai-instructions" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Instructions for the AI (optional)
+          </label>
+          <textarea
+            id="ai-instructions"
+            value={instructions}
+            onChange={e => setInstructions(e.target.value)}
+            rows={3}
+            maxLength={2000}
+            disabled={mutation.isPending}
+            placeholder="e.g. Port genset is off — ignore it. Add a description: anchored in Trogir, light chop, watermaker running."
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/50"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Sent to Claude with the photos. Ask for a description and it goes into Comments on the next page.
+          </p>
+        </div>
 
         {mutation.isError && (
           <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5">

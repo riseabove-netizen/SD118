@@ -204,6 +204,7 @@ export function ReviewPage() {
   // —————————— Re-upload: add more photos & merge ——————————
   const [moreOpen, setMoreOpen] = useState(false)
   const [moreFiles, setMoreFiles] = useState<File[]>([])
+  const [moreInstructions, setMoreInstructions] = useState('')
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [imagesProcessed, setImagesProcessed] = useState<number | null>(null)
@@ -249,9 +250,18 @@ export function ReviewPage() {
 
   const clearSelection = () => setSelectedKeys(new Set())
 
+  // Keys the merge will fill: the explicit selection, or — when nothing is
+  // selected — every field that is still blank.
+  const missingKeys = () => ALL_MERGEABLE_KEYS.filter(k => !values[k] || values[k] === '')
+  const effectiveKeys = (): string[] => (selectedKeys.size > 0 ? Array.from(selectedKeys) : missingKeys())
+
   const addMoreFiles = (newFiles: FileList | null) => {
     if (!newFiles || newFiles.length === 0) return
-    setMoreFiles(prev => [...prev, ...Array.from(newFiles)])
+    // Copy synchronously — the input's FileList is cleared (value = '')
+    // immediately after this call, so a lazy Array.from inside the state
+    // updater ended up adding ZERO files and the Extract button never enabled.
+    const picked = Array.from(newFiles)
+    setMoreFiles(prev => [...prev, ...picked])
   }
 
   const removeMoreFile = (idx: number) =>
@@ -264,7 +274,7 @@ export function ReviewPage() {
         const b64 = await compressImageToJpegBase64(file, { maxDim: 1600, quality: 0.82 })
         images.push(b64)
       }
-      return extractFromImages(images)
+      return extractFromImages(images, moreInstructions)
     },
     onSuccess: (data: Record<string, unknown>) => {
       // Capture image-count debug echo from server
@@ -288,16 +298,22 @@ export function ReviewPage() {
         if (typeof v === 'string' || typeof v === 'number') flat[k] = String(v)
       }
 
-      // Merge ONLY the user-selected individual fields
+      // Merge ONLY the user-selected individual fields. If nothing was
+      // picked, fill whatever is still missing.
+      const targetKeys = effectiveKeys()
       setValues(prev => {
         const next = { ...prev }
-        selectedKeys.forEach(k => {
+        targetKeys.forEach(k => {
           const v = flat[k]
           if (v !== undefined && v !== null && v !== '') next[k] = v
         })
+        // A description requested via the instructions box is appended to Comments.
+        const desc = (flat.comments || '').trim()
+        if (desc) next.comments = next.comments ? `${next.comments}\n${desc}` : desc
         return next
       })
       setMoreFiles([])
+      setMoreInstructions('')
       setSelectedKeys(new Set())
     },
   })
@@ -509,7 +525,7 @@ export function ReviewPage() {
           {moreOpen && (
             <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
               <p className="text-xs text-muted-foreground">
-                Pick the exact fields you want the AI to fill, then upload photos of those gauges.
+                Upload photos of the missing gauges. Optionally pick exact fields — if none are picked, the AI fills every field that is still blank.
               </p>
 
               <input
@@ -639,6 +655,20 @@ export function ReviewPage() {
                 </div>
               )}
 
+              <div className="space-y-1">
+                <label htmlFor="more-ai-instructions" className="text-xs font-medium text-muted-foreground">Instructions for the AI (optional)</label>
+                <textarea
+                  id="more-ai-instructions"
+                  value={moreInstructions}
+                  onChange={e => setMoreInstructions(e.target.value)}
+                  rows={2}
+                  maxLength={2000}
+                  disabled={mergeMutation.isPending}
+                  placeholder="e.g. This is the stbd engine display. Add a description of the alarm shown."
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+
               {mergeMutation.isError && (
                 <p className="text-xs text-destructive">
                   {mergeMutation.error instanceof Error ? mergeMutation.error.message : 'Extraction failed.'}
@@ -654,10 +684,16 @@ export function ReviewPage() {
               <Button
                 type="button"
                 onClick={() => mergeMutation.mutate()}
-                disabled={moreFiles.length === 0 || selectedKeys.size === 0 || mergeMutation.isPending}
+                disabled={moreFiles.length === 0 || mergeMutation.isPending}
                 className="w-full h-11"
               >
-                {mergeMutation.isPending ? 'Extracting…' : `Extract & Fill ${selectedKeys.size} Field${selectedKeys.size !== 1 ? 's' : ''}`}
+                {mergeMutation.isPending
+                  ? 'Extracting…'
+                  : moreFiles.length === 0
+                    ? 'Add a photo to extract'
+                    : selectedKeys.size > 0
+                      ? `Extract & Fill ${selectedKeys.size} Field${selectedKeys.size !== 1 ? 's' : ''}`
+                      : 'Extract & Fill Missing Fields'}
               </Button>
             </div>
           )}
