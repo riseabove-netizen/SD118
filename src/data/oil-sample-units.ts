@@ -9,7 +9,8 @@ export interface OilSampleUnit {
   label: string
   hoursSystemId: string   // MaintenanceSystem id used to prefill running hours
   parentSystemId: string  // page to link back to
-  driveFolder: string     // Maintenance/Oil Samples/<driveFolder>
+  driveFolder: string     // Maintenance/<Oil|Coolant> Samples/<driveFolder>
+  kind?: 'oil' | 'coolant' // defaults to 'oil'
 }
 
 export const OIL_SAMPLE_UNITS: OilSampleUnit[] = [
@@ -19,7 +20,20 @@ export const OIL_SAMPLE_UNITS: OilSampleUnit[] = [
   { id: 'main-engine-starboard', label: 'Main engine — Starboard', hoursSystemId: 'main-engine-starboard', parentSystemId: 'main-engine-starboard', driveFolder: 'Main Engine Starboard' },
   { id: 'transmission-port',      label: 'Transmission — Port',      hoursSystemId: 'main-engine-port',      parentSystemId: 'main-engine-port',      driveFolder: 'Transmission Port' },
   { id: 'transmission-starboard', label: 'Transmission — Starboard', hoursSystemId: 'main-engine-starboard', parentSystemId: 'main-engine-starboard', driveFolder: 'Transmission Starboard' },
+  { id: 'coolant-main-engine-port',      label: 'Main engine — Port',      hoursSystemId: 'main-engine-port',      parentSystemId: 'main-engine-port',      driveFolder: 'Main Engine Port',      kind: 'coolant' },
+  { id: 'coolant-main-engine-starboard', label: 'Main engine — Starboard', hoursSystemId: 'main-engine-starboard', parentSystemId: 'main-engine-starboard', driveFolder: 'Main Engine Starboard', kind: 'coolant' },
 ]
+
+export function sampleNoun(u: OilSampleUnit): string {
+  return u.kind === 'coolant' ? 'coolant' : 'oil'
+}
+
+// Short tab label used when several sample pages share one parent system.
+export function sampleTabLabel(u: OilSampleUnit): string {
+  if (u.kind === 'coolant') return 'Coolant'
+  if (u.id.startsWith('transmission')) return 'Transmission'
+  return 'Engine oil'
+}
 
 export function findOilSampleUnit(id: string): OilSampleUnit | undefined {
   return OIL_SAMPLE_UNITS.find(u => u.id === id)
@@ -29,8 +43,8 @@ export function oilSampleLinksForSystem(systemId: string): { label: string; href
   return OIL_SAMPLE_UNITS
     .filter(u => u.parentSystemId === systemId)
     .map(u => ({
-      label: u.id.startsWith('transmission') ? 'Transmission oil samples' : u.id.startsWith('main-engine') ? 'Engine oil samples' : 'Oil sampling results',
+      label: u.kind === 'coolant' ? 'Coolant samples' : u.id.startsWith('transmission') ? 'Transmission oil samples' : u.id.startsWith('main-engine') ? 'Engine oil samples' : 'Oil sampling results',
       href: `/maintenance/oil-samples/${u.id}`,
-      icon: '🧪',
+      icon: u.kind === 'coolant' ? '💧' : '🧪',
     }))
 }

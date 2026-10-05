@@ -13,7 +13,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useParams } from 'wouter'
 import { MenuLayout } from '@/components/MenuLayout'
 import { getCrewName, isAdmin } from '@/lib/auth'
-import { OIL_SAMPLE_UNITS, findOilSampleUnit } from '@/data/oil-sample-units'
+import { OIL_SAMPLE_UNITS, findOilSampleUnit, sampleNoun, sampleTabLabel } from '@/data/oil-sample-units'
 import {
   fetchOilSamples,
   uploadOilSample,
@@ -176,7 +176,7 @@ export function OilSamplesPage() {
   }
 
   async function remove(s: OilSample) {
-    if (!confirm(`Delete the ${fmtDate(s.SampleDate)} oil sample report?`)) return
+    if (!confirm(`Delete the ${fmtDate(s.SampleDate)} ${sampleNoun(unit!)} sample report?`)) return
     setDeletingId(s.SampleId)
     try {
       await deleteOilSample(s.SampleId)
@@ -189,7 +189,7 @@ export function OilSamplesPage() {
   }
 
   return (
-    <MenuLayout title={`Oil samples · ${unit.label}`} showBack backHref={parentHref(unit.parentSystemId)}>
+    <MenuLayout title={`${unit.kind === 'coolant' ? 'Coolant' : 'Oil'} samples · ${unit.label}`} showBack backHref={parentHref(unit.parentSystemId)}>
       <div className="space-y-5">
         {siblings.length > 1 && (
           <div className="flex gap-2">
@@ -203,7 +203,7 @@ export function OilSamplesPage() {
                     : 'border-border bg-card text-muted-foreground hover:bg-secondary'
                 }`}
               >
-                {u.id.startsWith('transmission') ? 'Transmission' : 'Engine'}
+                {sampleTabLabel(u)}
               </button>
             ))}
           </div>
@@ -297,7 +297,7 @@ export function OilSamplesPage() {
           {loading ? (
             <div className="text-xs text-muted-foreground">Loading…</div>
           ) : sorted.length === 0 ? (
-            <div className="text-xs text-muted-foreground">No oil sample reports uploaded yet.</div>
+            <div className="text-xs text-muted-foreground">No {sampleNoun(unit)} sample reports uploaded yet.</div>
           ) : (
             <ul className="space-y-2">
               {sorted.map(s => {

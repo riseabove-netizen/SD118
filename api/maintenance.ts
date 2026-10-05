@@ -1014,6 +1014,14 @@ const OIL_UNIT_FOLDERS: Record<string, string> = {
   'main-engine-starboard': 'Main Engine Starboard',
   'transmission-port': 'Transmission Port',
   'transmission-starboard': 'Transmission Starboard',
+  'coolant-main-engine-port': 'Main Engine Port',
+  'coolant-main-engine-starboard': 'Main Engine Starboard',
+}
+
+// Coolant sample units share the OilSamples sheet tab (UnitId tells them
+// apart) but get their own Drive tree and file naming.
+function isCoolantUnit(unitId: string): boolean {
+  return unitId.startsWith('coolant-')
 }
 
 function rowToOilSample(r: any[], rowNumber: number) {
@@ -1077,10 +1085,11 @@ async function handleOilSampleUpload(req: VercelRequest, res: VercelResponse) {
   const drive = google.drive({ version: 'v3', auth })
   await ensureSheet(sheets, 'OilSamples', OIL_HEADERS)
 
-  const folderId = await resolveFolderPath(drive, ['Maintenance', 'Oil Samples', folderName])
-  const sampleId = 'OIL-' + Date.now().toString(36)
+  const coolant = isCoolantUnit(unitId)
+  const folderId = await resolveFolderPath(drive, ['Maintenance', coolant ? 'Coolant Samples' : 'Oil Samples', folderName])
+  const sampleId = (coolant ? 'COOL-' : 'OIL-') + Date.now().toString(36)
   const hoursPart = hoursNum != null ? `_${Math.round(hoursNum)}h` : ''
-  const fileName = `${sampleDate}${hoursPart}_${unitId}_oil-sample.pdf`
+  const fileName = `${sampleDate}${hoursPart}_${unitId}_${coolant ? 'coolant' : 'oil'}-sample.pdf`
   const up = await drive.files.create({
     requestBody: { name: fileName, parents: [folderId], description: body.fileName ? `Original: ${body.fileName}` : undefined },
     media: { mimeType: 'application/pdf', body: Readable.from(bytes) },
