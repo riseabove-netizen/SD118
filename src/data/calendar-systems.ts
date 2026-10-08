@@ -452,6 +452,29 @@ export const CALENDAR_SYSTEMS: CalendarSystem[] = [
       },
     ],
   },
+  // ------------------------------------------------------------------
+  // Deck machinery — windlasses + aft deck winches, 6-monthly clean & grease
+  // ------------------------------------------------------------------
+  {
+    id: 'deck-machinery',
+    label: 'Windlasses & Winches',
+    tileEmoji: '⚓',
+    tileBlurb: 'Port & stbd windlass · port & stbd aft deck winch · clean & grease every 6 months',
+    units: [
+      { id: 'windlass-port',      label: 'Windlass — Port',             group: 'Windlasses' },
+      { id: 'windlass-starboard', label: 'Windlass — Starboard',        group: 'Windlasses' },
+      { id: 'winch-aft-port',      label: 'Aft deck winch — Port',      group: 'Aft deck winches' },
+      { id: 'winch-aft-starboard', label: 'Aft deck winch — Starboard', group: 'Aft deck winches' },
+    ],
+    items: [
+      {
+        id: 'clean-grease',
+        label: 'Service — clean & grease',
+        detail: 'Clean the unit (remove salt, old grease and debris), then grease all fittings and moving parts.',
+        interval: { kind: 'months', every: 6 },
+      },
+    ],
+  },
 ]
 
 // Which items apply to which unit? Some items only apply to certain
