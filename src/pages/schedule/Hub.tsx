@@ -25,7 +25,7 @@ function daysUntil(iso: string): number {
 // alternates, planning branches, …) stay off the list; keep this a
 // single source of truth so the "Past trips" folder and the upcoming
 // list use the same allow-list.
-const HUB_TRIP_IDS = ['june-honeymoon-2026']
+const HUB_TRIP_IDS = ['june-honeymoon-2026', 'new-years-family-2026']
 
 export function ScheduleHubPage() {
   const [, setLocation] = useLocation()

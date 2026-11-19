@@ -1896,6 +1896,422 @@ export const TRIPS: Trip[] = [
       },
     ],
   },
+
+  // =================================================================
+  // NEW YEARS FAMILY TRIP — SUGGESTED ITINERARY (Dec 28 2026 – Jan 11 2027)
+  // St Martin → St Barts (NYE) → Anguilla (private beach) → St Kitts & Nevis → Saba → St Martin
+  // =================================================================
+  {
+    id: 'new-years-family-2026',
+    name: 'New Years Family Trip',
+    subtitle: 'Suggested · St Martin · St Barts · Anguilla · Nevis · Saba',
+    startDate: '2026-12-28',
+    endDate: '2027-01-11',
+    hero: { icon: '\ud83c\udf86', gradient: 'from-sky-900 via-cyan-800 to-amber-600' },
+    guests: 'Family — guest list TBC',
+    days: [
+      // ---------------- Dec 28 · St Martin ----------------
+      {
+        date: 'Monday · December 28',
+        isoDate: '2026-12-28',
+        title: 'Arrival — St Martin / Sint Maarten',
+        subtitle: 'Day 1 · Guests land SXM · Berth inside Simpson Bay Lagoon',
+        imageUrl: satelliteImage({ west: -63.17, south: 18.0, east: -62.96, north: 18.13 }, { w: 1000, h: 450 }),
+        imageCaption: 'St Martin — Simpson Bay Lagoon (south) to Grand Case & Orient Bay (north)',
+        dock: {
+          marina: 'IGY Simpson Bay Marina',
+          marinaLink: 'https://www.igymarinas.com/marinas/simpson-bay-marina/',
+          radioChannel: 'Ch 12 (bridge)',
+          eta: 'In by Dec 27',
+          etd: '08:30 Dec 29 (outbound bridge)',
+          notes: 'Simpson Bay Bridge inbound 09:30 / 11:30 / 15:00 / 17:00 · outbound 08:30 / 10:30 / 16:00 · call bridge on VHF 12. Alternative: Yacht Club Port de Plaisance (to 90 m). Clear customs whenever moving between the Dutch and French sides.',
+        },
+        events: [
+          { title: 'Guests arrive Princess Juliana Airport (SXM)', link: mapsLink('Princess Juliana International Airport'), highlight: true },
+          { title: 'Transfer to the boat — welcome aboard, safety brief, settle in' },
+          { title: 'Optional: Maho Beach plane-spotting on the way in', link: mapsLink('Maho Beach Sint Maarten'), details: ['Jets land just over the beach — a classic family photo stop'] },
+          {
+            time: '19:30',
+            title: 'Welcome dinner — Bistrot Caraïbes, Grand Case',
+            link: mapsLink('Bistrot Caraibes Grand Case'),
+            details: ['French · OpenTable diners’ top pick in Grand Case', 'Alternative: La Villa, Grand Case boulevard'],
+            highlight: true,
+          },
+        ],
+        overnight: 'Berthed — Simpson Bay Lagoon',
+      },
+
+      // ---------------- Dec 29 · St Martin French side ----------------
+      {
+        date: 'Tuesday · December 29',
+        isoDate: '2026-12-29',
+        title: 'Pinel Island & Tintamarre',
+        subtitle: 'Day 2 · French side beach day · Anchor Grand Case for the night',
+        imageUrl: satelliteImage({ west: -63.04, south: 18.07, east: -62.97, north: 18.12 }, { w: 1000, h: 450 }),
+        imageCaption: 'Cul-de-Sac reserve — Pinel Island & Tintamarre',
+        events: [
+          { time: '08:30', title: 'Outbound Simpson Bay Bridge → around to the French side', details: ['Clear in French St Martin (Marigot) for the French-side anchorages'] },
+          { time: '10:30', title: 'Anchor off Cul-de-Sac — tender to Pinel Island', link: mapsLink('Pinel Island Saint Martin'), highlight: true, details: ['Calm, shallow water inside the reserve — tender only for the big boat'] },
+          {
+            time: '12:30',
+            title: 'Lunch at Le Karibuni, Pinel',
+            link: 'https://www.lekaribuni.com/restaurant',
+            details: ['Reserve by the day before: restaurant@lekaribuni.com · +590 690 39 67 00', 'Same-day requests by phone only'],
+            highlight: true,
+          },
+          { time: '15:00', title: 'Tender to Tintamarre — snorkel with turtles & rays', link: mapsLink('Tintamarre Island Saint Martin'), details: ['Uninhabited nature reserve · seagrass beds · walk the old 1950s airstrip', 'No facilities — bring everything'] },
+          { time: '17:30', title: 'Reposition to Grand Case Bay anchorage', link: mapsLink('Grand Case Bay Saint Martin') },
+          { time: '20:00', title: 'Dinner ashore in Grand Case — the “gourmet capital” boulevard', link: mapsLink('Grand Case Boulevard Saint Martin'), details: ['Options: La Villa, Java, or the casual lolos (local BBQ shacks)'] },
+        ],
+        overnight: 'Anchored — Grand Case Bay',
+      },
+
+      // ---------------- Dec 30 · to St Barts ----------------
+      {
+        date: 'Wednesday · December 30',
+        isoDate: '2026-12-30',
+        title: 'Crossing to St Barts — Gustavia',
+        subtitle: 'Day 3 · Creole Rock swim · Short hop to Gustavia',
+        imageUrl: satelliteImage({ west: -62.9, south: 17.86, east: -62.78, north: 17.94 }, { w: 1000, h: 450 }),
+        imageCaption: 'St Barthélemy — Gustavia, Shell Beach, St-Jean, Colombier',
+        dock: {
+          marina: 'Port de Gustavia (outer harbour anchorage)',
+          marinaLink: mapsLink('Port de Gustavia Saint Barthelemy'),
+          radioChannel: 'Ch 12',
+          eta: '~13:00 Dec 30',
+          etd: '08:00 Jan 3',
+          notes: 'Port Captain authorisation required before entering or manoeuvring. Quay berths for NYE go 6–12 months ahead — plan on the outer anchorage + tender. Colombier & Fourchue bays are closed to yachts over 25 m (tender visits only).',
+        },
+        events: [
+          { time: '09:00', title: 'Morning swim & snorkel at Creole Rock', link: mapsLink('Creole Rock Grand Case') },
+          { time: '11:00', title: 'Depart Grand Case for Gustavia', highlight: true },
+          { time: '13:00', title: 'Arrive Gustavia — anchor, clear in with the Port Captain', link: mapsLink('Gustavia harbour') },
+          { time: '14:30', title: 'Late lunch & sunbeds at Shellona, Shell Beach', link: mapsLink('Shellona Saint Barth'), details: ['The island’s signature beach club — a short walk from the port'], highlight: true },
+          { time: '20:00', title: 'Dinner at Bonito, overlooking the harbour', link: mapsLink('Bonito Saint Barth Gustavia'), details: ['French Pan-American · ceviche & anticuchos · resident DJ', 'Book early — Christmas to mid-January fills fast'] },
+        ],
+        overnight: 'Anchored — Gustavia outer harbour',
+        leg: {
+          label: 'Leg 1 · St Martin → St Barts',
+          route: 'Grand Case Bay → Gustavia, St Barthélemy',
+          sub: 'Depart 11:00 Dec 30 · Arrive ~13:00 Dec 30',
+          miles: 23, // ~20 nm
+          duration: '~1h 45m',
+          knots: 12,
+        },
+      },
+
+      // ---------------- Dec 31 · NYE ----------------
+      {
+        date: 'Thursday · December 31',
+        isoDate: '2026-12-31',
+        title: 'New Year’s Eve in Gustavia',
+        subtitle: 'Day 4 · Colombier by tender · Fireworks over Fort Oscar',
+        events: [
+          { time: '09:30', title: 'Tender to Anse de Colombier — swim, turtles, beach', link: mapsLink('Anse de Colombier Saint Barthelemy'), details: ['Inside the Réserve Naturelle — 5 kn speed limit, no jet skis or seabobs'] },
+          { time: '13:00', title: 'Lunch at Sand Bar, Eden Rock (St-Jean)', link: mapsLink('Eden Rock Sand Bar Saint Barth'), details: ['Jean-Georges beachfront · watch the planes land'] },
+          { time: '16:00', title: 'Back aboard — rest, dress up, family photos on deck' },
+          {
+            time: '19:30',
+            title: 'Family NYE dinner — Bagatelle or L’Isola, Gustavia',
+            link: mapsLink('Bagatelle Saint Barth Gustavia'),
+            details: ['Bagatelle: festive, champagne & DJ', 'L’Isola: refined Italian in a Creole house — calmer with kids', 'Party option: Nikki Beach NYE (St-Jean)'],
+            highlight: true,
+          },
+          {
+            time: '23:45',
+            title: 'Midnight on deck — fireworks over Fort Oscar',
+            link: mapsLink('Fort Oscar Gustavia'),
+            details: ['Every yacht in the harbour sounds its horn at midnight', 'Programme subject to official confirmation each year'],
+            highlight: true,
+          },
+        ],
+        overnight: 'Anchored — Gustavia outer harbour',
+      },
+
+      // ---------------- Jan 1 ----------------
+      {
+        date: 'Friday · January 1',
+        isoDate: '2027-01-01',
+        title: 'New Year’s Day — St-Jean & Saline',
+        subtitle: 'Day 5 · Slow morning · Beach lunch · Garden dinner',
+        events: [
+          { title: 'Slow breakfast aboard — swim platform open' },
+          {
+            time: '12:00',
+            title: 'New Year’s Day lunch at Nikki Beach (25th season)',
+            link: 'https://nikkibeach.com/saint-barth/happenings/new-years-day-lunch/',
+            details: ['“Pajama” recovery party — DJ & live percussion from 12 PM', 'Book: bookings.stbarth@nikkibeach.com', 'Quieter alternative: Le Toiny Beach Club (most secluded)'],
+            highlight: true,
+          },
+          { time: '16:00', title: 'Grande Saline beach — wild, undeveloped, great for a walk', link: mapsLink('Grande Saline Beach Saint Barthelemy') },
+          { time: '20:00', title: 'Dinner at Le Tamarin, Saline', link: mapsLink('Le Tamarin Saint Barth'), details: ['Lantern-lit garden under a century-old tamarind tree'] },
+        ],
+        overnight: 'Anchored — Gustavia outer harbour',
+      },
+
+      // ---------------- Jan 2 ----------------
+      {
+        date: 'Saturday · January 2',
+        isoDate: '2027-01-02',
+        title: 'Île Fourchue & Gustavia',
+        subtitle: 'Day 6 · Snorkel trip by tender · Shopping · Clear out',
+        events: [
+          { time: '09:00', title: 'Tender to Île Fourchue — snorkel & paddle', link: mapsLink('Ile Fourchue Saint Barthelemy'), details: ['Uninhabited horseshoe island in the reserve — tender only for 25 m+'] },
+          { time: '13:00', title: 'Lunch at Gyp Sea or La Guérite, St-Jean', link: mapsLink('Gyp Sea Beach Club Saint Barth') },
+          { time: '15:30', title: 'Gustavia stroll — boutiques, Fort Karl lookout, Shell Beach sunset', link: mapsLink('Fort Karl Gustavia') },
+          { title: 'Clear out of St Barts at the port office (early start tomorrow)' },
+          { time: '20:00', title: 'Dinner at Black Ginger (Thai rooftop) or Eddy’s (Creole garden)', link: mapsLink('Black Ginger Saint Barth') },
+        ],
+        overnight: 'Anchored — Gustavia outer harbour',
+      },
+
+      // ---------------- Jan 3 · to Anguilla ----------------
+      {
+        date: 'Sunday · January 3',
+        isoDate: '2027-01-03',
+        title: 'Crossing to Anguilla — Road Bay & Little Bay',
+        subtitle: 'Day 7 · Clear in at Road Bay · Secret cove by tender',
+        imageUrl: satelliteImage({ west: -63.2, south: 18.15, east: -62.95, north: 18.3 }, { w: 1000, h: 450 }),
+        imageCaption: 'Anguilla — Road Bay, Sandy Island, Prickly Pear Cays, Shoal Bay',
+        dock: {
+          marina: 'Road Bay, Sandy Ground (anchorage · port of entry)',
+          marinaLink: mapsLink('Road Bay Sandy Ground Anguilla'),
+          radioChannel: 'Ch 16',
+          eta: '~10:30 Jan 3',
+          etd: '07:00 Jan 7',
+          notes: 'Clear in person at Road Bay through an agent. Customs is normally closed weekends — pre-arrange Sunday overtime with the agent, or hold at anchor until Monday. Confirm the cruising permit (>20 t vessels) and marine-park permits; no mooring/anchoring in marine parks 19:00–06:00.',
+        },
+        events: [
+          { time: '08:00', title: 'Depart Gustavia for Anguilla', highlight: true },
+          { time: '10:30', title: 'Anchor Road Bay — clearance with agent', link: 'https://www.anguillayachtclearance.com/' },
+          { time: '13:00', title: 'Lunch in Sandy Ground or aboard' },
+          {
+            time: '15:00',
+            title: 'Tender to Little Bay — boat-access-only cove',
+            link: mapsLink('Little Bay Anguilla'),
+            details: ['Cliff-ringed sand · great snorkel · Jumping Rock (adults/strong swimmers, water shoes)', 'Crew can set up a private beach picnic'],
+            highlight: true,
+          },
+          { time: '20:00', title: 'Dinner at Leon’s at Meads Bay', link: mapsLink('Leons at Meads Bay Anguilla'), details: ['Elevated Caribbean on the sand · signature rum punch'] },
+        ],
+        overnight: 'Anchored — Road Bay',
+        leg: {
+          label: 'Leg 2 · St Barts → Anguilla',
+          route: 'Gustavia → north of St Martin → Road Bay, Anguilla',
+          sub: 'Depart 08:00 Jan 3 · Arrive ~10:30 Jan 3',
+          miles: 35, // ~30 nm
+          duration: '~2h 30m',
+          knots: 12,
+        },
+      },
+
+      // ---------------- Jan 4 · PRIVATE BEACH ----------------
+      {
+        date: 'Monday · January 4',
+        isoDate: '2027-01-04',
+        title: 'Private Beach Day — Sandy Island, reserved for the family',
+        subtitle: 'Day 8 · Whole-island private booking · Lobster grill & rum punch',
+        imageUrl: satelliteImage({ west: -63.13, south: 18.19, east: -63.09, north: 18.22 }, { w: 1000, h: 450 }),
+        imageCaption: 'Sandy Island — a palm-dotted sand cay ~1 mile off Road Bay',
+        events: [
+          {
+            title: 'RESERVE: Sandy Island private-event booking',
+            link: 'https://www.anguilla-beaches.com/anguilla-activities-sandy-island.html',
+            details: [
+              'The owners rent the island for private events — request exclusive use for the day',
+              'Reservations / opening hours: +1 264 476 6534',
+              'Public ferry normally runs hourly from 11:00 — ask for a full buyout or an early private slot',
+            ],
+            highlight: true,
+          },
+          { time: '10:00', title: 'Tender from Road Bay to Sandy Island (5 min)', link: mapsLink('Sandy Island Anguilla') },
+          { title: 'Snorkel the reef, paddleboards, beach games — crew sets up toys & shade' },
+          { time: '13:00', title: 'Private lunch on the sand — grilled lobster, crayfish, ribs, rum punch' },
+          {
+            title: 'Backup private beach: Prickly Pear Cays',
+            link: 'https://pricklypearanguilla.com/',
+            details: ['Private dining + custom buffets for groups of 10–30', '+1 264 235 1906 · info@pricklypearanguilla.com'],
+          },
+          { time: '18:30', title: 'Off the marine park before 19:00 — back to Road Bay' },
+          { time: '20:00', title: 'Dinner aboard — chef’s Caribbean menu on the aft deck' },
+        ],
+        overnight: 'Anchored — Road Bay',
+      },
+
+      // ---------------- Jan 5 ----------------
+      {
+        date: 'Tuesday · January 5',
+        isoDate: '2027-01-05',
+        title: 'Prickly Pear Cays & Dog Island',
+        subtitle: 'Day 9 · Offshore cays · Deserted beach · Crocus Bay night',
+        imageUrl: satelliteImage({ west: -63.35, south: 18.22, east: -63.15, north: 18.3 }, { w: 1000, h: 450 }),
+        imageCaption: 'Prickly Pear Cays and Dog Island, northwest of Anguilla',
+        events: [
+          { time: '09:00', title: 'Move to Prickly Pear moorings (marine-park permit)', link: mapsLink('Prickly Pear Cays Anguilla') },
+          { title: 'Snorkel the reefs — birds and butterflies ashore' },
+          {
+            time: '12:30',
+            title: 'Lunch at Prickly Pear Bar + Restaurant',
+            link: 'https://pricklypearanguilla.com/',
+            details: ['Family-style lobster packages · reservations required', '+1 264 235 1906'],
+            highlight: true,
+          },
+          { time: '15:00', title: 'Tender to Dog Island — wide, empty white-sand beach', link: mapsLink('Dog Island Anguilla'), details: ['Uninhabited, no facilities — you will almost certainly have it to yourselves', 'Calm-weather run only'] },
+          { time: '18:00', title: 'Reposition to Crocus Bay (sheltered, popular with large yachts)', link: mapsLink('Crocus Bay Anguilla') },
+          { time: '20:00', title: 'Dinner at Tasty’s POV, South Hill', link: mapsLink('Tastys POV Anguilla'), details: ['Creative Caribbean by chef Dale Carty'] },
+        ],
+        overnight: 'Anchored — Crocus Bay',
+      },
+
+      // ---------------- Jan 6 ----------------
+      {
+        date: 'Wednesday · January 6',
+        isoDate: '2027-01-06',
+        title: 'Shoal Bay East & Scilly Cay',
+        subtitle: 'Day 10 · Anguilla’s best beach · Private-island lunch · Clear out',
+        events: [
+          { time: '09:00', title: 'Cruise east along the north coast to Shoal Bay East', link: mapsLink('Shoal Bay East Anguilla'), details: ['Mooring field — marine-park permit'] },
+          { time: '10:00', title: 'Swim & beach time — Madeariman or Uncle Ernie’s for drinks', link: mapsLink('Madeariman Shoal Bay Anguilla') },
+          {
+            time: '12:30',
+            title: 'Lunch at Gorgeous Scilly Cay (private island)',
+            link: 'https://scillycay.ai/reservations/',
+            details: ['Open Wed, Thu & Sun noon–5 PM · grilled lobster & crayfish', 'Tender lands at the 3–4 ft dock or the beach — book online'],
+            highlight: true,
+          },
+          { time: '15:30', title: 'Clear out of Anguilla with the agent (weekday hours)' },
+          { time: '17:30', title: 'Back to Road Bay — sunset cocktails' },
+          { time: '20:00', title: 'Dinner at Blanchards, Meads Bay', link: mapsLink('Blanchards Restaurant Anguilla'), details: ['Anguilla institution since 1994', 'Alternative: Pimms at Cap Juluca'] },
+        ],
+        overnight: 'Anchored — Road Bay',
+      },
+
+      // ---------------- Jan 7 · St Kitts ----------------
+      {
+        date: 'Thursday · January 7',
+        isoDate: '2027-01-07',
+        title: 'Run South to St Kitts — Christophe Harbour',
+        subtitle: 'Day 11 · Longest leg · Dock at the superyacht marina',
+        imageUrl: satelliteImage({ west: -62.75, south: 17.1, east: -62.55, north: 17.3 }, { w: 1000, h: 450 }),
+        imageCaption: 'St Kitts Southeast Peninsula, The Narrows and Nevis',
+        dock: {
+          marina: 'The Marina at Christophe Harbour (Safe Harbor)',
+          marinaLink: mapsLink('Marina at Christophe Harbour St Kitts'),
+          radioChannel: 'Ch 16',
+          eta: '~12:30 Jan 7',
+          etd: '08:00 Jan 9',
+          notes: 'Port of entry with on-site customs & immigration · in-slip duty-free fuel · marina +1 869 465 9755 · marina@christopheharbour.com',
+        },
+        events: [
+          { time: '07:00', title: 'Depart Road Bay for St Kitts', highlight: true },
+          { time: '12:30', title: 'Dock Christophe Harbour — on-site clearance', link: mapsLink('Christophe Harbour St Kitts') },
+          { time: '14:00', title: 'Afternoon at Salt Plage / Park Hyatt beach', link: mapsLink('Salt Plage St Kitts') },
+          { time: '20:00', title: 'Dinner at Park Hyatt St Kitts', link: mapsLink('Park Hyatt St Kitts'), details: ['Three restaurants on site · +1 869 468 1234'] },
+        ],
+        overnight: 'Berthed — Christophe Harbour',
+        leg: {
+          label: 'Leg 3 · Anguilla → St Kitts',
+          route: 'Road Bay, Anguilla → Christophe Harbour, St Kitts',
+          sub: 'Depart 07:00 Jan 7 · Arrive ~12:30 Jan 7',
+          miles: 71, // ~62 nm
+          duration: '~5h 15m',
+          knots: 12,
+        },
+      },
+
+      // ---------------- Jan 8 · Nevis ----------------
+      {
+        date: 'Friday · January 8',
+        isoDate: '2027-01-08',
+        title: 'Nevis — Pinney’s Beach Day',
+        subtitle: 'Day 12 · Cross The Narrows · Killer Bees at Sunshine’s',
+        events: [
+          { time: '09:30', title: 'Short hop across The Narrows to Pinney’s Beach', link: mapsLink('Pinneys Beach Nevis'), details: ['Nevis Port Authority manages yacht moorings — call on VHF 16 for a buoy suitable for 36 m'] },
+          { title: 'Swim & beach walk — 3 miles of palm-backed sand facing St Kitts' },
+          {
+            time: '12:30',
+            title: 'Lunch at Sunshine’s Beach Bar & Grill',
+            link: mapsLink('Sunshines Beach Bar Nevis'),
+            details: ['Famous Killer Bee rum punch & grilled lobster'],
+            highlight: true,
+          },
+          { time: '15:00', title: 'Charlestown — Alexander Hamilton’s birthplace museum', link: mapsLink('Museum of Nevis History Charlestown') },
+          { time: '17:00', title: 'Sundowners at Four Seasons Nevis (Lime Beach Bar)', link: mapsLink('Four Seasons Resort Nevis') },
+          { time: '19:00', title: 'Back to Christophe Harbour — dinner aboard' },
+          {
+            title: 'Alternative plan: back to St Barts for the Music Festival',
+            link: 'https://www.saintbarthmusicfestival.com/en/ev%C3%A8nements',
+            details: ['43rd St Barth Music Festival runs Jan 8–18, 2027 in Gustavia & Lorient churches'],
+          },
+        ],
+        overnight: 'Berthed — Christophe Harbour',
+      },
+
+      // ---------------- Jan 9 · Saba ----------------
+      {
+        date: 'Saturday · January 9',
+        isoDate: '2027-01-09',
+        title: 'Saba — “The Unspoiled Queen” → St Martin',
+        subtitle: 'Day 13 · Day stop at Saba · Evening return to Simpson Bay',
+        imageUrl: satelliteImage({ west: -63.28, south: 17.6, east: -63.2, north: 17.66 }, { w: 1000, h: 450 }),
+        imageCaption: 'Saba — volcanic island; Ladder Bay & Wells Bay anchorage on the west side',
+        events: [
+          { time: '08:00', title: 'Depart Christophe Harbour for Saba', highlight: true },
+          { time: '11:30', title: 'Anchor in the Ladder Bay–Wells Bay zone', link: mapsLink('Ladder Bay Saba'), details: ['Yellow yacht moorings are only for boats to 18 m — use the designated anchorage', 'Saba Marine Park +599 416 3295 · Harbour Master VHF 16 · clear in at Fort Bay'] },
+          { title: 'Island tour up “The Road” to Windwardside — gingerbread cottages & views', link: mapsLink('Windwardside Saba') },
+          { title: 'Options: Mount Scenery hike (fit family members) or a Saba Marine Park dive/snorkel', link: mapsLink('Mount Scenery Saba') },
+          { time: '16:00', title: 'Depart Saba for Simpson Bay, St Martin' },
+          { time: '18:30', title: 'Anchor Simpson Bay (outside the bridge) — dinner aboard', link: mapsLink('Simpson Bay anchorage Sint Maarten') },
+        ],
+        overnight: 'Anchored — Simpson Bay',
+        leg: {
+          label: 'Leg 4 · St Kitts → Saba → St Martin',
+          route: 'Christophe Harbour → Saba (day stop) → Simpson Bay',
+          sub: '08:00–11:30 to Saba (~41 nm) · 16:00–18:30 to Simpson Bay (~28 nm)',
+          miles: 79, // ~69 nm total
+          duration: '~5h 45m underway',
+          knots: 12,
+        },
+      },
+
+      // ---------------- Jan 10 ----------------
+      {
+        date: 'Sunday · January 10',
+        isoDate: '2027-01-10',
+        title: 'Last Full Day — St Martin',
+        subtitle: 'Day 14 · Mullet Bay · Back inside the lagoon · Farewell dinner',
+        dock: {
+          marina: 'IGY Simpson Bay Marina',
+          marinaLink: 'https://www.igymarinas.com/marinas/simpson-bay-marina/',
+          radioChannel: 'Ch 12 (bridge)',
+          eta: '09:30 Jan 10 (inbound bridge)',
+          etd: 'After guests disembark Jan 11',
+          notes: 'Bridge operator +1 721-545-5230 · special openings with 24 h notice',
+        },
+        events: [
+          { time: '09:30', title: 'Inbound bridge — berth Simpson Bay Lagoon' },
+          { time: '11:00', title: 'Beach morning at Mullet Bay', link: mapsLink('Mullet Bay Beach Sint Maarten') },
+          { title: 'Optional: Loterie Farm Extreme zipline (min height 1.40 m — check winter schedule)', link: 'http://www.loteriefarm.com/adventures/fly-zone-extreme' },
+          { time: '17:30', title: 'Sunset & last swim off the stern' },
+          { time: '20:00', title: 'Farewell dinner — Java or La Villa, Grand Case', link: mapsLink('Java restaurant Grand Case'), highlight: true, details: ['Or a farewell chef’s dinner aboard with the crew'] },
+        ],
+        overnight: 'Berthed — Simpson Bay Lagoon',
+      },
+
+      // ---------------- Jan 11 ----------------
+      {
+        date: 'Monday · January 11',
+        isoDate: '2027-01-11',
+        title: 'Departure Day',
+        subtitle: 'Day 15 · Breakfast aboard · Transfer to SXM',
+        events: [
+          { time: '08:30', title: 'Farewell breakfast aboard' },
+          { time: '10:00', title: 'Luggage off — transfer to Princess Juliana Airport (SXM)', link: mapsLink('Princess Juliana International Airport'), highlight: true },
+        ],
+        overnight: 'Simpson Bay Lagoon — crew turnaround',
+      },
+    ],
+  },
 ]
 
 export function findTripById(id: string): Trip | undefined {
