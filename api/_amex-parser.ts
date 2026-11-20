@@ -234,7 +234,7 @@ function parseDate(text: string, receivedIso: string): string {
 
 function labelFromLast4(last4: string): string {
   // Known account labels (see project memory carryover).
-  if (last4 === '3240') return 'Amex 3240'
+  if (last4 === '3240' || last4 === '4248') return 'Amex 3240'  // 4248 = reissued 3240 card
   return last4 ? `Amex ${last4}` : ''
 }
 

@@ -8,6 +8,7 @@ import { plaidClient, requireAdmin, appendPlaidItem } from '../_plaid.js'
 
 const KNOWN_MASKS: Record<string, string> = {
   '3240': 'Amex 3240',
+  '4248': 'Amex 3240',
   '0540': 'Bilt 0540',
 }
 

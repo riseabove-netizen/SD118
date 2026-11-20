@@ -3,6 +3,7 @@
 // Expenses sheet, by comparing (account_label + amount rounded to 0.01 + date).
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
+import { canonicalMask } from '../_plaid-txns.js'
 import {
   plaidClient, requireAdmin, readPlaidItems, buildAccountLabelMap,
   sheetsAuth, SPREADSHEET_ID, EXPENSES_TAB,
@@ -61,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           options: { count: pageSize, offset, include_personal_finance_category: false },
         })
         const accMap: Record<string, string> = {}
-        for (const a of resp.data.accounts) accMap[a.account_id] = (a.mask || '').toString()
+        for (const a of resp.data.accounts) accMap[a.account_id] = canonicalMask((a.mask || '').toString())
         for (const t of resp.data.transactions) {
           if (t.pending) continue
           plaidTxns.push({

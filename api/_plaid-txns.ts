@@ -10,6 +10,15 @@ export const PLAID_TXNS_TAB = 'Plaid_Transactions'
 // Masks we care about (Gabriel-only filter).
 export const GABRIEL_MASKS = new Set(['3240', '0540'])
 
+// Replacement-card masks that post to the same Plaid account as an existing
+// card. Amex reissued the 3240 card as 4248 in Oct 2026 (same account_id), so
+// Plaid now reports mask 4248 for it. We store the canonical mask so the queue,
+// receipt matching and the Expenses sheet keep using "Amex 3240".
+export const MASK_ALIASES: Record<string, string> = { '4248': '3240' }
+export function canonicalMask(mask: string): string {
+  return MASK_ALIASES[mask] || mask
+}
+
 // Mask → sheet-account label (matches existing rows).
 // Amex writes as "Amex 3240"; Bilt writes as "Bilt" (39 existing Bilt rows do NOT include the mask).
 export function maskToSheetAccount(mask: string): string {
@@ -159,7 +168,7 @@ export async function syncPlaidTransactions(opts?: { maxDaysBack?: number }): Pr
           itemPulled++
           totalPulled++
           if (t.pending) continue
-          const mask = accountMap[t.account_id] || ''
+          const mask = canonicalMask(accountMap[t.account_id] || '')
           // Gate strictly on account_id being explicitly labeled in Plaid_Items.
           // A shared Bilt item can carry a partner card that reuses the same mask,
           // so mask alone is not a safe filter — only accounts we've explicitly

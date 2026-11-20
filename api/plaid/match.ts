@@ -18,7 +18,7 @@
 // Response: { ok: true, matches: [ {plaid_txn_id, ...} | null ] }
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { plaidClient, readPlaidItems, buildAccountLabelMap } from '../_plaid.js'
-import { readAllPlaidTxns } from '../_plaid-txns.js'
+import { readAllPlaidTxns, canonicalMask } from '../_plaid-txns.js'
 
 // account is optional: when omitted, the match runs across ALL cards (used by
 // the crew scan flow, which doesn't ask the user which card was used).
@@ -177,7 +177,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             })
             const accountMap: Record<string, { mask: string }> = {}
             for (const a of resp.data.accounts) {
-              accountMap[a.account_id] = { mask: (a.mask || '').toString() }
+              accountMap[a.account_id] = { mask: canonicalMask((a.mask || '').toString()) }
             }
             for (const t of resp.data.transactions) {
               if (t.pending) continue

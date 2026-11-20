@@ -34,6 +34,7 @@ export function PlaidLinkPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
+  const [updateMode, setUpdateMode] = useState(false)
 
   const loadAccounts = useCallback(async () => {
     setLoading(true); setError(null)
@@ -46,18 +47,34 @@ export function PlaidLinkPage() {
     finally { setLoading(false) }
   }, [])
 
-  const requestLinkToken = useCallback(async () => {
+  const requestLinkToken = useCallback(async (item_id?: string) => {
     setError(null); setStatus(null)
     try {
-      const r = await fetch('/api/plaid/link-token', { method: 'POST', headers: adminHeaders(), body: '{}' })
+      const r = await fetch('/api/plaid/link-token', {
+        method: 'POST', headers: adminHeaders(),
+        body: JSON.stringify(item_id ? { item_id } : {}),
+      })
       const j = await r.json()
       if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`)
+      setUpdateMode(!!j.update_mode)
       setLinkToken(j.link_token)
       setEnv(j.env || 'production')
     } catch (e: any) { setError(e?.message || String(e)) }
   }, [])
 
   const onSuccess = useCallback(async (public_token: string | null) => {
+    if (updateMode) {
+      // Update mode re-authenticates the existing item; no token exchange needed.
+      setStatus('Reconnected. Syncing transactions…')
+      setLinkToken(null); setUpdateMode(false)
+      try {
+        const r = await fetch('/api/plaid/cron-pull', { method: 'POST', headers: adminHeaders() })
+        const j = await r.json()
+        setStatus(r.ok ? `Reconnected. ${j.new ?? 0} new charges added to the queue.` : `Reconnected, but sync failed: ${j?.error || r.status}`)
+      } catch (e: any) { setStatus(`Reconnected, but sync failed: ${e?.message || e}`) }
+      await loadAccounts()
+      return
+    }
     if (!public_token) { setError('Plaid returned no public_token'); setLinkToken(null); return }
     setStatus('Linking account...')
     try {
@@ -72,14 +89,14 @@ export function PlaidLinkPage() {
       setLinkToken(null)
       await loadAccounts()
     } catch (e: any) { setError(e?.message || String(e)); setStatus(null) }
-  }, [loadAccounts])
+  }, [loadAccounts, updateMode])
 
   const { open, ready } = usePlaidLink({
     token: linkToken || '',
     onSuccess,
     onExit: (err) => {
       if (err) setError(err.display_message || err.error_message || err.error_code || 'Plaid Link exited')
-      setLinkToken(null)
+      setLinkToken(null); setUpdateMode(false)
     },
   })
 
@@ -113,7 +130,7 @@ export function PlaidLinkPage() {
     <MenuLayout title="Plaid Link" showBack backHref="/menu">
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button onClick={requestLinkToken} disabled={!!linkToken}>
+          <Button onClick={() => requestLinkToken()} disabled={!!linkToken}>
             {linkToken ? 'Opening Plaid…' : 'Link a new bank'}
           </Button>
           <Button onClick={loadAccounts} variant="outline" disabled={loading}>
@@ -140,6 +157,9 @@ export function PlaidLinkPage() {
                   </div>
                   {it.error && <div className="text-red-400 text-xs mt-1">{it.error}</div>}
                 </div>
+                {it.status === 'error' && (
+                  <Button size="sm" onClick={() => requestLinkToken(it.item_id)} disabled={!!linkToken}>Reconnect</Button>
+                )}
                 {it.status === 'active' && (
                   <Button size="sm" variant="destructive" onClick={() => unlink(it.item_id)}>Unlink</Button>
                 )}
