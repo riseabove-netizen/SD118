@@ -108,6 +108,7 @@ type PendingQueueTxn = {
   // Server flag: Bilt charge from a merchant the admin previously marked as
   // Enrico's. Held back from auto-submit / bulk submit until confirmed.
   likely_enrico?: boolean
+  enrico_reason?: string
 }
 
 type OrphanRow = {
@@ -1333,7 +1334,7 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
                   {t.category && <div className="text-xs text-neutral-500">{t.category}</div>}
                   {t.likely_enrico && !c.confirmedMine && (
                     <div className="mt-1.5 text-[11px] rounded border border-amber-500/50 bg-amber-500/10 text-amber-200 px-2 py-1">
-                      Likely Enrico — this merchant was marked as Enrico's before. Held from auto-submit.
+                      Likely Enrico — {t.enrico_reason === 'no_email' ? 'no Bilt alert email reached your inbox for this charge (Bilt only emails the cardholder).' : "this merchant was marked as Enrico's before."} Held from auto-submit.
                       <button type="button" onClick={() => setCard(t.txn_id, { confirmedMine: true })} className="ml-2 underline font-semibold">It's mine</button>
                     </div>
                   )}

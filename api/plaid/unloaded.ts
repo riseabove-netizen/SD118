@@ -39,33 +39,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const labels = buildAccountLabelMap(active)
     const plaid = plaidClient()
 
-    // ?raw=1&mask=0540 — admin diagnostic: return the full Plaid transaction
-    // objects (+ accounts) so cardholder-distinguishing fields can be inspected.
-    if (String(req.query.raw || '') === '1') {
-      const wantMask = String(req.query.mask || '')
-      const out: any[] = []
-      const accountsOut: any[] = []
-      for (const it of active) {
-        let offset = 0
-        while (true) {
-          const resp = await plaid.transactionsGet({
-            access_token: it.access_token, start_date: start, end_date: today,
-            options: { count: 500, offset, include_original_description: true } as any,
-          })
-          if (offset === 0) accountsOut.push(...resp.data.accounts.map(a => ({ ...a, item_id: it.item_id })))
-          const accMap: Record<string, string> = {}
-          for (const a of resp.data.accounts) accMap[a.account_id] = canonicalMask((a.mask || '').toString())
-          for (const t of resp.data.transactions) {
-            if (wantMask && accMap[t.account_id] !== wantMask) continue
-            out.push(t)
-          }
-          offset += resp.data.transactions.length
-          if (offset >= resp.data.total_transactions || resp.data.transactions.length === 0) break
-        }
-      }
-      return res.status(200).json({ ok: true, accounts: accountsOut, transactions: out })
-    }
-
     // Fetch Plaid txns
     type Out = {
       plaid_txn_id: string
@@ -146,6 +119,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   } catch (e: any) {
     const msg = e?.response?.data?.error_message || e?.message || String(e)
-    return res.status(500).json({ error: msg, stack: String(req.query.raw || '') === '1' ? String(e?.stack || '').slice(0, 1500) : undefined })
+    return res.status(500).json({ error: msg })
   }
 }
