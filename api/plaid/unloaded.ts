@@ -146,6 +146,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   } catch (e: any) {
     const msg = e?.response?.data?.error_message || e?.message || String(e)
-    return res.status(500).json({ error: msg })
+    return res.status(500).json({ error: msg, stack: String(req.query.raw || '') === '1' ? String(e?.stack || '').slice(0, 1500) : undefined })
   }
 }
