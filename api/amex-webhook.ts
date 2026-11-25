@@ -20,6 +20,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { google } from 'googleapis'
+import { queueBiltAlerts } from './_bilt-email-queue.js'
 
 
 // ==== inlined parser (see api/_amex-parser.ts for canonical source) ====
@@ -350,6 +351,7 @@ function parsedToRow(p: ParsedAmex): string[] {
 type ParsedBilt = ParsedAmex // same 16-col shape
 
 const BILT_LABELS = new Set(['transaction amount', 'amount', 'merchant', 'date'])
+// (exported parser is reused by /api/plaid/bilt-email-backfill)
 
 function extractBiltLabeledFields(text: string): Record<string, string> {
   // Bilt's plain body has "Label\n<value>" pairs, sometimes with blank lines
@@ -364,6 +366,8 @@ function extractBiltLabeledFields(text: string): Record<string, string> {
     for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
       const v = lines[j]
       if (!v) continue
+      // Skip separator rules (-----, *****) and tracking-link lines "( https://… )"
+      if (/^[-*_=\s]+$/.test(v) || /^\(\s*https?:/i.test(v)) continue
       // Guard: don't take the next label as the value
       if (BILT_LABELS.has(v.toLowerCase())) break
       out[key] = v
@@ -376,7 +380,7 @@ function extractBiltLabeledFields(text: string): Record<string, string> {
 const RE_BILT_AMOUNT = /(?<sym>[$€£¥])?\s*(?<code>USD|EUR|GBP|JPY|CHF|CAD|AUD|MXN)?\s*(?<num>\d{1,3}(?:,\d{3})*(?:\.\d{2}))/i
 const RE_BILT_LAST4 = /Mastercard\s+(\d{4})\b/i
 
-function parseBiltCloudMailin(
+export function parseBiltCloudMailin(
   body: any,
   ctx: { receivedAtUtc: string; from: string; subject: string; messageId: string; plainSnippet: string },
 ): ParsedBilt {
@@ -638,6 +642,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let parsedWriteOk = false
   let parsedDedup = false
   let sheetError: string | null = null
+  let queueStatus: string | null = null
   try {
     const auth = getSheetsAuth()
     const sheets = google.sheets({ version: 'v4', auth })
@@ -668,6 +673,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           requestBody: { values: [parsedToRow(parsed)] },
         })
         parsedWriteOk = true
+      }
+    }
+
+    // 3) Bilt: push the charge straight into the expense queue.
+    if (isBilt && parsed && parsed.parse_status === 'ok' && parsed.usd_amount && !parsedDedup) {
+      try {
+        const r = await queueBiltAlerts([{ message_id: parsed.message_id, txn_date: parsed.txn_date, merchant: parsed.merchant, usd_amount: parsed.usd_amount }])
+        queueStatus = r[0]?.status || null
+      } catch (e: any) {
+        queueStatus = 'error: ' + (e?.message || String(e))
       }
     }
   } catch (err: any) {
@@ -710,6 +725,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     rawWriteOk,
     parsedWriteOk,
     parsedDedup,
+    queueStatus,
     sheetError,
   })
 }

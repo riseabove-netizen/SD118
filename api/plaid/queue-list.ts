@@ -66,8 +66,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .filter(r => r.queue_status === 'pending')
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
       .map(r => {
-        const byMerchant = r.account_mask === '0540' && enricoMerchants.has(norm(r.merchant))
-        const byNoEmail = !byMerchant && noEmailCheck(r)
+        // Email-sourced Bilt rows come from Gabriel's own alert emails, so they are never Enrico's.
+        const fromEmail = r.txn_id.startsWith('bilt-email:')
+        const byMerchant = !fromEmail && r.account_mask === '0540' && enricoMerchants.has(norm(r.merchant))
+        const byNoEmail = !fromEmail && !byMerchant && noEmailCheck(r)
         return {
         row: r.rowIndex,
         txn_id: r.txn_id,
@@ -79,6 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         account_queue_label: maskToQueueLabel(r.account_mask),
         category: r.category,
         currency: r.currency,
+        source: fromEmail ? 'bilt_email' : 'plaid',
         likely_enrico: byMerchant || byNoEmail,
         enrico_reason: byMerchant ? 'merchant' : byNoEmail ? 'no_email' : '',
       }})
