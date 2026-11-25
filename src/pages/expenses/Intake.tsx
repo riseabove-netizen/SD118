@@ -15,7 +15,7 @@ import { getCrewName, getRole, canWrite, getToken } from '@/lib/auth'
 import { compressImageToJpegBase64 } from '@/lib/imageCompress'
 import { useLocation } from 'wouter'
 
-type Account = 'Amex 3240' | 'Bilt'
+type Account = 'Amex 3240' | 'Bilt' | 'Amex 1015'
 
 type Trip = {
   name: string
@@ -587,7 +587,7 @@ function AdminPlaidQueue({ onBack }: { onBack: () => void }) {
         const next: Record<string, CardEdit> = { ...prev }
         for (const t of d.pending || []) {
           if (!next[t.txn_id]) {
-            const account: Account = t.account_mask === '0540' ? 'Bilt' : 'Amex 3240'
+            const account: Account = t.account_mask === '0540' ? 'Bilt' : t.account_mask === '1015' ? 'Amex 1015' : 'Amex 3240'
             next[t.txn_id] = {
               key: t.txn_id,
               source: 'plaid',
@@ -1772,7 +1772,7 @@ function AdminOrphanQueue({ onBack }: { onBack: () => void }) {
                   <div>
                     <label className="text-xs text-neutral-400">Account</label>
                     <div className="flex gap-1 mt-1">
-                      {(['Amex 3240', 'Bilt'] as Account[]).map(a => (
+                      {(['Amex 3240', 'Amex 1015', 'Bilt'] as Account[]).map(a => (
                         <button
                           key={a}
                           onClick={() => setCard(o.id, { account: a })}
@@ -1920,7 +1920,7 @@ function AdminOneOff({ onBack }: { onBack: () => void }) {
   const { trips, tripForDate, createTrip } = useTrips()
 
   // Preset accounts + free-form 'Other' for anything not in the list.
-  const presetAccounts = ['Gabe’s Visa', 'Gabe’s Wise', 'Amex 3240', 'Bilt', 'Cash', 'Enrico’s Bilt', 'Other']
+  const presetAccounts = ['Gabe’s Visa', 'Gabe’s Wise', 'Amex 3240', 'Amex 1015', 'Bilt', 'Cash', 'Enrico’s Bilt', 'Other']
 
   const [account, setAccount] = useState<string>('Gabe’s Visa')
   const [accountOther, setAccountOther] = useState('')

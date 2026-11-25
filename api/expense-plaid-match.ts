@@ -30,11 +30,13 @@ const SPREADSHEET_ID = '1XBBy8ma5WmQNW2ix-K6JyBaJB7kvnXQoExGttcSu_Wk'
 const ACCOUNT_TO_MASK: Record<string, string> = {
   'Amex 3240': '3240',
   'Bilt': '0540',
+  'Amex 1015': '1015',
 }
 
 const MASK_TO_LABEL: Record<string, string> = {
   '3240': 'Amex 3240',
   '0540': 'Bilt',
+  '1015': 'Amex 1015',
 }
 
 function cleanEnv(v: string | undefined): string | undefined {

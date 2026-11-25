@@ -8,7 +8,7 @@ import { sheetsAuth, SPREADSHEET_ID, readPlaidItems, buildAccountLabelMap, plaid
 export const PLAID_TXNS_TAB = 'Plaid_Transactions'
 
 // Masks we care about (Gabriel-only filter).
-export const GABRIEL_MASKS = new Set(['3240', '0540'])
+export const GABRIEL_MASKS = new Set(['3240', '0540', '1015'])
 
 // Replacement-card masks that post to the same Plaid account as an existing
 // card. Amex reissued the 3240 card as 4248 in Oct 2026 (same account_id), so
@@ -24,6 +24,7 @@ export function canonicalMask(mask: string): string {
 export function maskToSheetAccount(mask: string): string {
   if (mask === '3240') return 'Amex 3240'
   if (mask === '0540') return 'Bilt'
+  if (mask === '1015') return 'Amex 1015'
   return ''
 }
 
@@ -31,6 +32,7 @@ export function maskToSheetAccount(mask: string): string {
 export function maskToQueueLabel(mask: string): string {
   if (mask === '3240') return 'Amex 3240'
   if (mask === '0540') return 'Bilt 0540'
+  if (mask === '1015') return 'Amex 1015'
   return `?${mask}`
 }
 

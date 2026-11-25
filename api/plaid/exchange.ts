@@ -10,6 +10,7 @@ const KNOWN_MASKS: Record<string, string> = {
   '3240': 'Amex 3240',
   '4248': 'Amex 3240',
   '0540': 'Bilt 0540',
+  '1015': 'Amex 1015',
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
